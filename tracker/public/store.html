@@ -23,8 +23,9 @@
         <a class="segb on">Report</a>
         <a class="segb" id="tabHistory">History</a>
       </div>
-      <button class="btn" id="csv" title="Download the full change log as CSV">📄 CSV</button>
-      <button class="btn pri" id="pdf" title="Open a clean, print-ready report">📥 PDF</button>
+      <a class="btn" id="csv" href="#" title="Download the full change log as CSV">📄 CSV</a>
+      <a class="btn pri" id="pdf" href="#" target="_blank" rel="noopener"
+         title="Open a clean, print-ready report">📥 PDF</a>
       <button class="btn ico" id="tg" title="Switch theme">◐</button>
     </div>
   </div>
@@ -173,10 +174,13 @@ function renderTabs () {
   tabs.innerHTML = TABS.map(t =>
     `<button class="tab ${t.key===tab?'on':''}" data-k="${t.key}">${t.label}<span class="tn" data-c="${t.key}"></span></button>`).join('')
   document.querySelectorAll('.tab').forEach(b =>
-    b.onclick = () => { tab = b.dataset.k; renderTabs(); loadRows() })
+    b.onclick = () => { tab = b.dataset.k; renderTabs(); syncExportLinks(); loadRows() })
 }
 
-async function loadAll () { await Promise.all([loadKpis(), loadRows(), loadCharts()]) }
+async function loadAll () {
+  syncExportLinks()
+  await Promise.all([loadKpis(), loadRows(), loadCharts()])
+}
 
 // ═══ KPIs + daily ═══
 async function loadKpis () {
@@ -418,11 +422,12 @@ document.querySelectorAll('.preset').forEach(b => b.onclick = () => {
 const $q = document.getElementById('q')
 $q.addEventListener('input', () => { q = $q.value.trim(); qc.hidden = !q; paint() })
 qc.onclick = () => { $q.value=''; q=''; qc.hidden=true; paint(); $q.focus() }
-baseChk.onchange = () => { showBase = baseChk.checked; loadRows() }
-csv.onclick = () => location.href =
-  `/api/stores/${ID}/report.csv?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1':''}`
-pdf.onclick = () => window.open(
-  `/print.html?id=${ID}&${qsDates()}${showBase?'baseline=1':''}`, '_blank', 'noopener')
+function syncExportLinks () {
+  const t = tab ? `type=${tab}&` : ''
+  csv.href = `/api/stores/${ID}/report.csv?${qsDates()}${t}${showBase ? 'baseline=1' : ''}`
+  pdf.href = `/print.html?id=${ID}&${qsDates()}${showBase ? 'baseline=1' : ''}`
+}
+baseChk.onchange = () => { showBase = baseChk.checked; syncExportLinks(); loadRows() }
 tg.onclick = () => {
   const cur = document.documentElement.getAttribute('data-theme')
     || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')

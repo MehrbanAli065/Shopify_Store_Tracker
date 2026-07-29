@@ -354,3 +354,6 @@ td.z{color:var(--muted)}
 .basetog input{accent-color:var(--blue);width:15px;height:15px;cursor:pointer}
 .basetog input:disabled{cursor:default;opacity:.45}
 .basetog span{color:var(--muted);font-size:11.5px}
+
+/* export controls are anchors so popup blockers cannot swallow them */
+a.btn{display:inline-flex;align-items:center;text-decoration:none}
