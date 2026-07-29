@@ -109,7 +109,7 @@ CREATE TABLE variants (
 CREATE TABLE variant_history (
   id                BIGSERIAL PRIMARY KEY,
   variant_id        BIGINT NOT NULL REFERENCES variants(id) ON DELETE CASCADE,
-  scrape_run_id     BIGINT REFERENCES scrape_runs(id),
+  scrape_run_id     BIGINT REFERENCES scrape_runs(id) ON DELETE CASCADE,
   observed_date     DATE NOT NULL,
 
   price             NUMERIC(12,2),

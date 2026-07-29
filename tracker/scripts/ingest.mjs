@@ -103,7 +103,56 @@ for (const r of rows) {
 console.log(`  parsed: ${rows.length} rows → ${csvProducts.size} products, ${csvVariants.size} variants`)
 
 // ── 2 · open the scrape run ───────────────────────────────────────
-await q(`DELETE FROM scrape_runs WHERE store_id = $1 AND run_date = $2`, [STORE_ID, RUN_DATE])
+// Re-running a date means undoing it first. That is only safe for the most
+// recent run: the Layer-1 cache holds the newest state, so replaying an older
+// day on top of newer data would produce nonsense diffs. Refuse that outright.
+const prior = await one(
+  `SELECT id FROM scrape_runs WHERE store_id = $1 AND run_date = $2`, [STORE_ID, RUN_DATE])
+
+if (prior) {
+  const newer = await q(
+    `SELECT run_date FROM scrape_runs WHERE store_id = $1 AND run_date > $2 ORDER BY run_date`,
+    [STORE_ID, RUN_DATE])
+  if (newer.length) {
+    console.error(
+      `\n  ✗ ${RUN_DATE} has already been ingested, and newer runs exist ` +
+      `(${newer.map(r => r.run_date).join(', ')}).\n` +
+      `    Replaying an older day on top of newer data would corrupt the history.\n` +
+      `    Re-ingest the newest date instead, or rebuild the store from scratch.\n`)
+    await close(); process.exit(2)
+  }
+
+  console.log(`  rewinding the existing ${RUN_DATE} run …`)
+  // drop this run's history, then rebuild the current-state layer from what is left
+  await q(`DELETE FROM variant_history WHERE scrape_run_id = $1`, [prior.id])
+  await q(`DELETE FROM scrape_runs WHERE id = $1`, [prior.id])
+
+  await q(`
+    UPDATE variants v
+       SET current_price = h.price, current_compare_at_price = h.compare_at_price,
+           current_in_stock = h.in_stock, is_active = h.in_stock, last_seen_at = h.observed_date
+      FROM (SELECT DISTINCT ON (variant_id) variant_id, price, compare_at_price, in_stock, observed_date
+              FROM variant_history ORDER BY variant_id, observed_date DESC) h
+     WHERE h.variant_id = v.id
+       AND v.product_id IN (SELECT id FROM products WHERE store_id = $1)`, [STORE_ID])
+
+  // anything whose only history was in that run never existed as far as we know
+  await q(`
+    DELETE FROM variants v USING products p
+     WHERE p.id = v.product_id AND p.store_id = $1
+       AND NOT EXISTS (SELECT 1 FROM variant_history h WHERE h.variant_id = v.id)`, [STORE_ID])
+  await q(`
+    DELETE FROM products p
+     WHERE p.store_id = $1
+       AND NOT EXISTS (SELECT 1 FROM variants v WHERE v.product_id = p.id)`, [STORE_ID])
+
+  await q(`
+    UPDATE products p
+       SET last_seen_at = agg.seen, is_active = agg.live
+      FROM (SELECT product_id, MAX(last_seen_at) AS seen, BOOL_OR(is_active) AS live
+              FROM variants GROUP BY product_id) agg
+     WHERE agg.product_id = p.id AND p.store_id = $1`, [STORE_ID])
+}
 const run = await one(
   `INSERT INTO scrape_runs (store_id, run_date, status, file_name, rows_ingested, products_found, variants_found)
    VALUES ($1,$2,'pending',$3,$4,$5,$6) RETURNING id`,

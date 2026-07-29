@@ -18,7 +18,53 @@ node scripts/ingest.mjs --store 1 --date 2026-07-28 --file "C:\path\alkaram.csv"
 node scripts/ingest.mjs --store 2 --date 2026-07-28 --file "C:\path\brooklinen.csv"
 ```
 
-Re-running the same store + date is safe — the run is replaced.
+Re-running the **most recent** date for a store is safe: the run is rewound (its
+history rows dropped and the current-state layer rebuilt from what remains) and
+then redone. Replaying an *older* date is refused, because the current-state
+layer holds the newest values and diffing against it would produce nonsense.
+
+## Nightly automation
+
+Ingest does not run on Vercel — it reads multi-megabyte CSVs and takes minutes.
+It belongs on whichever machine the scraper drops files onto, which for this
+project is the UiPath VM. Those files are already on disk there **before** they
+reach Drive, so there is no need to download them back.
+
+```bash
+node scripts/ingest-folder.mjs --dir "C:\...\Scrapped_Csv_Files" --archive "C:\...\Ingested"
+```
+
+It scans the folder, matches each file to a store by `csv_prefix` (longest match
+wins), works out the date, and ingests. Each store runs as its own child process
+with a small worker pool, so one bad file cannot take the batch down.
+
+| Flag | Effect |
+|---|---|
+| `--dir <path>` | folder to scan (required) |
+| `--date YYYY-MM-DD` | force one date for every file |
+| `--concurrency N` | stores at once, default 3 |
+| `--archive <path>` | move each file there after a **successful** ingest |
+| `--delete` | delete it instead |
+| `--dry-run` | print the plan, change nothing |
+| `--force` | re-ingest dates already recorded |
+
+Safeguards worth knowing:
+
+- **Already-ingested store+date pairs are skipped**, so re-running the job is harmless.
+- **Unmatched files are reported, never guessed.** A file whose prefix matches no
+  store is listed and left alone.
+- **Only successful files are archived or deleted.** Failures stay in the folder
+  so the next run retries them.
+- The date comes from the filename (`28_07_26`, `2026-07-28`, `28-07-2026`) and
+  falls back to the file's modification time. **Keep the date in the filename** —
+  the fallback is only correct if the job runs the same day.
+
+### Scheduling it
+
+`scripts/nightly.bat` wraps the command for Windows Task Scheduler — edit the
+three paths at the top, then create a daily task pointing at it. It writes a
+per-day log under `logs/` and exits non-zero if any store failed, so a broken
+night shows up in the task history instead of passing silently.
 
 ## Store registry
 
