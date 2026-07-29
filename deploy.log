@@ -1,0 +1,11 @@
+<claude-code-hint v="1" type="plugin" value="vercel@claude-plugins-official" />
+Vercel CLI 58.1.0 (Node.js 24.15.0)
+Retrieving project…
+Deploying techbugs-projects-a51e618e/shopify-stores-scraper
+Uploading [--------------------] (0.0B/35.8KB)
+Uploading [=============-------] (24.9KB/35.8KB)
+Uploading [==================--] (33.1KB/35.8KB)
+Uploading [====================] (35.8KB/35.8KB)
+Inspect         https://vercel.com/techbugs-projects-a51e618e/shopify-stores-scraper/Hug7MDuV1Nfxth6Kji9nQ4FuHued
+Production      https://shopify-stores-scraper-j88ildohf-techbugs-projects-a51e618e.vercel.app
+Building…
