@@ -244,20 +244,21 @@ const SNAPSHOT_SQL = (search, extra = '') => `
   WITH state AS (
     SELECT DISTINCT ON (h.variant_id)
            h.variant_id, h.price, h.compare_at_price, h.discount_pct,
-           h.in_stock, h.observed_date AS last_changed
+           h.in_feed, h.in_stock, h.observed_date AS last_changed
       FROM variant_history h
       JOIN variants v ON v.id = h.variant_id
       JOIN products p ON p.id = v.product_id
      WHERE p.store_id = $1 AND h.observed_date <= $2
      ORDER BY h.variant_id, h.observed_date DESC
   )
-  SELECT p.handle, p.title, p.vendor, p.product_type, p.image_src,
-         v.sku, v.variant_image,
+  SELECT p.handle, p.title, p.vendor, p.product_type, p.tags, p.status,
+         p.published_at, p.image_src, p.first_seen_at AS product_first_seen,
+         v.sku, v.variant_image, v.variant_key,
          v.option1_name, v.option1_value, v.option2_name, v.option2_value,
          v.option3_name, v.option3_value,
          NULLIF(CONCAT_WS(' / ', NULLIF(v.option1_value,''), NULLIF(v.option2_value,''),
                                  NULLIF(v.option3_value,'')), '') AS variant_label,
-         s.price, s.compare_at_price, s.discount_pct, s.last_changed,
+         s.price, s.compare_at_price, s.discount_pct, s.in_stock, s.last_changed,
          v.first_seen_at,
          'https://' || st.domain || '/products/' || p.handle AS product_url,
          st.currency
@@ -265,7 +266,7 @@ const SNAPSHOT_SQL = (search, extra = '') => `
     JOIN variants v  ON v.id = s.variant_id
     JOIN products p  ON p.id = v.product_id
     JOIN stores   st ON st.id = p.store_id
-   WHERE s.in_stock
+   WHERE s.in_feed
      ${search ? `AND (p.title ILIKE $3 OR p.handle ILIKE $3 OR v.sku ILIKE $3
                       OR COALESCE(v.option1_value,'') ILIKE $3
                       OR COALESCE(v.option2_value,'') ILIKE $3)` : ''}
@@ -295,7 +296,11 @@ app.get('/api/stores/:id/snapshot', wrap(async (req, res) => {
     run: run ? { ...run, run_date: d(run.run_date) } : null,
     total_variants: tot.n, total_products: tot.p,
     offset, limit, shown: rows.length,
-    rows: rows.map(r => ({ ...r, last_changed: d(r.last_changed), first_seen_at: d(r.first_seen_at) }))
+    in_stock_count: rows.filter(r => r.in_stock).length,
+    rows: rows.map(r => ({ ...r, last_changed: d(r.last_changed),
+                           first_seen_at: d(r.first_seen_at),
+                           product_first_seen: d(r.product_first_seen),
+                           published_at: d(r.published_at) }))
   })
 }))
 
@@ -305,10 +310,11 @@ app.get('/api/stores/:id/snapshot.csv', wrap(async (req, res) => {
   const date = req.query.date || (await range(id)).to
   const rows = await q(SNAPSHOT_SQL(''), [id, date])
 
-  const cols = ['handle','title','vendor','product_type','sku','variant_label',
+  const cols = ['handle','title','vendor','product_type','tags','status','sku','variant_label',
                 'option1_name','option1_value','option2_name','option2_value',
                 'option3_name','option3_value','price','compare_at_price','discount_pct',
-                'currency','last_changed','first_seen_at','image_src','product_url']
+                'in_stock','currency','last_changed','first_seen_at','product_first_seen',
+                'image_src','variant_image','product_url']
   const esc = v => v == null ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g,'""')}"` : String(v)
   const csv = [cols.join(','),
     ...rows.map(r => cols.map(c => esc(c === 'last_changed' || c === 'first_seen_at' ? d(r[c]) : r[c])).join(','))

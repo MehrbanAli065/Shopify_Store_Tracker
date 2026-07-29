@@ -238,7 +238,7 @@ if (newVariants.length) {
 }
 
 // ── 7 · THE DIFF — one history row per variant that actually changed ──
-const history = []            // [variant_id, run_id, date, price, compare, in_stock, pp, pc, pis, type]
+const history = []            // [variant_id, run_id, date, price, compare, in_feed, in_stock, pp, pc, pis, type]
 const cacheUpdates = []       // [variant_id, price, compare, in_stock]
 
 for (const [key, v] of csvVariants) {
@@ -246,7 +246,7 @@ for (const [key, v] of csvVariants) {
   const isNew = newVariants.some(([k]) => k === key)
 
   if (isNew) {
-    history.push([dbv.id, RUN_ID, RUN_DATE, v.price, v.compare_at, v.available, null, null, null, 'new'])
+    history.push([dbv.id, RUN_ID, RUN_DATE, v.price, v.compare_at, true, v.available, null, null, null, 'new'])
     continue
   }
 
@@ -262,7 +262,7 @@ for (const [key, v] of csvVariants) {
   else if (priceChanged)       type = v.price > num(dbv.current_price) ? 'price_up' : 'price_down'
   else                         type = 'discount_change'
 
-  history.push([dbv.id, RUN_ID, RUN_DATE, v.price, v.compare_at, v.available,
+  history.push([dbv.id, RUN_ID, RUN_DATE, v.price, v.compare_at, true, v.available,
                 num(dbv.current_price), num(dbv.current_compare_at_price), dbv.current_in_stock, type])
   cacheUpdates.push([dbv.id, v.price, v.compare_at, v.available])
 }
@@ -283,7 +283,7 @@ if (allowRemovals && !isFirstRun) {
 
     const type = delisted ? 'removed' : 'stock_out'
     history.push([dbv.id, RUN_ID, RUN_DATE,
-                  num(dbv.current_price), num(dbv.current_compare_at_price), false,
+                  num(dbv.current_price), num(dbv.current_compare_at_price), false, false,
                   num(dbv.current_price), num(dbv.current_compare_at_price), dbv.current_in_stock, type])
     cacheUpdates.push([dbv.id, num(dbv.current_price), num(dbv.current_compare_at_price), false])
     goneVariants++
@@ -299,7 +299,7 @@ if (allowRemovals && !isFirstRun) {
 // ── 9 · write history, then refresh the Layer 1 cache ─────────────
 if (history.length) {
   await bulk('variant_history',
-    ['variant_id','scrape_run_id','observed_date','price','compare_at_price','in_stock',
+    ['variant_id','scrape_run_id','observed_date','price','compare_at_price','in_feed','in_stock',
      'prev_price','prev_compare_at_price','prev_in_stock','change_type'], history)
 }
 for (let i = 0; i < cacheUpdates.length; i += 400) {

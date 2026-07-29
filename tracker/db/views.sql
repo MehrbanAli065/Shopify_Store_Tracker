@@ -62,6 +62,7 @@ SELECT
 
   h.prev_in_stock,
   h.in_stock,
+  h.in_feed,
 
   p.first_seen_at AS product_first_seen,
   v.first_seen_at AS variant_first_seen,

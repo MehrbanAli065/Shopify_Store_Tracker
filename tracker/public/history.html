@@ -59,8 +59,9 @@
     <div class="tw" style="border-top:1px solid var(--border);border-radius:12px">
       <table>
         <thead><tr>
-          <th>Product</th><th>Variant</th><th>Price</th><th>Compare at</th>
-          <th>Discount</th><th>Last changed</th><th></th>
+          <th>Product</th><th>Vendor</th><th>Type</th><th>Variant</th>
+          <th>Price</th><th>Compare at</th><th>Discount</th><th>Stock</th>
+          <th>First seen</th><th>Unchanged since</th><th>Tags</th><th></th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
@@ -84,6 +85,23 @@ const dt  = s => s ? new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month
 const esc = s => String(s ?? '').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
 
 let CUR = 'PKR', DATE = null, OFF = 0, Q = '', LIMIT = 100, SNAPS = []
+
+const STOCK = { in:'<span class="bdg in"><span class="d"></span>In</span>',
+                out:'<span class="bdg out"><span class="d"></span>Out</span>' }
+
+/** Show the option NAME with its value, so "M" reads as "Size M". */
+function optCell (x) {
+  const parts = [[x.option1_name, x.option1_value], [x.option2_name, x.option2_value],
+                 [x.option3_name, x.option3_value]].filter(([, v]) => v)
+  if (!parts.length) return '—'
+  return parts.map(([n, v]) =>
+    `<span class="vp" title="${esc(n||'')}">${n ? `<i>${esc(n)}</i> ` : ''}${esc(v)}</span>`).join('')
+}
+function tagCell (tags) {
+  if (!tags || !tags.length) return '<span class="s2">—</span>'
+  const shown = tags.slice(0, 3).map(t => `<span class="tg2">${esc(t)}</span>`).join('')
+  return shown + (tags.length > 3 ? `<span class="s2"> +${tags.length - 3}</span>` : '')
+}
 
 tabReport.href = `/store.html?id=${ID}`
 
@@ -126,13 +144,15 @@ function select (date) {
 }
 
 async function load () {
-  rows.innerHTML = Array.from({length:8},()=>`<tr class="skr"><td colspan="7"><div class="skl w90"></div></td></tr>`).join('')
+  rows.innerHTML = Array.from({length:8},()=>`<tr class="skr"><td colspan="12"><div class="skl w90"></div></td></tr>`).join('')
   const r = await (await fetch(
     `/api/stores/${ID}/snapshot?date=${DATE}&offset=${OFF}&limit=${LIMIT}${Q?`&q=${encodeURIComponent(Q)}`:''}`)).json()
 
   dLabel.textContent = dtL(r.date)
-  dSub.textContent = `${nf(r.total_products)} products · ${nf(r.total_variants)} variants` +
-                     (Q ? `  (filtered)` : '')
+  dSub.innerHTML = `${nf(r.total_products)} products · ${nf(r.total_variants)} variants` +
+    (r.in_stock_count != null && r.shown
+      ? ` · <b>${nf(r.in_stock_count)}</b> of the ${nf(r.shown)} on this page in stock` : '') +
+    (Q ? '  (filtered)' : '')
 
   const run = r.run
   runcard.innerHTML = run ? `
@@ -159,14 +179,19 @@ async function load () {
           <div class="hd">${esc(x.handle)}</div>
           ${x.sku ? `<div class="sk">SKU · ${esc(x.sku)}</div>` : ''}
         </div></div></td>
-      <td>${(x.variant_label||'—').split(' / ').map(v=>`<span class="vp">${esc(v)}</span>`).join('')}</td>
+      <td class="tight">${esc(x.vendor||'—')}</td>
+      <td class="tight">${esc(x.product_type||'—')}</td>
+      <td>${optCell(x)}</td>
       <td class="num"><span class="newp">${nf(x.price)}</span><div class="s2">${CUR}</div></td>
       <td class="num">${x.compare_at_price ? nf(x.compare_at_price) : '—'}</td>
       <td class="num">${Number(x.discount_pct) ? `<b style="color:var(--ink)">${x.discount_pct}%</b>` : '—'}</td>
-      <td class="num">${dt(x.last_changed)}<div class="s2">since</div></td>
+      <td>${x.in_stock ? STOCK.in : STOCK.out}</td>
+      <td class="num">${dt(x.first_seen_at)}</td>
+      <td class="num">${dt(x.last_changed)}</td>
+      <td class="tagcell">${tagCell(x.tags)}</td>
       <td><a class="lnk" href="${esc(x.product_url)}" target="_blank" rel="noopener">Open ↗</a></td>
     </tr>`).join('')
-    : `<tr><td colspan="7"><div class="nores" style="border:0;background:none;padding:40px 10px">
+    : `<tr><td colspan="12"><div class="nores" style="border:0;background:none;padding:40px 10px">
          <div class="ne">🔍</div><div class="nt">Nothing found</div>
          <div class="nd">${Q?`No rows match “${esc(Q)}” on this date.`:'This day has no catalogue data.'}</div>
        </div></td></tr>`

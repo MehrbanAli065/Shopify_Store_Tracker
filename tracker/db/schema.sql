@@ -119,6 +119,10 @@ CREATE TABLE variant_history (
                            THEN ROUND((compare_at_price - price) / compare_at_price * 100, 2)
                            ELSE 0 END
                     ) STORED,
+  -- two different facts, and they must not be conflated:
+  --   in_feed  = the variant appeared in that day's CSV at all
+  --   in_stock = it was sellable (Inventory quantity blank rather than 0)
+  in_feed           BOOLEAN NOT NULL DEFAULT true,
   in_stock          BOOLEAN,
 
   -- previous values on the same row, so reports need no LAG()
