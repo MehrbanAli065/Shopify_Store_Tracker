@@ -75,14 +75,16 @@ app.get('/api/stores/:id/summary', wrap(async (req, res) => {
       (SELECT count(*) FROM products WHERE store_id = $1 AND is_active)::int AS products,
       (SELECT count(*) FROM variants v JOIN products p ON p.id = v.product_id
         WHERE p.store_id = $1 AND v.is_active)::int                          AS variants,
-      COUNT(*) FILTER (WHERE change_type = 'new')::int             AS new_items,
+      COUNT(*) FILTER (WHERE change_type = 'new' AND NOT is_baseline)::int AS new_items,
+      COUNT(*) FILTER (WHERE change_type = 'new' AND is_baseline)::int     AS baseline_items,
       COUNT(*) FILTER (WHERE change_type = 'price_down')::int      AS price_down,
       COUNT(*) FILTER (WHERE change_type = 'price_up')::int        AS price_up,
       COUNT(*) FILTER (WHERE change_type = 'discount_change')::int AS discount_change,
       COUNT(*) FILTER (WHERE change_type = 'stock_out')::int       AS stock_out,
       COUNT(*) FILTER (WHERE change_type = 'stock_in')::int        AS stock_in,
       COUNT(*) FILTER (WHERE change_type = 'removed')::int         AS removed,
-      COUNT(*)::int                                                AS total
+      COUNT(*) FILTER (WHERE NOT is_baseline)::int AS total,
+      COUNT(*)::int AS total_with_baseline
     FROM v_change_report
    WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3`, [id, from, to])
 
@@ -93,12 +95,13 @@ app.get('/api/stores/:id/summary', wrap(async (req, res) => {
 
   const daily = await q(`
     SELECT observed_date,
-           COUNT(*) FILTER (WHERE change_type = 'new')::int      AS new_items,
+           COUNT(*) FILTER (WHERE change_type = 'new' AND NOT is_baseline)::int AS new_items,
+           COUNT(*) FILTER (WHERE change_type = 'new' AND is_baseline)::int     AS baseline_items,
            COUNT(*) FILTER (WHERE change_type LIKE 'price%')::int AS price,
            COUNT(*) FILTER (WHERE change_type = 'stock_out')::int AS stock_out,
            COUNT(*) FILTER (WHERE change_type = 'stock_in')::int  AS stock_in,
            COUNT(*) FILTER (WHERE change_type = 'removed')::int   AS removed,
-           COUNT(*)::int AS total
+           COUNT(*) FILTER (WHERE NOT is_baseline)::int AS total
       FROM v_change_report
      WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3
      GROUP BY observed_date ORDER BY observed_date`, [id, from, to])
@@ -121,14 +124,18 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   }
   const types = groups[req.query.type] || null
 
+  // The first ingest of a store records every variant as 'new' — that is the
+  // starting inventory, not news. Keep it out unless explicitly requested.
+  const baseFilter = req.query.baseline === '1' ? '' : 'AND NOT is_baseline'
+
   const rows = await q(`
     SELECT handle, title, sku, variant_label, product_url, image_src,
-           observed_date, change_type,
+           observed_date, change_type, is_baseline,
            prev_price, price, price_diff, price_diff_pct,
            prev_compare_at_price, compare_at_price, prev_discount_pct, discount_pct,
            prev_in_stock, in_stock, product_first_seen, currency
       FROM v_change_report
-     WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3
+     WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
        ${types ? 'AND change_type = ANY($5)' : ''}
      ORDER BY observed_date DESC, handle
      LIMIT $4`,
@@ -136,7 +143,7 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
 
   const total = await one(`
     SELECT count(*)::int AS n FROM v_change_report
-     WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3
+     WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
        ${types ? 'AND change_type = ANY($4)' : ''}`,
     types ? [id, from, to, types] : [id, from, to])
 
@@ -193,6 +200,7 @@ app.get('/api/stores/:id/report.csv', wrap(async (req, res) => {
   const groups = { price: ['price_up','price_down','discount_change'], new: ['new'],
                    stock: ['stock_out','stock_in'], removed: ['removed'] }
   const types = groups[req.query.type] || null
+  const baseFilter = req.query.baseline === '1' ? '' : 'AND NOT is_baseline'
 
   const rows = await q(`
     SELECT store_name, handle, title, sku, variant_label, observed_date, change_type,
@@ -200,7 +208,7 @@ app.get('/api/stores/:id/report.csv', wrap(async (req, res) => {
            prev_compare_at_price, compare_at_price, prev_discount_pct, discount_pct,
            prev_in_stock, in_stock, currency, product_url
       FROM v_change_report
-     WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3
+     WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
        ${types ? 'AND change_type = ANY($4)' : ''}
      ORDER BY observed_date, handle`,
     types ? [id, from, to, types] : [id, from, to])

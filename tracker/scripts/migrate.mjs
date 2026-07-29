@@ -46,6 +46,9 @@ if (existing.length && !yes) {
 console.log('\n· applying schema …')
 await exec(fs.readFileSync(path.join(ROOT, 'db', 'schema.sql'), 'utf8'))
 
+console.log('· applying views …')
+await exec(fs.readFileSync(path.join(ROOT, 'db', 'views.sql'), 'utf8'))
+
 console.log('· seeding stores …')
 await exec(fs.readFileSync(path.join(ROOT, 'db', 'seed.sql'), 'utf8'))
 

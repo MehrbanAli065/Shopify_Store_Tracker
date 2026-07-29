@@ -37,6 +37,13 @@ let _lite = null   // PGlite
 async function pool () {
   if (!_pool) {
     const { default: pg } = await import('pg')
+
+    // A DATE has no time and no zone. Left alone, pg turns it into a JS Date at
+    // LOCAL midnight, and toISOString() then rolls it back a day east of UTC —
+    // 2026-07-27 would surface as 2026-07-26. Hand it back as the plain string.
+    pg.types.setTypeParser(1082, v => v)          // date
+    pg.types.setTypeParser(1700, v => v)          // numeric — keep full precision
+
     _pool = new pg.Pool({
       connectionString: URL,
       // hosted Postgres needs TLS; the pooled endpoints use a shared cert

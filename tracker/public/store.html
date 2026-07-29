@@ -87,6 +87,8 @@
     <input id="q" type="search" autocomplete="off" placeholder="Filter by product name, handle or SKU…">
     <button class="clr" id="qc" hidden>✕</button>
   </div>
+  <label class="basetog"><input type="checkbox" id="baseChk">
+    Include the first import <span id="baseHint"></span></label>
   <div class="tabs" id="tabs"></div>
   <div class="tw"><table>
     <thead><tr>
@@ -128,7 +130,7 @@ const TABS = [
   { key:'removed', label:'Removed' }
 ]
 const CHANGE_HUES = { new:'var(--s1)', price:'var(--s2)', stock:'var(--s3)', removed:'var(--s4)' }
-let tab = '', CUR = 'PKR', RANGE = {}, ROWS = [], q = ''
+let tab = '', CUR = 'PKR', RANGE = {}, ROWS = [], q = '', showBase = false, BASE_N = 0
 
 const STOCK = { in:'<span class="bdg in"><span class="d"></span>In</span>',
                 out:'<span class="bdg out"><span class="d"></span>Out</span>',
@@ -183,12 +185,16 @@ async function loadKpis () {
   kpis.innerHTML = [
     ['Products',      nf(k.products),  '', 'Active products in the catalogue'],
     ['Variants',      nf(k.variants),  '', 'Size / colour combinations tracked'],
-    ['New',           nf(k.new_items), 'c4','Appeared for the first time'],
+    ['New products',  nf(k.new_items), 'c4','Arrived after tracking started — not the first import'],
     ['Price changes', nf(priceTotal),  'c2','Price or discount moved'],
     ['Out of stock',  nf(k.stock_out), 'c3','Dropped out of the feed'],
     ['Removed',       nf(k.removed),   'c5','Whole product delisted'],
     ['Avg discount',  (k.avg_discount ?? 0)+'%','', 'Across all discounted variants']
   ].map(([l,v,c,h]) => `<div class="kpi ${c}" title="${h}"><div class="k">${l}</div><div class="v">${v}</div></div>`).join('')
+
+  BASE_N = k.baseline_items || 0
+  baseHint.textContent = BASE_N ? `(${nf(BASE_N)} rows from the initial load)` : '(none in this range)'
+  baseChk.disabled = !BASE_N
 
   document.querySelectorAll('.tn').forEach(el => {
     const n = { '':k.total, price:priceTotal, new:k.new_items,
@@ -198,7 +204,7 @@ async function loadKpis () {
 
   daily.innerHTML = k.daily.length ? k.daily.map(d => `
     <tr><td class="num">${dt(d.observed_date)}</td>
-      <td class="num ${d.new_items?'':'z'}">${d.new_items}</td>
+      <td class="num ${d.new_items?'':'z'}">${d.new_items}${d.baseline_items?`<div class="s2">+${nf(d.baseline_items)} initial</div>`:''}</td>
       <td class="num ${d.price?'':'z'}">${d.price}</td>
       <td class="num ${d.stock_out?'':'z'}">${d.stock_out}</td>
       <td class="num ${d.stock_in?'':'z'}">${d.stock_in}</td>
@@ -276,6 +282,7 @@ function priceCell (r) {
   return `<span class="newp">${nf(r.price)}</span>`
 }
 function changeCell (r) {
+  if (r.is_baseline) return `<span class="mut">FIRST IMPORT</span>`
   const M = { new:['up','NEW'], removed:['mut','REMOVED'], stock_out:['dn','SOLD OUT'], stock_in:['up','RESTOCKED'] }
   if (M[r.change_type]) return `<span class="${M[r.change_type][0]}">${M[r.change_type][1]}</span>`
   if (r.price_diff == null || Number(r.price_diff) === 0) return `<span class="mut">DISCOUNT ONLY</span>`
@@ -293,7 +300,8 @@ function discCell (r) {
 
 async function loadRows () {
   rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="8"><div class="skl w90"></div></td></tr>`).join('')
-  const r = await (await fetch(`/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}`:''}&limit=600`)).json()
+  const r = await (await fetch(
+    `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}limit=600`)).json()
   ROWS = r.rows; window.__total = r.total
   paint()
 }
@@ -410,7 +418,9 @@ document.querySelectorAll('.preset').forEach(b => b.onclick = () => {
 const $q = document.getElementById('q')
 $q.addEventListener('input', () => { q = $q.value.trim(); qc.hidden = !q; paint() })
 qc.onclick = () => { $q.value=''; q=''; qc.hidden=true; paint(); $q.focus() }
-csv.onclick = () => location.href = `/api/stores/${ID}/report.csv?${qsDates()}${tab?`type=${tab}`:''}`
+baseChk.onchange = () => { showBase = baseChk.checked; loadRows() }
+csv.onclick = () => location.href =
+  `/api/stores/${ID}/report.csv?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1':''}`
 pdf.onclick = () => window.print()
 tg.onclick = () => {
   const cur = document.documentElement.getAttribute('data-theme')

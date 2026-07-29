@@ -11,7 +11,8 @@
     "migrate": "node scripts/migrate.mjs",
     "migrate:check": "node scripts/migrate.mjs --check",
     "start": "node server.mjs",
-    "dev": "node server.mjs"
+    "dev": "node server.mjs",
+    "views": "node scripts/apply-views.mjs"
   },
   "dependencies": {
     "csv-parse": "^5.6.0",

@@ -20,6 +20,9 @@ const seed   = fs.readFileSync(path.join(ROOT, 'db', 'seed.sql'),   'utf8')
 console.log('· applying schema …')
 await exec(schema)
 
+console.log('· applying views …')
+await exec(fs.readFileSync(path.join(ROOT, 'db', 'views.sql'), 'utf8'))
+
 console.log('· seeding stores …')
 await exec(seed)
 
