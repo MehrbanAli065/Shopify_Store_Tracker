@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stores — Shopify Tracker</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="bl">
+      <div class="logo">ST</div>
+      <div>
+        <div class="ttl">Store Tracker</div>
+        <div class="sub" id="sub">loading…</div>
+      </div>
+    </div>
+    <button class="btn ico" id="tg" title="Switch theme">◐</button>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- ── overview ── -->
+  <div class="ovw" id="ovw"></div>
+
+  <!-- ── search ── -->
+  <div class="searchbar">
+    <span class="si">🔍</span>
+    <input id="search" type="search" autocomplete="off"
+           placeholder="Search by store name, website or ID…   (press / )">
+    <button class="clr" id="clr" title="Clear" hidden>✕</button>
+  </div>
+
+  <div class="frow" style="margin-bottom:20px">
+    <button class="chip on" data-f="all">All stores</button>
+    <button class="chip"    data-f="today">Updated today</button>
+    <button class="chip"    data-f="changes">Has changes</button>
+    <button class="chip"    data-f="issue">Needs attention</button>
+    <span class="grow"></span>
+    <label class="sortl">Sort
+      <select id="sort" class="sel">
+        <option value="id">Store ID</option>
+        <option value="name">Name</option>
+        <option value="products">Most products</option>
+        <option value="changes">Most changes</option>
+      </select>
+    </label>
+  </div>
+
+  <div id="hint" class="rescount"></div>
+  <div id="grid" class="grid"></div>
+
+</div>
+
+<script>
+const nf   = n => new Intl.NumberFormat('en-US').format(n ?? 0)
+const dt   = s => s ? new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '—'
+const HUES = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948']
+const initials = n => n.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()
+
+let STORES = [], filter = 'all', sort = 'id', term = ''
+
+const isToday = s => s.last_run && s.last_run === STORES.map(x=>x.last_run).sort().at(-1)
+const health  = s => !s.last_run ? 'non' : s.last_status === 'success' ? 'ok'
+                   : s.last_status === 'partial' ? 'wrn' : 'err'
+
+function statusRow (s) {
+  const h = health(s), lbl = dt(s.last_run)
+  const txt = { ok:`Updated ${lbl}`, wrn:`Partial — ${lbl}`,
+                err:`Scrape failed — ${lbl}`, non:'Never scraped' }[h]
+  return `<div class="st ${h}"><span class="d"></span>${txt}</div>`
+}
+
+function matches (s) {
+  if (filter === 'today'   && !isToday(s))                     return false
+  if (filter === 'changes' && !s.last_changes)                 return false
+  if (filter === 'issue'   && ['ok'].includes(health(s)))      return false
+  if (!term) return true
+  const t = term.toLowerCase()
+  return String(s.id) === t || s.name.toLowerCase().includes(t) ||
+         s.domain.toLowerCase().includes(t) || (s.country||'').toLowerCase() === t
+}
+
+function hilite (text, t) {
+  if (!t) return text
+  const i = text.toLowerCase().indexOf(t.toLowerCase())
+  return i < 0 ? text
+    : text.slice(0,i) + '<mark>' + text.slice(i, i+t.length) + '</mark>' + text.slice(i+t.length)
+}
+
+function render () {
+  let list = STORES.filter(matches)
+  const by = { id:(a,b)=>a.id-b.id, name:(a,b)=>a.name.localeCompare(b.name),
+               products:(a,b)=>b.products-a.products, changes:(a,b)=>b.last_changes-a.last_changes }
+  list.sort(by[sort])
+
+  document.getElementById('hint').innerHTML = (term || filter !== 'all')
+    ? `<b>${list.length}</b> of ${STORES.length} store${STORES.length===1?'':'s'}` +
+      (term ? ` matching “${term}”` : '') : ''
+
+  if (!list.length) {
+    document.getElementById('grid').className = ''
+    document.getElementById('grid').innerHTML = `
+      <div class="nores">
+        <div class="ne">🔍</div>
+        <div class="nt">No stores found</div>
+        <div class="nd">${term ? `Nothing matches “${term}”.` : 'No stores match this filter.'}
+          Try a different search, or <button class="linkbtn" id="rst">reset filters</button>.</div>
+      </div>`
+    document.getElementById('rst').onclick = () => {
+      term = ''; filter = 'all'
+      document.getElementById('search').value = ''
+      document.getElementById('clr').hidden = true
+      document.querySelectorAll('[data-f]').forEach(b => b.classList.toggle('on', b.dataset.f==='all'))
+      render()
+    }
+    return
+  }
+
+  document.getElementById('grid').className = 'grid'
+  document.getElementById('grid').innerHTML = list.map((s,i) => {
+    const hue = HUES[(s.id - 1) % HUES.length]
+    return `
+    <a class="card" href="/store.html?id=${s.id}" style="animation-delay:${Math.min(i,12)*22}ms">
+      <div class="chead">
+        <div class="av" style="background:${hue}">${initials(s.name)}</div>
+        <div style="min-width:0;flex:1">
+          <div class="nm">${hilite(s.name, term)}</div>
+          <div class="dm">${hilite(s.domain, term)}</div>
+        </div>
+        <span class="idb">ID ${s.id}</span>
+      </div>
+
+      <div class="stats">
+        <div><div class="sv">${nf(s.products)}</div><div class="sl">Products</div></div>
+        <div><div class="sv">${nf(s.variants)}</div><div class="sl">Variants</div></div>
+        <div><div class="sv ${s.last_changes?'hot':''}">${nf(s.last_changes)}</div><div class="sl">Changes</div></div>
+      </div>
+
+      <div class="meta2">
+        <span class="tagx">${s.currency}</span>
+        ${s.country ? `<span class="tagx">${s.country}</span>` : ''}
+        <span class="tagx">${s.runs} scrape${s.runs===1?'':'s'}</span>
+      </div>
+
+      ${statusRow(s)}
+      <div class="cta">View report →</div>
+    </a>`
+  }).join('')
+}
+
+function overview () {
+  const p = STORES.reduce((a,s)=>a+s.products,0)
+  const v = STORES.reduce((a,s)=>a+s.variants,0)
+  const c = STORES.reduce((a,s)=>a+s.last_changes,0)
+  const bad = STORES.filter(s => health(s) !== 'ok').length
+  document.getElementById('ovw').innerHTML = `
+    <div class="ov"><div class="ok">${nf(STORES.length)}</div><div class="ol">Stores tracked</div></div>
+    <div class="ov"><div class="ok">${nf(p)}</div><div class="ol">Products</div></div>
+    <div class="ov"><div class="ok">${nf(v)}</div><div class="ol">Variants</div></div>
+    <div class="ov"><div class="ok" style="color:var(--blue)">${nf(c)}</div><div class="ol">Changes last run</div></div>
+    <div class="ov"><div class="ok" style="color:${bad?'var(--critical)':'var(--good-ink)'}">${bad}</div>
+      <div class="ol">Need attention</div></div>`
+}
+
+// ── wiring ────────────────────────────────────────────────────────
+const $s = document.getElementById('search'), $c = document.getElementById('clr')
+$s.addEventListener('input', () => { term = $s.value.trim(); $c.hidden = !term; render() })
+$c.onclick = () => { $s.value=''; term=''; $c.hidden=true; render(); $s.focus() }
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement !== $s) { e.preventDefault(); $s.focus() }
+  if (e.key === 'Escape' && document.activeElement === $s) { $s.value=''; term=''; $c.hidden=true; render() }
+})
+document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => {
+  filter = b.dataset.f
+  document.querySelectorAll('[data-f]').forEach(x => x.classList.toggle('on', x===b))
+  render()
+})
+document.getElementById('sort').onchange = e => { sort = e.target.value; render() }
+document.getElementById('tg').onclick = () => {
+  const cur = document.documentElement.getAttribute('data-theme')
+    || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+  document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark')
+}
+
+document.getElementById('grid').innerHTML =
+  Array.from({length:3},()=>'<div class="card sk"><div class="skl w60"></div><div class="skl w40"></div><div class="skl w90" style="margin-top:18px;height:34px"></div></div>').join('')
+
+fetch('/api/stores').then(r => r.json()).then(rows => {
+  STORES = rows
+  document.getElementById('sub').textContent =
+    `${rows.length} store${rows.length===1?'':'s'} · updated ${dt(rows.map(r=>r.last_run).sort().at(-1))}`
+  overview(); render()
+}).catch(e => {
+  document.getElementById('grid').className = ''
+  document.getElementById('grid').innerHTML =
+    `<div class="nores"><div class="ne">⚠</div><div class="nt">Could not load stores</div>
+     <div class="nd">${e.message}</div></div>`
+})
+</script>
+</body>
+</html>

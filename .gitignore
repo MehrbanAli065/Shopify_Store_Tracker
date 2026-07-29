@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# local database (PGlite file store — rebuilt with `npm run reset`)
+tracker/data/
+
+# secrets — never commit these
+.env
+.env.local
+client_secrets.json
+mycreds.txt
+*.pem
+
+# deployment
+.vercel/
+
+# scraped data — CSVs land here daily, they belong on Drive, not in git
+*.csv
+
+# editor / OS
+.claude/settings.local.json
+.DS_Store
+Thumbs.db

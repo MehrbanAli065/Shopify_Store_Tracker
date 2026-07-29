@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample Report — Alkaram Studio</title>
+<style>
+:root{
+  color-scheme:light;
+  --plane:#f9f9f7; --surface:#fcfcfb; --surface-2:#f2f2ee;
+  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --line:#e1e0d9; --rule:#c3c2b7; --border:rgba(11,11,11,.10);
+  --blue:#2a78d6; --blue-soft:#86b6ef; --orange:#eb6834;
+  --good:#0ca30c; --good-ink:#006300; --warning:#fab219; --critical:#d03b3b;
+  --shadow:0 1px 2px rgba(11,11,11,.04),0 8px 24px rgba(11,11,11,.05);
+}
+@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){
+  color-scheme:dark;
+  --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232322;
+  --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+  --line:#2c2c2a; --rule:#383835; --border:rgba(255,255,255,.10);
+  --blue:#3987e5; --blue-soft:#184f95; --orange:#d95926;
+  --good-ink:#0ca30c;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232322;
+  --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+  --line:#2c2c2a; --rule:#383835; --border:rgba(255,255,255,.10);
+  --blue:#3987e5; --blue-soft:#184f95; --orange:#d95926;
+  --good-ink:#0ca30c;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.page{max-width:1120px;margin:0 auto;padding:0 24px 80px}
+@media(max-width:640px){.page{padding:0 14px 50px}}
+
+/* header */
+.rh{border-bottom:1px solid var(--line);background:var(--surface);margin-bottom:30px}
+.rh-in{max-width:1120px;margin:0 auto;padding:30px 24px 26px;display:flex;justify-content:space-between;
+  align-items:flex-start;gap:20px;flex-wrap:wrap}
+.rh .eyebrow{font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--muted);font-weight:650}
+.rh h1{font-size:clamp(21px,3.4vw,29px);margin:8px 0 5px;letter-spacing:-.02em;font-weight:700}
+.rh .dm{color:var(--ink-2);font-size:14px}
+.rh .dm b{color:var(--ink);font-weight:640}
+.rh .rt{text-align:right;font-size:12px;color:var(--muted);line-height:1.75}
+.rh .rt b{color:var(--ink);font-weight:640;display:block;font-size:13px}
+.dl{display:inline-block;margin-top:10px;background:var(--blue);color:#fff;font-size:12.5px;font-weight:620;
+  padding:7px 14px;border-radius:8px}
+
+h2{font-size:18px;letter-spacing:-.012em;margin:40px 0 4px;font-weight:670;display:flex;align-items:center;gap:10px}
+h2 .cnt{font-size:11.5px;font-weight:650;padding:2px 9px;border-radius:999px;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--ink-2);letter-spacing:0}
+h2 .ic{width:8px;height:8px;border-radius:2.5px;flex-shrink:0}
+.hint{color:var(--muted);font-size:13px;margin:0 0 14px;max-width:78ch}
+
+/* kpis */
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:11px;margin-bottom:8px}
+@media(max-width:820px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:520px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:14px 15px;box-shadow:var(--shadow)}
+.kpi .k{font-size:11.5px;color:var(--muted);font-weight:600}
+.kpi .v{font-size:26px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi.n .v{color:var(--good-ink)} .kpi.d .v{color:var(--critical)}
+.kpi.o .v{color:var(--orange)} .kpi.r .v{color:var(--muted)}
+
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--surface);
+  box-shadow:var(--shadow);margin-bottom:6px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:720px}
+th{text-align:left;font-size:10.5px;letter-spacing:.055em;text-transform:uppercase;color:var(--muted);
+  font-weight:650;padding:11px 14px;border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:12px 14px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.pt{color:var(--ink);font-weight:640;font-size:13.5px;line-height:1.35}
+.hd{font:11px ui-monospace,Consolas,monospace;color:var(--blue);margin-top:3px;word-break:break-all;line-height:1.45}
+.sk{font:11px ui-monospace,Consolas,monospace;color:var(--muted);margin-top:1px}
+.vp{display:inline-block;font:11px ui-monospace,Consolas,monospace;color:var(--ink-2);background:var(--surface-2);
+  border:1px solid var(--border);border-radius:5px;padding:1.5px 7px;margin:0 3px 3px 0;white-space:nowrap}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.old{color:var(--muted);text-decoration:line-through;font-variant-numeric:tabular-nums}
+.new{color:var(--ink);font-weight:660;font-variant-numeric:tabular-nums}
+.arw{color:var(--muted);margin:0 5px}
+.dn{color:var(--critical);font-weight:660;font-variant-numeric:tabular-nums;white-space:nowrap}
+.up{color:var(--good-ink);font-weight:660;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sub2{font-size:11px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.bdg{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:640;padding:2.5px 8px;
+  border-radius:6px;border:1px solid var(--border);white-space:nowrap}
+.bdg .d{width:6px;height:6px;border-radius:50%}
+.bdg.in{color:var(--good-ink)}   .bdg.in .d{background:var(--good)}
+.bdg.out{color:var(--critical)}  .bdg.out .d{background:var(--critical)}
+.bdg.nw{color:var(--blue)}       .bdg.nw .d{background:var(--blue)}
+.bdg.rm{color:var(--muted)}      .bdg.rm .d{background:var(--muted)}
+.lnk{color:var(--blue);text-decoration:none;font-size:11.5px;font-weight:600;white-space:nowrap}
+.lnk:hover{text-decoration:underline}
+
+/* notes */
+.note{border-radius:11px;padding:14px 17px;margin:16px 0 26px;font-size:13.5px;border:1px solid var(--border);
+  border-left-width:3px;background:var(--surface)}
+.note .nh{font-weight:660;font-size:12.5px;margin-bottom:4px}
+.note p{margin:0;color:var(--ink-2)}
+.note.i{border-left-color:var(--blue)}   .note.i .nh{color:var(--blue)}
+.note.w{border-left-color:var(--warning)}.note.w .nh{color:var(--ink)}
+.note.g{border-left-color:var(--good)}   .note.g .nh{color:var(--good-ink)}
+
+/* timeline card */
+.tl{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:20px 22px;
+  box-shadow:var(--shadow);margin-bottom:6px}
+.tl .th{border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px}
+.tl .th .pt{font-size:15.5px}
+.mgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px}
+@media(max-width:700px){.mgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.mgrid .m .k{font-size:10.5px;color:var(--muted);font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+.mgrid .m .v{font-size:13px;color:var(--ink);font-weight:600;margin-top:2px}
+.ev{display:grid;grid-template-columns:92px 26px 1fr;gap:0 14px;align-items:start}
+.ev .dt{font-size:12.5px;color:var(--ink-2);font-weight:620;padding-top:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ev .ra{display:flex;flex-direction:column;align-items:center;padding-top:14px}
+.ev .pin{width:11px;height:11px;border-radius:50%;border:2px solid var(--surface);flex-shrink:0}
+.ev .bar{width:2px;flex:1;background:var(--line);min-height:34px;margin-top:3px}
+.ev:last-child .bar{display:none}
+.ev .bx{padding:9px 0 16px}
+.ev:last-child .bx{padding-bottom:0}
+.ev .ttl{font-size:13.5px;font-weight:650;color:var(--ink)}
+.ev .dsc{font-size:12.5px;color:var(--ink-2);margin-top:3px}
+.ev .tag{display:inline-block;font:10.5px ui-monospace,Consolas,monospace;padding:1.5px 7px;border-radius:5px;
+  border:1px solid var(--border);background:var(--surface-2);color:var(--muted);margin-left:7px;vertical-align:1px}
+
+/* daily strip */
+.days{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow)}
+table.dt{min-width:620px;font-size:13px}
+table.dt td{padding:9px 14px}
+table.dt td.z{color:var(--muted)}
+footer{border-top:1px solid var(--line);margin-top:44px;padding-top:20px;color:var(--muted);font-size:12.5px}
+code{background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px;
+  font:12px ui-monospace,Consolas,monospace;color:var(--ink)}
+.tg{position:fixed;top:14px;right:14px;z-index:20;background:var(--surface);border:1px solid var(--border);
+  color:var(--ink-2);border-radius:9px;width:36px;height:36px;cursor:pointer;font-size:15px;box-shadow:var(--shadow)}
+</style>
+</head>
+<body>
+
+<button class="tg" id="tg" title="Theme">◐</button>
+
+<header class="rh">
+  <div class="rh-in">
+    <div>
+      <div class="eyebrow">Store Report · Sample</div>
+      <h1>Alkaram Studio</h1>
+      <div class="dm">alkaramstudio.com · <b>18 Jul 2026 → 27 Jul 2026</b> (10 days)</div>
+      <span class="dl">📥 Download PDF</span>
+    </div>
+    <div class="rt">
+      <b>Generated 27 Jul 2026</b>
+      1,997 products · 7,588 variants<br>
+      10 of 10 scrapes successful
+    </div>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- ===== SUMMARY ===== -->
+  <div class="kpis">
+    <div class="kpi"><div class="k">Products tracked</div><div class="v">1,997</div></div>
+    <div class="kpi n"><div class="k">New products</div><div class="v">3</div></div>
+    <div class="kpi d"><div class="k">Price changes</div><div class="v">6</div></div>
+    <div class="kpi o"><div class="k">Went out of stock</div><div class="v">4</div></div>
+    <div class="kpi r"><div class="k">Removed</div><div class="v">1</div></div>
+  </div>
+
+  <div class="note i">
+    <div class="nh">ℹ How to read this report</div>
+    <p>Every row below is one <strong>change event</strong> recorded on a specific date. Rows are written only when something actually changed — price, discount or stock. Each row carries the product <code>handle</code>, SKU and variant so it can be identified without any lookup, plus a live link to the product page.</p>
+  </div>
+
+  <!-- ===== DAILY ACTIVITY ===== -->
+  <h2><span class="ic" style="background:var(--blue)"></span>Daily activity</h2>
+  <p class="hint">What was recorded each day across the 10-day window.</p>
+  <div class="days">
+    <table class="dt">
+      <thead><tr><th>Date</th><th>Products in CSV</th><th>New</th><th>Price changes</th><th>Stock out</th><th>Stock in</th><th>Removed</th><th>History rows</th></tr></thead>
+      <tbody>
+        <tr><td class="num">18 Jul</td><td class="num">1,995</td><td class="z num">—</td><td class="z num">—</td><td class="z num">—</td><td class="z num">—</td><td class="z num">—</td><td class="num">baseline</td></tr>
+        <tr><td class="num">19 Jul</td><td class="num">1,995</td><td class="z num">0</td><td class="num">1</td><td class="z num">0</td><td class="z num">0</td><td class="z num">0</td><td class="num">1</td></tr>
+        <tr><td class="num">20 Jul</td><td class="num">1,995</td><td class="z num">0</td><td class="z num">0</td><td class="num">1</td><td class="z num">0</td><td class="z num">0</td><td class="num">1</td></tr>
+        <tr><td class="num">21 Jul</td><td class="num">1,996</td><td class="num">1</td><td class="num">1</td><td class="z num">0</td><td class="z num">0</td><td class="z num">0</td><td class="num">3</td></tr>
+        <tr><td class="num">22 Jul</td><td class="num">1,996</td><td class="z num">0</td><td class="z num">0</td><td class="z num">0</td><td class="z num">0</td><td class="z num">0</td><td class="z num">0</td></tr>
+        <tr><td class="num">23 Jul</td><td class="num">1,995</td><td class="z num">0</td><td class="num">1</td><td class="num">2</td><td class="z num">0</td><td class="z num">0</td><td class="num">3</td></tr>
+        <tr><td class="num">24 Jul</td><td class="num">1,996</td><td class="num">1</td><td class="z num">0</td><td class="z num">0</td><td class="num">1</td><td class="z num">0</td><td class="num">3</td></tr>
+        <tr><td class="num">25 Jul</td><td class="num">1,996</td><td class="z num">0</td><td class="num">1</td><td class="z num">0</td><td class="num">1</td><td class="z num">0</td><td class="num">2</td></tr>
+        <tr><td class="num">26 Jul</td><td class="num">1,996</td><td class="num">1</td><td class="z num">0</td><td class="num">1</td><td class="z num">0</td><td class="num">1</td><td class="num">4</td></tr>
+        <tr><td class="num">27 Jul</td><td class="num">1,997</td><td class="z num">0</td><td class="num">2</td><td class="z num">0</td><td class="z num">0</td><td class="z num">0</td><td class="num">2</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note w">
+    <div class="nh">⚠ Note the 22 Jul row</div>
+    <p>Zero history rows that day — nothing changed anywhere in the store. All 7,588 variants still had <code>last_seen_at</code> updated to 22 Jul, proving the scrape ran and every variant was checked. <strong>No change is not the same as no data.</strong></p>
+  </div>
+
+  <!-- ===== NEW ===== -->
+  <h2><span class="ic" style="background:var(--good)"></span>New products <span class="cnt">3</span></h2>
+  <p class="hint">Handles that appeared in the CSV for the first time. Detected by <code>products.first_seen_at</code>.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Product</th><th>Variant</th><th>Price</th><th>Discount</th><th>Status</th><th>First seen</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT, TROUSER &amp; DUPATTA</div>
+            <div class="hd">rts-shirt-trouser-dupatta-ss-61-1-26-1-maroon</div>
+            <div class="sk">SKU · SS-61.1-26-1-Maroon</div>
+          </td>
+          <td><span class="vp">Maroon</span><span class="vp">LAWN</span></td>
+          <td><span class="new">3,432</span><div class="sub2">was 4,290</div></td>
+          <td class="num">20.0%</td>
+          <td><span class="bdg nw"><span class="d"></span>New</span></td>
+          <td class="num">21 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT</div>
+            <div class="hd">rts-shirt-ec-88-26-mint</div>
+            <div class="sk">SKU · EC-88-26-Mint</div>
+          </td>
+          <td><span class="vp">Mint</span><span class="vp">LAWN</span></td>
+          <td><span class="new">1,190</span><div class="sub2">no compare-at</div></td>
+          <td class="num">—</td>
+          <td><span class="bdg nw"><span class="d"></span>New</span></td>
+          <td class="num">24 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="pt">RTW | SHIRT, TROUSER &amp; DUPATTA</div>
+            <div class="hd">stitched-3-pc-embroidered-lawn-gfsu7104-ivory</div>
+            <div class="sk">SKU · GFSU7104-Ivory-8</div>
+          </td>
+          <td><span class="vp">8</span><span class="vp">Ivory</span><span class="vp">LAWN</span></td>
+          <td><span class="new">5,990</span><div class="sub2">was 9,990</div></td>
+          <td class="num">40.0%</td>
+          <td><span class="bdg nw"><span class="d"></span>New</span></td>
+          <td class="num">26 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note g">
+    <div class="nh">✓ Why these are reliably "new"</div>
+    <p>The handle had never appeared in any previous scrape for this store. A returning product that was merely out of stock would come back as <code>stock_in</code>, not <code>new</code>, because its <code>first_seen_at</code> already exists.</p>
+  </div>
+
+  <!-- ===== PRICE ===== -->
+  <h2><span class="ic" style="background:var(--critical)"></span>Price changes <span class="cnt">6</span></h2>
+  <p class="hint">Old price, new price, the difference, and how the discount moved. Base prices are real values from the 27 Jul CSV.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Product</th><th>Variant</th><th>Price</th><th>Change</th><th>Discount</th><th>Stock</th><th>Date</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT, TROUSER &amp; DUPATTA</div>
+            <div class="hd">rts-shirt-trouser-dupatta-ss-59-1-25-3-blue</div>
+            <div class="sk">SKU · SS-59.1-25-3-Blue</div>
+          </td>
+          <td><span class="vp">Blue</span><span class="vp">LAWN</span></td>
+          <td><span class="old">3,432</span><span class="arw">→</span><span class="new">3,290</span><div class="sub2">compare-at 4,290</div></td>
+          <td class="dn">−142<div class="sub2" style="color:var(--critical)">−4.14%</div></td>
+          <td class="num">20.0% → <b style="color:var(--ink)">23.3%</b></td>
+          <td><span class="bdg in"><span class="d"></span>In</span></td>
+          <td class="num">21 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT &amp; DUPATTA</div>
+            <div class="hd">rts-shirt-dupatta-ec50-26-purple</div>
+            <div class="sk">SKU · EC50-26-Purple</div>
+          </td>
+          <td><span class="vp">Purple</span><span class="vp">LAWN</span></td>
+          <td><span class="old">2,392</span><span class="arw">→</span><span class="new">1,990</span><div class="sub2">compare-at 2,990</div></td>
+          <td class="dn">−402<div class="sub2" style="color:var(--critical)">−16.81%</div></td>
+          <td class="num">20.0% → <b style="color:var(--ink)">33.4%</b></td>
+          <td><span class="bdg in"><span class="d"></span>In</span></td>
+          <td class="num">19 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT, TOUSER &amp; DUPATTA</div>
+            <div class="hd">rts-shirt-touser-dupatta-sf-05-26-teal-green</div>
+            <div class="sk">SKU · SF-05-26-Teal green</div>
+          </td>
+          <td><span class="vp">Teal green</span><span class="vp">SILK COTTON NET</span></td>
+          <td><span class="old">6,367.50</span><span class="arw">→</span><span class="new">5,940</span><div class="sub2">compare-at 8,490</div></td>
+          <td class="dn">−427.50<div class="sub2" style="color:var(--critical)">−6.71%</div></td>
+          <td class="num">25.0% → <b style="color:var(--ink)">30.0%</b></td>
+          <td><span class="bdg in"><span class="d"></span>In</span></td>
+          <td class="num">23 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="pt">RTW | SHIRT &amp; DUPATTA</div>
+            <div class="hd">stitched-2-pc-printed-jacquard-outfit-gfsu6082-grey</div>
+            <div class="sk">SKU · GFSU6082-Grey-6</div>
+          </td>
+          <td><span class="vp">6</span><span class="vp">GREY</span><span class="vp">JACQUARD</span></td>
+          <td><span class="old">2,495</span><span class="arw">→</span><span class="new">1,995</span><div class="sub2">compare-at 4,990</div></td>
+          <td class="dn">−500<div class="sub2" style="color:var(--critical)">−20.04%</div></td>
+          <td class="num">50.0% → <b style="color:var(--ink)">60.0%</b></td>
+          <td><span class="bdg in"><span class="d"></span>In</span></td>
+          <td class="num">25 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT, TROUSER &amp; DUPATTA</div>
+            <div class="hd">rts-shirt-trouser-dupatta-ef56-26-lavender</div>
+            <div class="sk">SKU · EF56-26-Lavender</div>
+          </td>
+          <td><span class="vp">Lavender</span><span class="vp">LAWN</span></td>
+          <td><span class="old">5,112</span><span class="arw">→</span><span class="new">5,490</span><div class="sub2">compare-at 6,390</div></td>
+          <td class="up">+378<div class="sub2" style="color:var(--good-ink)">+7.39%</div></td>
+          <td class="num">20.0% → <b style="color:var(--ink)">14.1%</b></td>
+          <td><span class="bdg in"><span class="d"></span>In</span></td>
+          <td class="num">27 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT, TROUSER &amp; DUPATTA</div>
+            <div class="hd">rts-shirt-trouser-dupatta-ms-180-26-blue</div>
+            <div class="sk">SKU · MS-180-26-Blue</div>
+          </td>
+          <td><span class="vp">Blue</span><span class="vp">LAWN</span></td>
+          <td><span class="new">3,432</span><span class="arw">→</span><span class="new">3,432</span><div class="sub2">compare-at 4,290 → <b style="color:var(--ink)">4,990</b></div></td>
+          <td class="num" style="color:var(--muted)">no price move<div class="sub2">discount_change</div></td>
+          <td class="num">20.0% → <b style="color:var(--ink)">31.2%</b></td>
+          <td><span class="bdg in"><span class="d"></span>In</span></td>
+          <td class="num">27 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note i">
+    <div class="nh">ℹ Look at the last row</div>
+    <p>The selling price did not move at all — it stayed at 3,432. But the store raised the compare-at price from 4,290 to 4,990, so the advertised discount jumped from 20.0% to 31.2%. This is why <code>compare_at_price</code> is tracked alongside <code>price</code>: a discount can change without the price changing.</p>
+  </div>
+
+  <!-- ===== STOCK OUT ===== -->
+  <h2><span class="ic" style="background:var(--orange)"></span>Went out of stock <span class="cnt">4</span></h2>
+  <p class="hint">The product handle is still in the CSV, but this variant disappeared from it — the standard Shopify sold-out signal.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Product</th><th>Variant</th><th>Last price</th><th>Discount</th><th>Days in stock</th><th>Stock</th><th>Date</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT, TROUSER &amp; DUPATTA</div>
+            <div class="hd">rts-shirt-trouser-dupatta-ec41-26-yellow</div>
+            <div class="sk">SKU · EC41-26-Yellow</div>
+          </td>
+          <td><span class="vp">Yellow</span><span class="vp">LAWN</span></td>
+          <td class="num">3,432</td>
+          <td class="num">20.0%</td>
+          <td class="num">196</td>
+          <td><span class="bdg out"><span class="d"></span>Out</span></td>
+          <td class="num">20 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT, TROUSER &amp; DUPATTA</div>
+            <div class="hd">rts-shirt-trouser-dupatta-ss-60-1-25-3-grey</div>
+            <div class="sk">SKU · SS-60.1-25-3-Grey</div>
+          </td>
+          <td><span class="vp">Grey</span><span class="vp">LAWN</span></td>
+          <td class="num">3,432</td>
+          <td class="num">20.0%</td>
+          <td class="num">143</td>
+          <td><span class="bdg out"><span class="d"></span>Out</span></td>
+          <td class="num">23 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT, TOUSER &amp; DUPATTA</div>
+            <div class="hd">rts-shirt-touser-dupatta-sf-01-26-black</div>
+            <div class="sk">SKU · SF-01-26-Black</div>
+          </td>
+          <td><span class="vp">Black</span><span class="vp">SILK COTTON NET</span></td>
+          <td class="num">6,367.50</td>
+          <td class="num">25.0%</td>
+          <td class="num">61</td>
+          <td><span class="bdg out"><span class="d"></span>Out</span></td>
+          <td class="num">23 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT</div>
+            <div class="hd">rts-shirt-br05-26-dark-green</div>
+            <div class="sk">SKU · BR05-26-Dark Green</div>
+          </td>
+          <td><span class="vp">Dark Green</span><span class="vp">LAWN</span></td>
+          <td class="num">1,190</td>
+          <td class="num">—</td>
+          <td class="num">88</td>
+          <td><span class="bdg out"><span class="d"></span>Out</span></td>
+          <td class="num">26 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===== STOCK IN ===== -->
+  <h2><span class="ic" style="background:var(--good)"></span>Back in stock <span class="cnt">2</span></h2>
+  <p class="hint">Variants that had previously gone out and reappeared in the CSV. These are <code>stock_in</code>, not <code>new</code> — the handle already existed.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Product</th><th>Variant</th><th>Price</th><th>Discount</th><th>Was out since</th><th>Stock</th><th>Date</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT &amp; DUPATTA</div>
+            <div class="hd">rts-shirt-dupatta-ec109-26-red</div>
+            <div class="sk">SKU · EC109-26-Red</div>
+          </td>
+          <td><span class="vp">Red</span><span class="vp">LAWN</span></td>
+          <td class="num">2,392</td>
+          <td class="num">20.0%</td>
+          <td class="num">09 Jul (15 days)</td>
+          <td><span class="bdg in"><span class="d"></span>In</span></td>
+          <td class="num">24 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT</div>
+            <div class="hd">rts-shirt-br04-26-lavender</div>
+            <div class="sk">SKU · BR04-26-Lavender</div>
+          </td>
+          <td><span class="vp">Lavender</span><span class="vp">LAWN</span></td>
+          <td class="num">1,190</td>
+          <td class="num">—</td>
+          <td class="num">17 Jul (8 days)</td>
+          <td><span class="bdg in"><span class="d"></span>In</span></td>
+          <td class="num">25 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===== REMOVED ===== -->
+  <h2><span class="ic" style="background:var(--muted)"></span>Removed from store <span class="cnt">1</span></h2>
+  <p class="hint">The entire handle disappeared from the CSV — not just one variant. Marked <code>is_active = false</code>; the row is kept forever.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Product</th><th>Variant</th><th>Last price</th><th>Discount</th><th>Lifetime</th><th>Status</th><th>Date</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <div class="pt">RTS | SHIRT, TROUSER &amp; DUPATTA</div>
+            <div class="hd">rts-shirt-trouser-dupatta-efl-39-3p25-orange</div>
+            <div class="sk">SKU · EFL-39-3P25-Orange</div>
+          </td>
+          <td><span class="vp">Orange</span><span class="vp">LAWN</span></td>
+          <td class="num">3,390</td>
+          <td class="num">—</td>
+          <td class="num">12 Jan → 25 Jul<div class="sub2">194 days</div></td>
+          <td><span class="bdg rm"><span class="d"></span>Removed</span></td>
+          <td class="num">26 Jul</td>
+          <td><span class="lnk">Open ↗</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===== TIMELINE ===== -->
+  <h2><span class="ic" style="background:var(--blue)"></span>Product timeline — full history</h2>
+  <p class="hint">Drilling into one product shows every event ever recorded for it. This is what "complete tracking" looks like at variant level.</p>
+
+  <div class="tl">
+    <div class="th">
+      <div class="pt">RTS | SHIRT, TROUSER &amp; DUPATTA</div>
+      <div class="hd">rts-shirt-trouser-dupatta-ss-59-1-25-3-blue</div>
+      <div class="mgrid">
+        <div class="m"><div class="k">SKU</div><div class="v">SS-59.1-25-3-Blue</div></div>
+        <div class="m"><div class="k">Variant</div><div class="v">Blue / LAWN</div></div>
+        <div class="m"><div class="k">First seen</div><div class="v">12 Jan 2026</div></div>
+        <div class="m"><div class="k">Last seen</div><div class="v">27 Jul 2026</div></div>
+      </div>
+    </div>
+
+    <div class="ev">
+      <div class="dt">12 Jan 2026</div>
+      <div class="ra"><div class="pin" style="background:var(--blue)"></div><div class="bar"></div></div>
+      <div class="bx">
+        <div class="ttl">First appeared<span class="tag">new</span></div>
+        <div class="dsc">Price <b>4,290</b> · no discount · in stock</div>
+      </div>
+    </div>
+    <div class="ev">
+      <div class="dt">03 Mar 2026</div>
+      <div class="ra"><div class="pin" style="background:var(--critical)"></div><div class="bar"></div></div>
+      <div class="bx">
+        <div class="ttl">Price dropped<span class="tag">price_down</span></div>
+        <div class="dsc">4,290 → <b>3,432</b> · <span style="color:var(--critical);font-weight:640">−858 (−20.0%)</span> · discount 0% → <b>20.0%</b></div>
+      </div>
+    </div>
+    <div class="ev">
+      <div class="dt">21 Jul 2026</div>
+      <div class="ra"><div class="pin" style="background:var(--critical)"></div><div class="bar"></div></div>
+      <div class="bx">
+        <div class="ttl">Price dropped<span class="tag">price_down</span></div>
+        <div class="dsc">3,432 → <b>3,290</b> · <span style="color:var(--critical);font-weight:640">−142 (−4.14%)</span> · discount 20.0% → <b>23.3%</b></div>
+      </div>
+    </div>
+    <div class="ev">
+      <div class="dt">23 Jul 2026</div>
+      <div class="ra"><div class="pin" style="background:var(--orange)"></div><div class="bar"></div></div>
+      <div class="bx">
+        <div class="ttl">Went out of stock<span class="tag">stock_out</span></div>
+        <div class="dsc">Variant disappeared from the CSV · last price 3,290</div>
+      </div>
+    </div>
+    <div class="ev">
+      <div class="dt">25 Jul 2026</div>
+      <div class="ra"><div class="pin" style="background:var(--good)"></div><div class="bar"></div></div>
+      <div class="bx">
+        <div class="ttl">Back in stock<span class="tag">stock_in</span></div>
+        <div class="dsc">Reappeared after 2 days · price unchanged at 3,290</div>
+      </div>
+    </div>
+    <div class="ev">
+      <div class="dt">27 Jul 2026</div>
+      <div class="ra"><div class="pin" style="background:var(--critical)"></div></div>
+      <div class="bx">
+        <div class="ttl">Price dropped<span class="tag">price_down</span></div>
+        <div class="dsc">3,290 → <b>2,990</b> · <span style="color:var(--critical);font-weight:640">−300 (−9.12%)</span> · discount 23.3% → <b>30.3%</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note g">
+    <div class="nh">✓ Six rows cover 196 days</div>
+    <p>Between 12 Jan and 27 Jul this variant was scraped every single day, but only <strong>6 history rows</strong> exist — one per actual change. Asking "what was the price on 14 May?" returns 3,432, because that was the last recorded change before that date. Nothing is lost; nothing is duplicated.</p>
+  </div>
+
+  <footer>
+    <strong>Sample report</strong> — Alkaram Studio · 18–27 Jul 2026<br>
+    Handles, SKUs, variant options and base prices are real values taken from
+    <code>https___www_alkaramstudio_com__shopify 27_07_26.csv</code>.
+    The change events across the 10-day window are illustrative, since only a single day's file exists so far.
+  </footer>
+</div>
+
+<script>
+document.getElementById('tg').addEventListener('click',function(){
+  var c=document.documentElement.getAttribute('data-theme');
+  if(!c){c=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+  document.documentElement.setAttribute('data-theme',c==='dark'?'light':'dark');
+});
+</script>
+</body>
+</html>

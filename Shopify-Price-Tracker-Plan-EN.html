@@ -1,0 +1,1747 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shopify Price Tracker — Project Plan (English)</title>
+<style>
+:root {
+  color-scheme: light;
+  --plane:      #f9f9f7;
+  --surface:    #fcfcfb;
+  --surface-2:  #f2f2ee;
+  --ink:        #0b0b0b;
+  --ink-2:      #52514e;
+  --muted:      #898781;
+  --line:       #e1e0d9;
+  --rule:       #c3c2b7;
+  --border:     rgba(11,11,11,0.10);
+  --blue:       #2a78d6;
+  --blue-soft:  #86b6ef;
+  --orange:     #eb6834;
+  --aqua:       #1baf7a;
+  --violet:     #4a3aa7;
+  --good:       #0ca30c;
+  --warning:    #fab219;
+  --serious:    #ec835a;
+  --critical:   #d03b3b;
+  --good-ink:   #006300;
+  --shadow:     0 1px 2px rgba(11,11,11,.04), 0 8px 24px rgba(11,11,11,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --plane:     #0d0d0d;
+    --surface:   #1a1a19;
+    --surface-2: #232322;
+    --ink:       #ffffff;
+    --ink-2:     #c3c2b7;
+    --muted:     #898781;
+    --line:      #2c2c2a;
+    --rule:      #383835;
+    --border:    rgba(255,255,255,0.10);
+    --blue:      #3987e5;
+    --blue-soft: #184f95;
+    --orange:    #d95926;
+    --aqua:      #199e70;
+    --violet:    #9085e9;
+    --good-ink:  #0ca30c;
+    --shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane:     #0d0d0d;
+  --surface:   #1a1a19;
+  --surface-2: #232322;
+  --ink:       #ffffff;
+  --ink-2:     #c3c2b7;
+  --muted:     #898781;
+  --line:      #2c2c2a;
+  --rule:      #383835;
+  --border:    rgba(255,255,255,0.10);
+  --blue:      #3987e5;
+  --blue-soft: #184f95;
+  --orange:    #d95926;
+  --aqua:      #199e70;
+  --violet:    #9085e9;
+  --good-ink:  #0ca30c;
+  --shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+body {
+  margin: 0;
+  background: var(--plane);
+  color: var(--ink);
+  font: 16px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Layout ---------- */
+.wrap { display: grid; grid-template-columns: 248px minmax(0,1fr); gap: 40px; max-width: 1240px; margin: 0 auto; padding: 0 28px 100px; }
+@media (max-width: 900px) { .wrap { grid-template-columns: 1fr; gap: 0; padding: 0 18px 64px; } }
+
+/* ---------- Header ---------- */
+.hero { border-bottom: 1px solid var(--line); background: var(--surface); margin-bottom: 44px; }
+.hero-in { max-width: 1240px; margin: 0 auto; padding: 44px 28px 38px; }
+.eyebrow { font-size: 12px; letter-spacing: .10em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+h1 { font-size: clamp(28px, 4.2vw, 42px); line-height: 1.15; margin: 12px 0 10px; letter-spacing: -.022em; font-weight: 700; }
+.lede { color: var(--ink-2); font-size: 17px; max-width: 62ch; margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.pill { font-size: 12.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-2); }
+.pill.b { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 32%, transparent); background: color-mix(in srgb, var(--blue) 9%, transparent); }
+
+/* ---------- Nav ---------- */
+nav { position: sticky; top: 24px; align-self: start; max-height: calc(100vh - 48px); overflow-y: auto; }
+@media (max-width: 900px) { nav { position: static; max-height: none; margin-bottom: 34px; padding-bottom: 20px; border-bottom: 1px solid var(--line); } }
+nav .nt { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); font-weight: 650; margin-bottom: 12px; }
+nav a { display: block; padding: 7px 12px; color: var(--ink-2); text-decoration: none; font-size: 14px; border-radius: 7px; border-left: 2px solid transparent; }
+nav a:hover { background: var(--surface-2); color: var(--ink); }
+nav a .n { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 8px; font-size: 12.5px; }
+
+/* ---------- Sections ---------- */
+section { margin-bottom: 62px; scroll-margin-top: 24px; }
+h2 { font-size: 25px; letter-spacing: -.018em; margin: 0 0 6px; font-weight: 680; display: flex; align-items: baseline; gap: 12px; }
+h2 .num { font-size: 13px; color: var(--blue); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+h3 { font-size: 17px; margin: 32px 0 12px; font-weight: 660; letter-spacing: -.01em; }
+h4 { font-size: 14.5px; margin: 22px 0 8px; font-weight: 650; color: var(--ink-2); }
+.sub { color: var(--ink-2); margin: 0 0 24px; font-size: 15.5px; max-width: 70ch; }
+p { max-width: 74ch; }
+.hr { height: 1px; background: var(--line); border: 0; margin: 0 0 26px; }
+
+/* ---------- Cards ---------- */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 24px; box-shadow: var(--shadow); }
+.grid { display: grid; gap: 16px; }
+.g3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.g2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+@media (max-width: 860px) { .g3, .g2 { grid-template-columns: 1fr; } }
+
+/* ---------- Stat tiles ---------- */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; margin: 22px 0; }
+@media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.tile .v { font-size: 30px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+.tile .k { font-size: 12.5px; color: var(--muted); margin-top: 4px; font-weight: 550; }
+.tile.ok  .v { color: var(--good-ink); }
+.tile.bad .v { color: var(--critical); }
+.tile.hi  .v { color: var(--blue); }
+
+/* ---------- Tables ---------- */
+.tw { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); margin: 18px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 520px; }
+th { text-align: left; font-weight: 640; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 12px 16px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+td { padding: 11px 16px; border-bottom: 1px solid var(--line); color: var(--ink-2); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td strong, td b { color: var(--ink); font-weight: 640; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.yes { color: var(--good-ink); font-weight: 640; }
+.no  { color: var(--critical); font-weight: 640; }
+.mid { color: var(--muted); font-weight: 600; }
+
+/* ---------- Code ---------- */
+pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; padding: 16px 18px; overflow-x: auto; font: 13px/1.62 ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace; color: var(--ink-2); margin: 16px 0; }
+pre b { color: var(--blue); font-weight: 600; }
+pre i  { color: var(--muted); font-style: normal; }
+pre u  { color: var(--good-ink); text-decoration: none; font-weight: 600; }
+code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 1.5px 6px; font: 13px ui-monospace, Consolas, monospace; color: var(--ink); }
+
+/* ---------- Callouts ---------- */
+.note { border-radius: 11px; padding: 15px 18px; margin: 18px 0; font-size: 14.5px; border: 1px solid var(--border); border-left-width: 3px; background: var(--surface); }
+.note .hd { font-weight: 660; font-size: 13px; letter-spacing: .02em; margin-bottom: 5px; display: flex; align-items: center; gap: 7px; }
+.note p { margin: 0; color: var(--ink-2); }
+.note.warn { border-left-color: var(--warning); }  .note.warn .hd { color: var(--ink); }
+.note.crit { border-left-color: var(--critical); } .note.crit .hd { color: var(--critical); }
+.note.good { border-left-color: var(--good); }     .note.good .hd { color: var(--good-ink); }
+.note.info { border-left-color: var(--blue); }     .note.info .hd { color: var(--blue); }
+
+/* ---------- Flow diagram ---------- */
+.flow { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 26px 22px; margin: 20px 0; }
+.step { display: flex; gap: 16px; align-items: flex-start; }
+.step + .step { margin-top: 4px; }
+.rail { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 34px; }
+.dot { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 12.5px; font-weight: 700; color: #fff; background: var(--blue); flex-shrink: 0; }
+.dot.o { background: var(--orange); } .dot.a { background: var(--aqua); } .dot.v { background: var(--violet); }
+.line { width: 2px; flex: 1; min-height: 26px; background: var(--line); margin: 5px 0; }
+.step .bd { padding-bottom: 18px; min-width: 0; }
+.step:last-child .bd { padding-bottom: 0; }
+.step .t { font-weight: 650; font-size: 15px; margin-bottom: 3px; }
+.step .d { color: var(--ink-2); font-size: 14px; }
+
+/* ---------- Chain ---------- */
+.chain { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 18px 0; }
+.link { display: grid; grid-template-columns: 168px 1fr; gap: 18px; padding: 14px 18px; border-bottom: 1px solid var(--line); align-items: center; }
+.link:last-child { border-bottom: 0; }
+@media (max-width: 640px) { .link { grid-template-columns: 1fr; gap: 4px; } }
+.link .tbl { font: 13.5px ui-monospace, Consolas, monospace; font-weight: 650; color: var(--blue); }
+.link .dsc { font-size: 14px; color: var(--ink-2); }
+.link .dsc em { color: var(--muted); font-style: normal; font-size: 13px; }
+
+/* ---------- Approach card ---------- */
+.appr { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+.appr.pick { border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+.badge { position: absolute; top: -10px; right: 16px; background: var(--good); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .05em; padding: 3px 10px; border-radius: 999px; text-transform: uppercase; }
+.appr .no-t { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+.appr h3 { margin: 6px 0 4px; font-size: 18px; }
+.appr .tag { font-size: 13px; color: var(--ink-2); margin-bottom: 16px; }
+.appr ul { margin: 0 0 14px; padding-left: 0; list-style: none; font-size: 13.5px; }
+.appr li { padding: 3.5px 0 3.5px 22px; position: relative; color: var(--ink-2); }
+.appr li.p::before { content: "✓"; position: absolute; left: 0; color: var(--good-ink); font-weight: 700; }
+.appr li.m::before { content: "✕"; position: absolute; left: 0; color: var(--critical); font-weight: 700; }
+.appr .foot { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-size: 13px; }
+.appr .foot span { color: var(--muted); }
+.appr .foot b { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+
+/* ---------- Column lists ---------- */
+.cols { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0 4px; }
+.cc { font: 12.5px ui-monospace, Consolas, monospace; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-2); }
+.cc.skip { text-decoration: line-through; opacity: .62; }
+
+/* ---------- UI MOCKUPS ---------- */
+.mock { border: 1px solid var(--border); border-radius: 13px; overflow: hidden; background: var(--plane); box-shadow: var(--shadow); margin: 18px 0 8px; }
+.mock-bar { display: flex; align-items: center; gap: 7px; padding: 9px 13px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.mock-bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--rule); display: block; }
+.mock-bar .url { margin-left: 8px; font: 11.5px ui-monospace, Consolas, monospace; color: var(--muted); background: var(--surface); padding: 3px 10px; border-radius: 5px; border: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mock-body { padding: 18px; }
+.cap { font-size: 12.5px; color: var(--muted); margin: 0 0 26px; }
+
+/* app chrome */
+.app-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--line); margin-bottom: 16px; flex-wrap: wrap; }
+.app-top .lt { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand { width: 26px; height: 26px; border-radius: 7px; background: var(--blue); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.app-top .ttl { font-weight: 660; font-size: 15px; letter-spacing: -.01em; }
+.app-top .sm { font-size: 12px; color: var(--muted); }
+.btn { font-size: 12.5px; font-weight: 600; padding: 6px 13px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); white-space: nowrap; }
+.btn.pri { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn.gh { border: 0; background: transparent; color: var(--muted); padding-left: 0; }
+
+/* store cards */
+.sgrid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+@media (max-width: 720px) { .sgrid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 460px) { .sgrid { grid-template-columns: 1fr; } }
+.scard { background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 14px; }
+.scard:first-child { border-color: color-mix(in srgb, var(--blue) 40%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 11%, transparent); }
+.scard .nm { font-weight: 650; font-size: 13.5px; letter-spacing: -.005em; }
+.scard .dm { font-size: 11.5px; color: var(--muted); margin-top: 1px; font-family: ui-monospace, Consolas, monospace; }
+.scard .row { display: flex; align-items: baseline; gap: 6px; margin-top: 11px; }
+.scard .big { font-size: 20px; font-weight: 700; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+.scard .unit { font-size: 11.5px; color: var(--muted); }
+.scard .delta { margin-left: auto; font-size: 11.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.scard .delta.dn { color: var(--critical); } .scard .delta.up { color: var(--good-ink); }
+.st { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 620; margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--line); width: 100%; }
+.st .d { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.st.ok  .d { background: var(--good); }     .st.ok  { color: var(--good-ink); }
+.st.err .d { background: var(--critical); } .st.err { color: var(--critical); }
+.st.wrn .d { background: var(--warning); }  .st.wrn { color: var(--ink-2); }
+
+/* filter row */
+.frow { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 16px; }
+.chip { font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); }
+.chip.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+.chip.dt { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; }
+
+/* kpi */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 16px; }
+@media (max-width: 620px) { .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 13px; }
+.kpi .k { font-size: 11px; color: var(--muted); font-weight: 600; }
+.kpi .v { font-size: 23px; font-weight: 700; letter-spacing: -.03em; line-height: 1.2; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.kpi.c1 .v { color: var(--ink); } .kpi.c2 .v { color: var(--critical); }
+.kpi.c3 .v { color: var(--orange); } .kpi.c4 .v { color: var(--good-ink); }
+
+/* charts */
+.cgrid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 12px; margin-bottom: 16px; }
+@media (max-width: 700px) { .cgrid { grid-template-columns: 1fr; } }
+.chart { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px 11px; }
+.chart .ct { font-size: 12.5px; font-weight: 650; }
+.chart .cs { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+.chart svg { display: block; width: 100%; height: auto; }
+.ax { font: 9.5px system-ui, sans-serif; fill: var(--muted); }
+.bars { display: flex; align-items: flex-end; gap: 6px; height: 82px; margin-top: 6px; }
+.bcol { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; height: 100%; }
+.bseg { border-radius: 4px 4px 0 0; }
+.bseg.a { background: var(--blue); } .bseg.b { background: var(--blue-soft); border-radius: 0 0 4px 4px; }
+.blbl { display: flex; gap: 6px; margin-top: 6px; }
+.blbl span { flex: 1; text-align: center; font-size: 9.5px; color: var(--muted); }
+.lgnd { display: flex; gap: 13px; margin-top: 9px; font-size: 10.5px; color: var(--ink-2); }
+.lgnd i { display: inline-block; width: 9px; height: 9px; border-radius: 2.5px; margin-right: 5px; vertical-align: -1px; }
+
+/* tabs + mock table */
+.tabs { display: flex; gap: 3px; border-bottom: 1px solid var(--line); margin-bottom: 0; overflow-x: auto; }
+.tab { font-size: 12.5px; font-weight: 600; padding: 8px 13px; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tab.on { color: var(--blue); border-bottom-color: var(--blue); }
+.mtw { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-top: 0; border-radius: 0 0 10px 10px; }
+table.mt { min-width: 560px; font-size: 12.5px; }
+table.mt th { padding: 9px 13px; font-size: 10px; }
+table.mt td { padding: 9px 13px; }
+.sw { display: inline-block; padding: 1.5px 7px; border-radius: 5px; font-size: 11px; font-weight: 620; border: 1px solid var(--border); }
+.sw.in  { color: var(--good-ink); }
+.sw.out { color: var(--critical); }
+.sw.new { color: var(--blue); }
+.pr { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pr s { color: var(--muted); text-decoration: line-through; margin-right: 5px; }
+.pr b { color: var(--ink); }
+.dn { color: var(--critical); font-weight: 650; font-variant-numeric: tabular-nums; }
+.up { color: var(--good-ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+.vpill { font-size: 11px; font-family: ui-monospace, Consolas, monospace; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; margin-right: 4px; }
+
+/* login */
+.login { max-width: 300px; margin: 26px auto 30px; text-align: center; }
+.login .brand { margin: 0 auto 14px; width: 34px; height: 34px; border-radius: 9px; font-size: 15px; }
+.login h5 { margin: 0 0 4px; font-size: 15px; font-weight: 660; }
+.login p { font-size: 12px; color: var(--muted); margin: 0 0 16px; }
+.inp { display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+.login .btn { display: block; width: 100%; text-align: center; padding: 9px; margin-top: 4px; }
+
+/* pdf sheet */
+.sheet { background: #fff; color: #111; border: 1px solid var(--border); border-radius: 8px; padding: 20px 22px; font-size: 11.5px; box-shadow: var(--shadow); }
+.sheet .sh { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 9px; margin-bottom: 12px; }
+.sheet h6 { margin: 0; font-size: 14px; font-weight: 700; color: #111; }
+.sheet .mt-s { font-size: 10px; color: #666; margin-top: 2px; }
+.sheet table { min-width: 0; font-size: 10.5px; }
+.sheet th { color: #666; border-bottom: 1px solid #ccc; padding: 6px 8px; }
+.sheet td { color: #333; border-bottom: 1px solid #eee; padding: 6px 8px; }
+.sheet .krow { display: flex; gap: 22px; margin-bottom: 13px; }
+.sheet .krow div span { display: block; font-size: 9.5px; color: #777; }
+.sheet .krow div b { font-size: 16px; font-weight: 700; color: #111; }
+
+/* ---------- Toggle ---------- */
+.tg { position: fixed; top: 16px; right: 16px; z-index: 20; background: var(--surface); border: 1px solid var(--border); color: var(--ink-2); border-radius: 9px; width: 38px; height: 38px; cursor: pointer; font-size: 16px; box-shadow: var(--shadow); }
+.tg:hover { color: var(--ink); }
+footer { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 22px; color: var(--muted); font-size: 13px; }
+
+/* ═══ ADDED: multi-store + versioning visuals ═══ */
+
+/* two-layer boxes */
+.layers{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+@media(max-width:760px){.layers{grid-template-columns:1fr}}
+.lay{border:1px solid var(--border);border-radius:12px;padding:17px 18px;background:var(--surface);box-shadow:var(--shadow);border-top:3px solid var(--rule)}
+.lay.cur{border-top-color:var(--orange)}
+.lay.his{border-top-color:var(--blue)}
+.lay .lt{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:650;color:var(--muted)}
+.lay h4{margin:5px 0 3px;font-size:16px;color:var(--ink);font-weight:660}
+.lay .ls{font-size:13px;color:var(--ink-2);margin-bottom:12px}
+.lay ul{margin:0;padding-left:0;list-style:none;font-size:13px}
+.lay li{padding:4px 0 4px 20px;position:relative;color:var(--ink-2)}
+.lay li::before{content:"›";position:absolute;left:2px;color:var(--muted);font-weight:700}
+.lay .rule{margin-top:12px;padding-top:11px;border-top:1px solid var(--line);font-size:12.5px;font-weight:640}
+.lay.cur .rule{color:var(--orange)} .lay.his .rule{color:var(--blue)}
+
+/* mini db table */
+.dbt{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface);margin:12px 0;box-shadow:var(--shadow)}
+.dbt .cp{padding:8px 13px;background:var(--surface-2);border-bottom:1px solid var(--line);
+  font:12.5px ui-monospace,Consolas,monospace;font-weight:650;color:var(--ink);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.dbt .cp em{font-style:normal;font-family:system-ui,sans-serif;font-size:11.5px;font-weight:500;color:var(--muted)}
+.dbt .sc{overflow-x:auto}
+.dbt table{min-width:520px;font-size:12px}
+.dbt th{padding:7px 12px;font-size:9.5px}
+.dbt td{padding:7px 12px;font:11.5px ui-monospace,Consolas,monospace;color:var(--ink-2)}
+td.chg{background:color-mix(in srgb,var(--warning) 20%,transparent);color:var(--ink);font-weight:660}
+td.same{color:var(--muted)}
+tr.add td{background:color-mix(in srgb,var(--good) 13%,transparent)}
+tr.add td:first-child{box-shadow:inset 3px 0 0 var(--good)}
+tr.frozen td{color:var(--muted)}
+.lgd{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2);margin:8px 0 0}
+.lgd i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px;border:1px solid var(--border)}
+
+/* event cards */
+.evg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}
+@media(max-width:860px){.evg{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.evg{grid-template-columns:1fr}}
+.evc{border:1px solid var(--border);border-radius:10px;padding:12px 13px;background:var(--surface)}
+.evc .n{font:11.5px ui-monospace,Consolas,monospace;font-weight:660;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.evc .n i{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.evc .t{font-size:12px;color:var(--ink-2);line-height:1.5}
+
+/* sparse-vs-dense timeline */
+.sp{border:1px solid var(--border);border-radius:12px;padding:18px 16px 14px;background:var(--surface);
+  overflow-x:auto;margin:16px 0;box-shadow:var(--shadow)}
+.spg{display:grid;grid-template-columns:98px repeat(12,minmax(40px,1fr));min-width:660px;align-items:center;row-gap:5px}
+.spg .lbl{font-size:11px;color:var(--muted);font-weight:640;padding-right:10px}
+.spg .dy{text-align:center;font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;padding-bottom:4px}
+.dot2{width:11px;height:11px;border-radius:50%;margin:0 auto;background:var(--blue)}
+.dot2.no{background:transparent;border:1.5px dashed var(--rule);width:9px;height:9px}
+.seg{height:27px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:650;color:#fff;margin:2px 2px;white-space:nowrap;overflow:hidden}
+.seg.b1{background:var(--blue)} .seg.b2{background:var(--blue-soft);color:var(--ink)}
+.seg.o1{background:#c2521f} .seg.g1{background:#0a7d0a}
+
+/* daily loop */
+.loop{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:20px 22px;
+  margin:16px 0;box-shadow:var(--shadow)}
+.lp{display:grid;grid-template-columns:30px 1fr;gap:0 15px}
+.lp .rn{display:flex;flex-direction:column;align-items:center}
+.lp .cir{width:26px;height:26px;border-radius:50%;background:var(--surface-2);border:1.5px solid var(--rule);
+  display:grid;place-items:center;font-size:11.5px;font-weight:700;color:var(--ink-2);flex-shrink:0}
+.lp .cir.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.lp .vl{width:2px;flex:1;background:var(--line);min-height:16px;margin:4px 0}
+.lp .bd{padding:2px 0 15px}
+.lp .bd:last-child{padding-bottom:0}
+.lp .tt{font-size:13.5px;font-weight:650;color:var(--ink)}
+.lp .dd{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.rewind{margin-top:14px;padding-top:13px;border-top:1px dashed var(--rule);font-size:12.5px;
+  color:var(--blue);font-weight:640;display:flex;align-items:center;gap:8px}
+
+/* store split */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+@media(max-width:760px){.split{grid-template-columns:1fr}}
+.sb{border:1px solid var(--border);border-radius:12px;padding:16px 17px;background:var(--surface);box-shadow:var(--shadow)}
+.sb.bad{border-left:3px solid var(--critical)}
+.sb.ok{border-left:3px solid var(--good)}
+.sb .h{font-size:13.5px;font-weight:660;margin-bottom:9px}
+.sb.bad .h{color:var(--critical)} .sb.ok .h{color:var(--good-ink)}
+.sb pre{margin:0 0 10px;font-size:11.5px;padding:12px 13px}
+.sb ul{margin:0;padding-left:0;list-style:none;font-size:12.5px}
+.sb li{padding:3px 0 3px 19px;position:relative;color:var(--ink-2)}
+.sb.bad li::before{content:"✕";position:absolute;left:0;color:var(--critical);font-weight:700}
+.sb.ok li::before{content:"✓";position:absolute;left:0;color:var(--good-ink);font-weight:700}
+
+/* as-of lookup */
+.aof td.rowsrc{color:var(--blue);font-weight:640}
+.aof td.carry{color:var(--muted)}
+.aof tr.hl td{background:color-mix(in srgb,var(--blue) 10%,transparent)}
+
+</style>
+</head>
+<body>
+<button class="tg" id="tg" title="Theme">◐</button>
+
+<header class="hero">
+  <div class="hero-in">
+    <div class="eyebrow">Technical Plan · v1</div>
+    <h1>Shopify Multi-Store<br>Price &amp; Stock Tracker</h1>
+    <p class="lede">Daily CSV from 100 Shopify stores — variant-level tracking of price, discount and stock, with a full history log and date-range reports.</p>
+    <div class="meta">
+      <span class="pill b">100 Stores / Daily</span>
+      <span class="pill">UiPath → Drive → PostgreSQL → Next.js</span>
+      <span class="pill">Variant-level</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <nav>
+    <div class="nt">Contents</div>
+    <a href="#s1"><span class="n">01</span>Project Flow</a>
+    <a href="#s2"><span class="n">02</span>Three Approaches</a>
+    <a href="#s3"><span class="n">03</span>Database Choice</a>
+    <a href="#s4"><span class="n">04</span>Required Columns</a>
+    <a href="#s5"><span class="n">05</span>Multi-Store Architecture</a>
+    <a href="#s6"><span class="n">06</span>How Versioning Works</a>
+    <a href="#s7"><span class="n">07</span>Table Mapping</a>
+    <a href="#s8"><span class="n">08</span>Database Schema</a>
+    <a href="#s9"><span class="n">09</span>Report Query</a>
+    <a href="#s10"><span class="n">10</span>Frontend</a>
+    <a href="#s11"><span class="n">11</span>Warnings</a>
+  </nav>
+
+  <main>
+
+  <!-- ============ 01 ============ -->
+  <section id="s1">
+    <h2><span class="num">01</span>Project Flow</h2>
+    <p class="sub">A Google Sheet holds 100 store URLs. Every day each store produces one CSV. From those files we extract price, discount and stock changes — <strong>at variant level</strong> (size / color), not just product level.</p>
+    <hr class="hr">
+
+    <div class="flow">
+      <div class="step">
+        <div class="rail"><div class="dot o">1</div><div class="line"></div></div>
+        <div class="bd">
+          <div class="t">Phase 1 — UiPath</div>
+          <div class="d">Reads the 100 store URLs from the Google Sheet, downloads each store's CSV, and uploads them to Google Drive. Runs automatically every day.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="rail"><div class="dot">2</div><div class="line"></div></div>
+        <div class="bd">
+          <div class="t">Phase 2 — Ingest Worker</div>
+          <div class="d">Picks up new files from Drive, parses each CSV, extracts only the 18 columns we need, and writes them into the database. Every file is logged in <code>scrape_runs</code>.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="rail"><div class="dot">3</div><div class="line"></div></div>
+        <div class="bd">
+          <div class="t">Phase 2 — Diff Engine</div>
+          <div class="d">Compares today's data against yesterday's and writes <strong>only what changed</strong> into history — price up/down, stock in/out, new product, removed product.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="rail"><div class="dot a">4</div><div class="line"></div></div>
+        <div class="bd">
+          <div class="t">PostgreSQL</div>
+          <div class="d">Five tables. <code>handle</code> is the unique ID — not the title, since titles repeat. Full history is preserved.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="rail"><div class="dot v">5</div></div>
+        <div class="bd">
+          <div class="t">Frontend — Next.js</div>
+          <div class="d">Log in → 100 store cards → click a card → that store's report (charts + variant table) → date-range filter → PDF download.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tiles">
+      <div class="tile hi"><div class="v">100</div><div class="k">Stores daily</div></div>
+      <div class="tile"><div class="v">~500k</div><div class="k">Variants tracked</div></div>
+      <div class="tile"><div class="v">5</div><div class="k">Database tables</div></div>
+      <div class="tile ok"><div class="v">18</div><div class="k">Columns needed (of 49)</div></div>
+    </div>
+  </section>
+
+  <!-- ============ 02 ============ -->
+  <section id="s2">
+    <h2><span class="num">02</span>Three Approaches</h2>
+    <p class="sub">All three use <strong>PostgreSQL</strong> — that decision is separate (Section 03). What differs is <em>who runs the ingest</em> and <em>how the frontend gets built</em>.</p>
+    <hr class="hr">
+
+    <div class="grid g3">
+
+      <div class="appr pick">
+        <span class="badge">Recommended</span>
+        <div class="no-t">Approach 1</div>
+        <h3>Managed Cloud</h3>
+        <div class="tag">Supabase + Next.js + Vercel Cron</div>
+        <ul>
+          <li class="p">Live in 2–3 weeks</li>
+          <li class="p">Auth system out of the box</li>
+          <li class="p">Automatic backups</li>
+          <li class="p">No servers to maintain</li>
+          <li class="p">Full control over cards and PDF</li>
+          <li class="m">Function timeout ~60 sec</li>
+          <li class="m">100 CSVs must run as separate calls</li>
+        </ul>
+        <div class="foot"><span>Cost</span><b>~$45 / mo</b></div>
+      </div>
+
+      <div class="appr">
+        <div class="no-t">Approach 2</div>
+        <h3>Self-Hosted VPS</h3>
+        <div class="tag">Docker + Node worker + BullMQ + Postgres</div>
+        <ul>
+          <li class="p">No timeouts — handles large files</li>
+          <li class="p">Proper retry queue (3 attempts on failure)</li>
+          <li class="p">Cheapest to run</li>
+          <li class="p">Data stays on your own server</li>
+          <li class="m">You maintain the server</li>
+          <li class="m">Backups and auth must be built</li>
+          <li class="m">Takes 4–5 weeks</li>
+        </ul>
+        <div class="foot"><span>Cost</span><b>~$20 / mo</b></div>
+      </div>
+
+      <div class="appr">
+        <div class="no-t">Approach 3</div>
+        <h3>Low-Code</h3>
+        <div class="tag">n8n + Metabase (no custom frontend)</div>
+        <ul>
+          <li class="p">Working system in one week</li>
+          <li class="p">No ingest code to write</li>
+          <li class="p">Great for a demo or proof of value</li>
+          <li class="m"><b>Store cards are not possible</b></li>
+          <li class="m">PDF layout stays generic</li>
+          <li class="m">Hits a ceiling as needs grow</li>
+        </ul>
+        <div class="foot"><span>Cost</span><b>~$25 / mo</b></div>
+      </div>
+
+    </div>
+
+    <h3>Comparison</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th></th><th>1 · Managed</th><th>2 · Self-Hosted</th><th>3 · Low-Code</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Build time</strong></td><td>2–3 weeks</td><td>4–5 weeks</td><td class="yes">1 week</td></tr>
+          <tr><td><strong>Cost / month</strong></td><td class="num">$45</td><td class="num yes">$20</td><td class="num">$25</td></tr>
+          <tr><td><strong>Custom store cards</strong></td><td class="yes">✓ Full</td><td class="yes">✓ Full</td><td class="no">✕ No</td></tr>
+          <tr><td><strong>Custom PDF layout</strong></td><td class="yes">✓</td><td class="yes">✓</td><td class="no">✕</td></tr>
+          <tr><td><strong>Reliability</strong></td><td class="mid">Good</td><td class="yes">Best</td><td class="mid">Adequate</td></tr>
+          <tr><td><strong>Server maintenance</strong></td><td class="yes">None</td><td class="no">Yours</td><td class="mid">Some</td></tr>
+          <tr><td><strong>Complexity</strong></td><td class="mid">Medium</td><td class="no">High</td><td class="yes">Low</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note good">
+      <div class="hd">✓ Recommendation — start with Approach 1</div>
+      <p><strong>1.</strong> You need store cards and a custom PDF — Approach 3 simply cannot deliver those.<br>
+      <strong>2.</strong> Approach 2 is more robust but not needed yet. 100 files a day is a small load; taking on server maintenance now buys nothing.<br>
+      <strong>3.</strong> Approach 1 gives you authentication for free. In Approach 2 you would build that yourself.<br>
+      <strong>4. Most importantly —</strong> both use Postgres. If you later move to Approach 2, only the <em>ingest layer</em> changes; the database and frontend carry over untouched. This is not a lock-in decision.</p>
+    </div>
+
+    <div class="note info">
+      <div class="hd">ℹ When to pick Approach 2 instead</div>
+      <p>Only if the store count grows past <strong>500</strong>, or CSV files reach <strong>20 MB+</strong>. At that point serverless timeouts start to hurt.</p>
+    </div>
+  </section>
+
+  <!-- ============ 03 ============ -->
+  <section id="s3">
+    <h2><span class="num">03</span>Database Choice</h2>
+    <p class="sub">Decision: <strong>PostgreSQL (relational)</strong>. Not a vector database.</p>
+    <hr class="hr">
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>Database</th><th>Verdict</th><th>Reason</th></tr></thead>
+        <tbody>
+          <tr><td><strong>PostgreSQL</strong></td><td class="yes">✓ Use this</td><td>Numbers, dates and exact comparison — all native. The source data is already tabular.</td></tr>
+          <tr><td><strong>MongoDB</strong></td><td class="mid">⚠ Not needed</td><td>Would work, but day-over-day comparison has to be hand-written. Extra effort for no gain.</td></tr>
+          <tr><td><strong>Vector DB</strong></td><td class="no">✕ Do not use</td><td>It cannot detect a price change at all. See the example below.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Why a vector DB fails here — a real example</h3>
+    <p>A vector database answers exactly one kind of question: <em>"what is semantically similar to this?"</em> It searches by meaning. <strong>It does not compare exact numbers.</strong></p>
+    <p>Take a real variant from your own file:</p>
+
+<pre><i>Yesterday :</i>  SS-59.1-25-3-Blue  |  price <u>3,432</u>  |  compare_at 4,290  |  in stock
+<i>Today     :</i>  SS-59.1-25-3-Blue  |  price <u>3,290</u>  |  compare_at 4,290  |  <b>out of stock</b>
+
+<i>This is what must be caught →</i>  142 PKR drop, discount 20% → 23.3%, and a stock-out</pre>
+
+    <div class="note crit">
+      <div class="hd">✕ Where the vector DB breaks</div>
+      <p>Embed those two lines and their vectors land on top of each other — cosine similarity ≈ <strong>0.999</strong>. The database reports <em>"these are the same thing."</em> It has <strong>no way to see</strong> the difference between 3,432 and 3,290, because the shirt, the color and the name are all identical.<br><br>
+      There is a second problem: vector search is <strong>approximate by design</strong>. There is no guarantee every match is returned. You need a daily report people can trust — if three stores' price drops go missing, the report is worthless.</p>
+    </div>
+
+    <h3>The same job in SQL</h3>
+    <p>One line. Exact, complete and fast:</p>
+<pre><b>WHERE</b> today_price &lt; yesterday_price</pre>
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>Question</th><th>PostgreSQL</th><th>Vector DB</th></tr></thead>
+        <tbody>
+          <tr><td>Which products dropped in price?</td><td class="yes">✓ One query</td><td class="no">✕ Impossible</td></tr>
+          <tr><td>Which variants went out of stock?</td><td class="yes">✓ One query</td><td class="no">✕ Impossible</td></tr>
+          <tr><td>Report for 1 July – 27 July</td><td class="yes">✓ <code>BETWEEN</code></td><td class="no">✕ No concept of dates</td></tr>
+          <tr><td>Which products are new?</td><td class="yes">✓ One query</td><td class="no">✕ Impossible</td></tr>
+          <tr><td>"Find products similar to this one"</td><td class="mid">Difficult</td><td class="yes">✓ Excellent</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note info">
+      <div class="hd">ℹ When a vector DB would earn its place</div>
+      <p>Later, when you want to match <strong>the same product across different stores</strong> — for example "Blue Printed Lawn 3-Piece" vs "3 PC Lawn Suit — Blue" (different names, same item). But you have scoped that out for now: no cross-store comparison yet. So park it.<br><br>
+      Good news: Postgres already ships <code>pgvector</code>. When the need arrives, enable it in the same database. <strong>No migration required.</strong></p>
+    </div>
+  </section>
+
+  <!-- ============ 04 ============ -->
+  <section id="s4">
+    <h2><span class="num">04</span>Required Columns — CSV to Database</h2>
+    <p class="sub">The CSV has 49 columns. We need only 18 — the rest are either completely empty or carry no useful signal.</p>
+    <hr class="hr">
+
+    <div class="tiles">
+      <div class="tile"><div class="v">49</div><div class="k">Columns in the CSV</div></div>
+      <div class="tile ok"><div class="v">14</div><div class="k">Must have</div></div>
+      <div class="tile hi"><div class="v">4</div><div class="k">Good to have</div></div>
+      <div class="tile bad"><div class="v">31</div><div class="k">Skip — no value</div></div>
+    </div>
+
+    <h3>✓ Must have — the system cannot work without these</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>CSV Column</th><th>DB Column</th><th>Table</th><th>Why it is needed</th></tr></thead>
+        <tbody>
+          <tr><td><b>Handle</b></td><td><code>handle</code></td><td>products</td><td><strong>Unique ID</strong> — the most critical field</td></tr>
+          <tr><td>Title</td><td><code>title</code></td><td>products</td><td>Display name in reports</td></tr>
+          <tr><td>Vendor</td><td><code>vendor</code></td><td>products</td><td>Brand</td></tr>
+          <tr><td>Type</td><td><code>product_type</code></td><td>products</td><td>Category filter</td></tr>
+          <tr><td>Tags</td><td><code>tags</code></td><td>products</td><td>Filtering and grouping</td></tr>
+          <tr><td>Published</td><td><code>published_at</code></td><td>products</td><td>Whether it is live</td></tr>
+          <tr><td>Status</td><td><code>status</code></td><td>products</td><td>active / draft</td></tr>
+          <tr><td><b>Variant SKU</b></td><td><code>sku</code></td><td>variants</td><td>Variant identity</td></tr>
+          <tr><td>Option1 Name + Value</td><td><code>option1_*</code></td><td>variants</td><td>Size / Color</td></tr>
+          <tr><td>Option2 Name + Value</td><td><code>option2_*</code></td><td>variants</td><td>Color / Fabric</td></tr>
+          <tr><td>Option3 Name + Value</td><td><code>option3_*</code></td><td>variants</td><td>Fabric</td></tr>
+          <tr><td><b>Variant Price</b></td><td><code>price</code></td><td>variant_history</td><td>Current selling price</td></tr>
+          <tr><td><b>Variant Compare At Price</b></td><td><code>compare_at_price</code></td><td>variant_history</td><td>Original price — discount derives from this</td></tr>
+          <tr><td>Variant Inventory Policy</td><td><code>inventory_policy</code></td><td>variant_history</td><td>Stock signal</td></tr>
+          <tr><td>Inventory quantity</td><td><code>inventory_qty</code></td><td>variant_history</td><td>Stock count <span class="no">(see §09)</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note info">
+      <div class="hd">ℹ Why all three option columns matter</div>
+      <p>Because the requirement is <strong>variant-level tracking</strong>. In your file Option1 is mostly <code>Size</code>, Option2 is <code>Color</code>, Option3 is <code>Fabric</code>. Without them there is no way to tell <em>which</em> size or color dropped in price.</p>
+    </div>
+
+    <h3>🟡 Good to have — improves the report</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>CSV Column</th><th>Purpose</th><th>Decision</th></tr></thead>
+        <tbody>
+          <tr><td>Image Src</td><td>Product thumbnail in reports</td><td class="mid">Keep the <b>first</b> image only</td></tr>
+          <tr><td>Variant Image</td><td>Per-variant thumbnail</td><td class="yes">Keep</td></tr>
+          <tr><td>Body (HTML)</td><td>Product description</td><td class="mid">Heavy — optional, can be dropped</td></tr>
+          <tr><td>Variant Grams</td><td>Weight</td><td class="mid">Not needed right now</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note warn">
+      <div class="hd">⚠ The image problem</div>
+      <p>Your file contains <strong>8,161 image rows</strong> for only <strong>1,997 products</strong> — roughly 4 photos each. There is no need to store them all. Keep only the first image (<code>Image Position = 1</code>) and discard the rest, otherwise the database fills up for no benefit.</p>
+    </div>
+
+    <h3>✕ Skip — these 31 columns</h3>
+    <h4>Completely empty (0% filled) — not a single value in your file</h4>
+    <div class="cols">
+      <span class="cc skip">Variant Barcode</span><span class="cc skip">SEO Title</span><span class="cc skip">SEO Description</span>
+      <span class="cc skip">Variant Weight Unit</span><span class="cc skip">Variant Tax Code</span><span class="cc skip">Cost per item</span>
+      <span class="cc skip">Google Shopping / Category</span><span class="cc skip">/ Gender</span><span class="cc skip">/ Age Group</span>
+      <span class="cc skip">/ MPN</span><span class="cc skip">/ AdWords Grouping</span><span class="cc skip">/ AdWords Labels</span>
+      <span class="cc skip">/ Condition</span><span class="cc skip">/ Custom Product</span><span class="cc skip">/ Custom Label 0</span>
+      <span class="cc skip">/ Custom Label 1</span><span class="cc skip">/ Custom Label 2</span><span class="cc skip">/ Custom Label 3</span>
+      <span class="cc skip">/ Custom Label 4</span>
+    </div>
+    <h4>No useful signal</h4>
+    <div class="cols">
+      <span class="cc skip">Image Alt Text — 8,160 of 8,161 empty</span>
+      <span class="cc skip">Variant Inventory Tracker — only 0.78% filled</span>
+      <span class="cc skip">Gift Card — all false</span>
+      <span class="cc skip">Variant Requires Shipping — all true</span>
+      <span class="cc skip">Variant Taxable — all true</span>
+      <span class="cc skip">Variant Fulfillment Service — all manual</span>
+      <span class="cc skip">Image Position — only used for sorting</span>
+    </div>
+
+    <h3>➕ Columns we generate ourselves — not in the CSV</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>DB Column</th><th>How it is derived</th></tr></thead>
+        <tbody>
+          <tr><td><code>discount_pct</code></td><td><code>(compare_at − price) / compare_at × 100</code></td></tr>
+          <tr><td><code>in_stock</code></td><td>Inventory policy + whether the variant still appears in the feed</td></tr>
+          <tr><td><code>observed_date</code></td><td>Date of the scrape</td></tr>
+          <tr><td><code>scrape_run_id</code></td><td>Which run produced this row</td></tr>
+          <tr><td><code>first_seen_at</code></td><td>First appearance — this is how <strong>new products</strong> are detected</td></tr>
+          <tr><td><code>last_seen_at</code></td><td>Last appearance — this is how <strong>removals</strong> are detected</td></tr>
+          <tr><td><code>change_type</code></td><td>price_up / price_down / stock_in / stock_out / new / removed</td></tr>
+          <tr><td><code>store_id</code></td><td>Which store the row belongs to</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note good">
+      <div class="hd">✓ The payoff</div>
+      <p><strong>49 columns → 18 kept → 31 dropped.</strong> The database stays roughly 60% smaller, queries run faster, and reports load quickly.</p>
+    </div>
+  </section>
+
+    <!-- ============ 05 MULTI-STORE ============ -->
+  <section id="s5">
+    <h2><span class="num">05</span>Multi-Store Architecture</h2>
+    <p class="sub">100 stores are independent — but that does <strong>not</strong> mean 100 databases. One database, one set of tables, separated by a <code>store_id</code> column.</p>
+    <hr class="hr">
+
+    <div class="split">
+      <div class="sb bad">
+        <div class="h">✕ What not to do</div>
+<pre>alkaram_db   → products, variants, history
+khaadi_db    → products, variants, history
+sapphire_db  → products, variants, history
+        ⋮  × 100
+
+<i>= 100 databases · 500 tables</i></pre>
+        <ul>
+          <li>Every schema change runs 100 times</li>
+          <li>100 backup jobs to monitor</li>
+          <li>100 connection pools — Postgres often caps at 100 connections</li>
+          <li>Adding a store means creating a whole database</li>
+          <li>Cross-store queries become impossible</li>
+        </ul>
+      </div>
+
+      <div class="sb ok">
+        <div class="h">✓ What to do</div>
+<pre>ONE database
+  └─ products (store_id, handle, …)
+     variants
+     variant_history
+     scrape_runs
+     stores
+
+<i>= 1 database · 5 tables</i></pre>
+        <ul>
+          <li>Schema change runs once</li>
+          <li>One backup</li>
+          <li>One connection pool</li>
+          <li>Adding a store is a single <code>INSERT</code></li>
+          <li>Cross-store reporting is one <code>GROUP BY</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>How the data actually sits</h3>
+    <div class="dbt">
+      <div class="cp">products <em>one table, every store</em></div>
+      <div class="sc">
+        <table>
+          <thead><tr><th>id</th><th>store_id</th><th>handle</th><th>title</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td class="chg">12</td><td>rts-shirt-ss-59-1-blue</td><td>RTS | Shirt, Trouser &amp; Dupatta</td></tr>
+            <tr><td>2</td><td class="chg">12</td><td>rts-shirt-dupatta-ec50-purple</td><td>RTS | Shirt &amp; Dupatta</td></tr>
+            <tr><td>3</td><td>45</td><td>khaadi-kurta-red</td><td>Printed Kurta</td></tr>
+            <tr><td>4</td><td>45</td><td>khaadi-dupatta-printed</td><td>Printed Dupatta</td></tr>
+            <tr><td>5</td><td>78</td><td>sapphire-bedsheet-king</td><td>King Bedsheet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p>Isolation comes from the filter, not from physical separation. Every query carries it:</p>
+<pre><b>WHERE</b> store_id = 12     <i>-- Khaadi's rows can never appear</i></pre>
+    <p>The column is indexed, so pulling one store out of five million rows takes milliseconds.</p>
+
+    <h3>Adding store #101</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th></th><th>100 separate databases</th><th>One database</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Work required</strong></td><td>Create database, 5 tables, indexes, connection, backup job, new code branch</td><td class="yes">One <code>INSERT</code> row</td></tr>
+          <tr><td><strong>Time</strong></td><td>~30 minutes</td><td class="yes">~10 seconds</td></tr>
+          <tr><td><strong>Schema migration</strong></td><td class="no">Runs 100×; three failures = three stores out of sync</td><td class="yes">Runs once</td></tr>
+          <tr><td><strong>Backups</strong></td><td class="no">100 jobs</td><td class="yes">1</td></tr>
+          <tr><td><strong>"Which store discounts most?"</strong></td><td class="no">Impossible — no JOIN across databases</td><td class="yes">One <code>GROUP BY store_id</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+<pre><i>-- adding a store is genuinely this small</i>
+<b>INSERT INTO</b> stores (name, domain) <b>VALUES</b> ('New Store', 'newstore.com');
+<i>-- the ingest worker picks it up on the next run</i></pre>
+
+    <div class="note info">
+      <div class="hd">ℹ Why "independent" still holds</div>
+      <p>Independence is about <em>behaviour</em>, not storage. Each store gets its own <code>scrape_runs</code> row and its own ingest job, so one store failing never touches the other 99. Each report filters by <code>store_id</code>. Postgres Row Level Security can enforce that boundary at the database level if you ever need a hard guarantee.<br><br>
+      And the decisive point: <strong>all 100 CSVs have the identical 49-column Shopify shape.</strong> Same shape means same table. Separate tables would only make sense if each store had a different format.</p>
+    </div>
+
+    <div class="note good">
+      <div class="hd">✓ This is the standard pattern</div>
+      <p>It is called <strong>multi-tenancy</strong>, and effectively every SaaS product is built this way — including Shopify itself, which holds millions of stores in shared tables keyed by shop ID. At 100 stores × ~5,000 variants = 500,000 rows, this is a small workload for Postgres.</p>
+    </div>
+  </section>
+
+  <!-- ============ 06 VERSIONING ============ -->
+  <section id="s6">
+    <h2><span class="num">06</span>How Versioning Works</h2>
+    <p class="sub">The core of the system. Every day's CSV is compared against the previous day, and only what changed is recorded — yet the complete state of any past date can still be reconstructed exactly.</p>
+    <hr class="hr">
+
+    <h3>6.1 · Two layers</h3>
+    <p>The whole design rests on splitting the data into two layers that do different jobs and never fight each other.</p>
+
+    <div class="layers">
+      <div class="lay cur">
+        <div class="lt">Layer 1</div>
+        <h4>Current state</h4>
+        <div class="ls"><code>products</code> · <code>variants</code></div>
+        <ul>
+          <li>What the store looks like <strong>today</strong></li>
+          <li>handle, title, SKU, size, color, fabric</li>
+          <li><code>current_price</code>, <code>current_in_stock</code> — a cache for speed</li>
+          <li><code>first_seen_at</code>, <code>last_seen_at</code>, <code>is_active</code></li>
+        </ul>
+        <div class="rule">↻ Updated in place every day</div>
+      </div>
+      <div class="lay his">
+        <div class="lt">Layer 2</div>
+        <h4>History</h4>
+        <div class="ls"><code>variant_history</code></div>
+        <ul>
+          <li>What happened, and <strong>when</strong></li>
+          <li>price, compare-at, discount %, stock</li>
+          <li>previous values carried on the same row</li>
+          <li>one row per actual change, with its date</li>
+        </ul>
+        <div class="rule">＋ Append-only · never updated, never deleted</div>
+      </div>
+    </div>
+
+    <div class="note info">
+      <div class="hd">ℹ The division of labour</div>
+      <p>Layer 1 answers <em>"what is the price right now?"</em> in one indexed row read — that is what the ingest diff and the store cards use. Layer 2 answers <em>"what was the price on 14 May?"</em> and <em>"when did it change?"</em>. Neither can overwrite the other, because price only ever <strong>changes</strong> in Layer 2 by adding a row.</p>
+    </div>
+
+    <h3>6.2 · The daily loop</h3>
+    <p>This runs once per store, per day. Identical for all 100 stores.</p>
+
+    <div class="loop">
+      <div class="lp">
+        <div class="rn"><div class="cir on">1</div><div class="vl"></div></div>
+        <div class="bd"><div class="tt">Open a scrape run</div><div class="dd">Insert a <code>scrape_runs</code> row with status <code>pending</code> — proof this store was attempted today.</div></div>
+      </div>
+      <div class="lp">
+        <div class="rn"><div class="cir on">2</div><div class="vl"></div></div>
+        <div class="bd"><div class="tt">Parse today's CSV</div><div class="dd">Build a set keyed by <code>(handle, variant_key)</code> holding price, compare-at price and presence.</div></div>
+      </div>
+      <div class="lp">
+        <div class="rn"><div class="cir on">3</div><div class="vl"></div></div>
+        <div class="bd"><div class="tt">Read yesterday's state</div><div class="dd">Load the store's active variants with their <code>current_*</code> values. No history scan — one indexed read.</div></div>
+      </div>
+      <div class="lp">
+        <div class="rn"><div class="cir on">4</div><div class="vl"></div></div>
+        <div class="bd"><div class="tt">Compare, variant by variant</div><div class="dd">
+          In CSV but not in DB → <b>new</b><br>
+          In both, price / compare-at / stock differs → <b>write a history row</b><br>
+          In both, everything identical → <b>update <code>last_seen_at</code> only</b><br>
+          In DB but not in CSV → <b>stock_out</b> (or <b>removed</b> if the whole handle is gone)
+        </div></div>
+      </div>
+      <div class="lp">
+        <div class="rn"><div class="cir on">5</div><div class="vl"></div></div>
+        <div class="bd"><div class="tt">Refresh the cache</div><div class="dd">Overwrite <code>current_price</code>, <code>current_in_stock</code>, <code>last_seen_at</code> on Layer 1.</div></div>
+      </div>
+      <div class="lp">
+        <div class="rn"><div class="cir on">6</div></div>
+        <div class="bd"><div class="tt">Close the run</div><div class="dd">Set status <code>success</code> and record the counts — products found, changes written.</div></div>
+      </div>
+      <div class="rewind">↻ Tomorrow's CSV runs the same six steps against today's state</div>
+    </div>
+
+    <div class="note crit">
+      <div class="hd">✕ The one rule that must never be broken</div>
+      <p>If the download failed, or the file came back empty or truncated, <strong>skip step 4's removal detection entirely</strong>. Otherwise one bad download marks 2,000 products as <code>removed</code> and corrupts the history permanently.<br><br>
+      Guard it with a sanity check: if today's product count is below 50% of yesterday's, mark the run <code>partial</code>, skip removals, and raise an alert. A store never loses half its catalogue overnight — that is a scrape problem, not a store event.</p>
+    </div>
+
+    <h3>6.3 · Day 1 → Day 2: what actually changes</h3>
+    <p>Take one real variant. On day 1 it is priced 3,000. On day 2 the CSV says 2,500.</p>
+
+    <h4>After day 1 (01 Aug)</h4>
+    <div class="dbt">
+      <div class="cp">variants <em>Layer 1 — current state</em></div>
+      <div class="sc"><table>
+        <thead><tr><th>id</th><th>sku</th><th>current_price</th><th>current_in_stock</th><th>first_seen_at</th><th>last_seen_at</th></tr></thead>
+        <tbody><tr><td>4471</td><td>XYZ</td><td>3,000</td><td>true</td><td>01-Aug</td><td>01-Aug</td></tr></tbody>
+      </table></div>
+    </div>
+    <div class="dbt">
+      <div class="cp">variant_history <em>Layer 2 — append-only</em></div>
+      <div class="sc"><table>
+        <thead><tr><th>variant_id</th><th>observed_date</th><th>change_type</th><th>price</th><th>prev_price</th><th>in_stock</th></tr></thead>
+        <tbody><tr><td>4471</td><td>01-Aug</td><td>new</td><td>3,000</td><td>—</td><td>true</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <h4>After day 2 (02 Aug) — price moved to 2,500</h4>
+    <div class="dbt">
+      <div class="cp">variants <em>two fields overwritten</em></div>
+      <div class="sc"><table>
+        <thead><tr><th>id</th><th>sku</th><th>current_price</th><th>current_in_stock</th><th>first_seen_at</th><th>last_seen_at</th></tr></thead>
+        <tbody><tr><td class="same">4471</td><td class="same">XYZ</td><td class="chg">2,500</td><td class="same">true</td><td class="same">01-Aug</td><td class="chg">02-Aug</td></tr></tbody>
+      </table></div>
+    </div>
+    <div class="dbt">
+      <div class="cp">variant_history <em>day 1's row untouched, a new row appended</em></div>
+      <div class="sc"><table>
+        <thead><tr><th>variant_id</th><th>observed_date</th><th>change_type</th><th>price</th><th>prev_price</th><th>in_stock</th></tr></thead>
+        <tbody>
+          <tr class="frozen"><td>4471</td><td>01-Aug</td><td>new</td><td>3,000</td><td>—</td><td>true</td></tr>
+          <tr class="add"><td>4471</td><td>02-Aug</td><td>price_down</td><td>2,500</td><td>3,000</td><td>true</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="lgd">
+      <span><i style="background:color-mix(in srgb,var(--warning) 20%,transparent)"></i>Overwritten</span>
+      <span><i style="background:color-mix(in srgb,var(--good) 13%,transparent)"></i>Newly appended</span>
+      <span><i style="background:var(--surface)"></i>Frozen forever</span>
+    </div>
+
+    <h3>6.4 · So does the old price get overwritten?</h3>
+    <div class="note good">
+      <div class="hd">✓ Yes in Layer 1 — no in Layer 2</div>
+      <p><code>variants.current_price</code> goes from 3,000 to <strong>2,500</strong>. That is deliberate: it is a cache so the app can show today's price without scanning history.<br><br>
+      <code>variant_history</code> still holds <strong>3,000 against 01-Aug</strong>, and always will. The new value arrived as a row <em>beneath</em> the old one, not on top of it.<br><br>
+      If the cache is ever wrong or lost, it can be rebuilt from history in one statement — so nothing authoritative depends on it.</p>
+    </div>
+
+<pre><i>-- rebuilding the Layer 1 cache from Layer 2, if ever needed</i>
+<b>UPDATE</b> variants v
+   <b>SET</b> current_price = h.price, current_in_stock = h.in_stock
+  <b>FROM</b> (<b>SELECT DISTINCT ON</b> (variant_id) variant_id, price, in_stock
+          <b>FROM</b> variant_history <b>ORDER BY</b> variant_id, observed_date <b>DESC</b>) h
+ <b>WHERE</b> h.variant_id = v.id;</pre>
+
+    <div class="note info">
+      <div class="hd">ℹ Make it impossible to overwrite history</div>
+      <p>Lock it at the database level so no bug can ever rewrite the past:</p>
+<pre><b>REVOKE</b> UPDATE, DELETE <b>ON</b> variant_history <b>FROM</b> app_user;
+<b>GRANT</b>  INSERT, SELECT  <b>ON</b> variant_history <b>TO</b>   app_user;</pre>
+    </div>
+
+    <h3>6.5 · The seven event types</h3>
+    <p>Every change written to history is exactly one of these.</p>
+    <div class="evg">
+      <div class="evc"><div class="n"><i style="background:var(--blue)"></i>new</div><div class="t">Handle or variant appeared in a CSV for the first time ever.</div></div>
+      <div class="evc"><div class="n"><i style="background:var(--critical)"></i>price_down</div><div class="t">Selling price fell. Amount and % both recorded.</div></div>
+      <div class="evc"><div class="n"><i style="background:var(--good)"></i>price_up</div><div class="t">Selling price rose.</div></div>
+      <div class="evc"><div class="n"><i style="background:var(--warning)"></i>discount_change</div><div class="t">Price unchanged, but compare-at moved — so the advertised % changed.</div></div>
+      <div class="evc"><div class="n"><i style="background:var(--orange)"></i>stock_out</div><div class="t">Variant vanished from the CSV while its product is still listed.</div></div>
+      <div class="evc"><div class="n"><i style="background:var(--good)"></i>stock_in</div><div class="t">A previously missing variant reappeared.</div></div>
+      <div class="evc"><div class="n"><i style="background:var(--muted)"></i>removed</div><div class="t">The whole handle left the store. Row kept, <code>is_active=false</code>.</div></div>
+      <div class="evc" style="border-style:dashed"><div class="n" style="color:var(--muted)">— no row —</div><div class="t">Nothing differed. Only <code>last_seen_at</code> advances.</div></div>
+    </div>
+
+    <div class="note warn">
+      <div class="hd">⚠ discount_change is easy to miss</div>
+      <p>A store can leave the price at 3,432 and raise the compare-at price from 4,290 to 4,990. The customer now sees <strong>31.2% off</strong> instead of 20.0% — with no price movement at all. That is why <code>compare_at_price</code> is compared alongside <code>price</code>, not derived from it.</p>
+    </div>
+
+    <h3>6.6 · Few rows, complete timeline</h3>
+    <p>This is the idea that makes the whole thing work. History rows are <strong>sparse</strong>; the timeline they describe is <strong>continuous</strong>. Each row means <em>"this value held from this date until the next row."</em></p>
+
+    <div class="sp">
+      <div class="spg">
+        <div class="lbl"></div>
+        <div class="dy">1</div><div class="dy">2</div><div class="dy">3</div><div class="dy">4</div>
+        <div class="dy">5</div><div class="dy">6</div><div class="dy">7</div><div class="dy">8</div>
+        <div class="dy">9</div><div class="dy">10</div><div class="dy">11</div><div class="dy">12</div>
+
+        <div class="lbl">History row</div>
+        <div><div class="dot2"></div></div><div><div class="dot2"></div></div>
+        <div><div class="dot2 no"></div></div><div><div class="dot2 no"></div></div><div><div class="dot2 no"></div></div>
+        <div><div class="dot2"></div></div>
+        <div><div class="dot2 no"></div></div><div><div class="dot2 no"></div></div>
+        <div><div class="dot2"></div></div><div><div class="dot2 no"></div></div>
+        <div><div class="dot2"></div></div><div><div class="dot2 no"></div></div>
+
+        <div class="lbl">Actual state</div>
+        <div class="seg b1">3,000</div>
+        <div class="seg b2" style="grid-column:span 4">2,500 · in stock</div>
+        <div class="seg o1" style="grid-column:span 3">2,500 · OUT</div>
+        <div class="seg g1" style="grid-column:span 2">2,500 · in</div>
+        <div class="seg b1" style="grid-column:span 2">2,200</div>
+      </div>
+      <div class="lgd" style="margin-top:12px">
+        <span><i style="background:var(--blue)"></i>A change was recorded</span>
+        <span><i style="background:transparent;border:1.5px dashed var(--rule)"></i>Nothing changed — no row written</span>
+      </div>
+    </div>
+
+    <p><strong>5 history rows cover all 12 days.</strong> Days 3, 4, 5, 7, 8, 10 and 12 have no row of their own — because on those days nothing changed, and the previous row is still the correct answer.</p>
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>Approach</th><th>Rows / day</th><th>Rows / year</th><th>Answers every question?</th></tr></thead>
+        <tbody>
+          <tr><td>Full snapshot every day</td><td class="num">~500,000</td><td class="num">~180,000,000</td><td class="mid">Yes — at 30× the cost</td></tr>
+          <tr><td><strong>Change-only</strong></td><td class="num">~15,000</td><td class="num">~5,500,000</td><td class="yes">✓ Yes</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>6.7 · Reading any past date</h3>
+    <p>To recover the state on a given day, take the <strong>last row on or before that date</strong>. In SQL that is one <code>DISTINCT ON</code>.</p>
+
+<pre><b>SELECT DISTINCT ON</b> (variant_id)
+       variant_id, observed_date, change_type,
+       price, compare_at_price, discount_pct, in_stock
+<b>FROM</b>   variant_history
+<b>WHERE</b>  variant_id = 4471
+  <b>AND</b>  observed_date &lt;= '2026-08-01'      <i>-- ← any date you want</i>
+<b>ORDER</b>  <b>BY</b> variant_id, observed_date <b>DESC</b>;</pre>
+
+    <p>Running that for each of the 12 days above returns:</p>
+    <div class="tw aof">
+      <table>
+        <thead><tr><th>Day asked for</th><th>Row that answers it</th><th>Price</th><th>Stock</th></tr></thead>
+        <tbody>
+          <tr class="hl"><td><strong>Day 1</strong> — 01 Aug</td><td class="rowsrc">01 Aug</td><td class="num">3,000</td><td class="yes">In</td></tr>
+          <tr><td>Day 2 — 02 Aug</td><td class="rowsrc">02 Aug</td><td class="num">2,500</td><td class="yes">In</td></tr>
+          <tr><td>Day 3 — 03 Aug</td><td class="carry">02 Aug <em>(carried)</em></td><td class="num">2,500</td><td class="yes">In</td></tr>
+          <tr><td>Day 4 — 04 Aug</td><td class="carry">02 Aug <em>(carried)</em></td><td class="num">2,500</td><td class="yes">In</td></tr>
+          <tr><td>Day 5 — 05 Aug</td><td class="carry">02 Aug <em>(carried)</em></td><td class="num">2,500</td><td class="yes">In</td></tr>
+          <tr><td>Day 6 — 06 Aug</td><td class="rowsrc">06 Aug</td><td class="num">2,500</td><td class="no">Out</td></tr>
+          <tr><td>Day 7 — 07 Aug</td><td class="carry">06 Aug <em>(carried)</em></td><td class="num">2,500</td><td class="no">Out</td></tr>
+          <tr><td>Day 8 — 08 Aug</td><td class="carry">06 Aug <em>(carried)</em></td><td class="num">2,500</td><td class="no">Out</td></tr>
+          <tr><td>Day 9 — 09 Aug</td><td class="rowsrc">09 Aug</td><td class="num">2,500</td><td class="yes">In</td></tr>
+          <tr><td>Day 10 — 10 Aug</td><td class="carry">09 Aug <em>(carried)</em></td><td class="num">2,500</td><td class="yes">In</td></tr>
+          <tr><td>Day 11 — 11 Aug</td><td class="rowsrc">11 Aug</td><td class="num">2,200</td><td class="yes">In</td></tr>
+          <tr><td>Day 12 — 12 Aug</td><td class="carry">11 Aug <em>(carried)</em></td><td class="num">2,200</td><td class="yes">In</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Every day answered correctly, from five rows. This pattern has a name — <strong>Slowly Changing Dimension Type 2</strong> — and it is how banking and inventory systems have kept history for decades.</p>
+
+    <h4>Wrap it in a function so nobody rewrites it</h4>
+<pre><b>CREATE OR REPLACE FUNCTION</b> store_state_on(p_store_id BIGINT, p_date DATE)
+<b>RETURNS TABLE</b> (variant_id BIGINT, handle TEXT, title TEXT, sku TEXT,
+               variant_label TEXT, price NUMERIC, compare_at NUMERIC,
+               discount_pct NUMERIC, in_stock BOOLEAN, changed_on DATE) <b>AS</b> $$
+  <b>SELECT DISTINCT ON</b> (h.variant_id)
+         h.variant_id, p.handle, p.title, v.sku,
+         concat_ws(' / ', v.option1_value, v.option2_value, v.option3_value),
+         h.price, h.compare_at_price, h.discount_pct, h.in_stock, h.observed_date
+  <b>FROM</b>   variant_history h
+  <b>JOIN</b>   variants v <b>ON</b> v.id = h.variant_id
+  <b>JOIN</b>   products p <b>ON</b> p.id = v.product_id
+  <b>WHERE</b>  p.store_id = p_store_id
+    <b>AND</b>  h.observed_date &lt;= p_date
+  <b>ORDER</b>  <b>BY</b> h.variant_id, h.observed_date <b>DESC</b>;
+$$ <b>LANGUAGE</b> sql <b>STABLE</b>;
+
+<i>-- the whole store, as it stood on any date</i>
+<b>SELECT</b> * <b>FROM</b> store_state_on(12, '2026-08-01');   <i>-- day 1</i>
+<b>SELECT</b> * <b>FROM</b> store_state_on(12, '2026-08-12');   <i>-- day 12</i></pre>
+
+    <h4>Comparing any two dates</h4>
+<pre><b>SELECT</b> d1.handle, d1.sku, d1.variant_label,
+       d1.price  <b>AS</b> day_1_price,
+       d12.price <b>AS</b> day_12_price,
+       d12.price - d1.price <b>AS</b> diff,
+       <b>ROUND</b>((d12.price - d1.price) / <b>NULLIF</b>(d1.price,0) * 100, 2) <b>AS</b> diff_pct,
+       d1.in_stock <b>AS</b> stock_before, d12.in_stock <b>AS</b> stock_after
+<b>FROM</b>      store_state_on(12, '2026-08-12') d12
+<b>FULL JOIN</b> store_state_on(12, '2026-08-01') d1 <b>USING</b> (variant_id)
+<b>WHERE</b>  d1.price    <b>IS DISTINCT FROM</b> d12.price
+   <b>OR</b>  d1.in_stock <b>IS DISTINCT FROM</b> d12.in_stock;</pre>
+    <p><code>FULL JOIN</code> is deliberate — it also surfaces variants that did not exist on day 1 (new) and ones gone by day 12 (removed).</p>
+
+    <div class="note info">
+      <div class="hd">ℹ Two different reads — do not confuse them</div>
+      <p><strong>Ingest</strong> compares against <code>variants.current_*</code> — one indexed row, milliseconds, no history touched. That keeps 100 stores ingesting fast.<br>
+      <strong>Reporting</strong> reads <code>variant_history</code> — that is where six-month-old answers come from.</p>
+    </div>
+
+    <h3>6.8 · How history reaches the report</h3>
+    <p>Reports never join three tables by hand. One view does it once, and the screen, the PDF and the CSV export all read from it.</p>
+
+<pre><b>CREATE VIEW</b> v_change_report <b>AS</b>
+<b>SELECT</b> s.id <b>AS</b> store_id, s.name <b>AS</b> store_name,
+       p.handle, p.title, p.vendor, p.product_type, p.image_src,
+       'https://' || s.domain || '/products/' || p.handle <b>AS</b> product_url,
+       v.sku, concat_ws(' / ', v.option1_value, v.option2_value, v.option3_value) <b>AS</b> variant_label,
+       h.observed_date, h.change_type,
+       h.prev_price, h.price, h.price - h.prev_price <b>AS</b> price_diff,
+       <b>ROUND</b>((h.price - h.prev_price) / <b>NULLIF</b>(h.prev_price,0)*100, 2) <b>AS</b> price_diff_pct,
+       h.prev_compare_at_price, h.compare_at_price, h.discount_pct,
+       h.prev_in_stock, h.in_stock,
+       p.first_seen_at, v.last_seen_at
+<b>FROM</b>   variant_history h
+<b>JOIN</b>   variants v <b>ON</b> v.id = h.variant_id
+<b>JOIN</b>   products p <b>ON</b> p.id = v.product_id
+<b>JOIN</b>   stores   s <b>ON</b> s.id = p.store_id;
+
+<i>-- the entire report is then this</i>
+<b>SELECT</b> * <b>FROM</b> v_change_report
+<b>WHERE</b>  store_id = 12 <b>AND</b> observed_date <b>BETWEEN</b> $1 <b>AND</b> $2
+<b>ORDER</b>  <b>BY</b> observed_date <b>DESC</b>, handle;</pre>
+
+    <p>Each row that comes back is fully self-describing — no lookups needed to understand it:</p>
+<pre>═══════════════════════════════════════════════════════════════
+ STORE     Alkaram Studio · alkaramstudio.com
+ HANDLE    rts-shirt-trouser-dupatta-ss-59-1-25-3-blue
+ TITLE     RTS | SHIRT, TROUSER &amp; DUPATTA
+ 🔗 LINK   https://alkaramstudio.com/products/rts-shirt-trouser-…
+ SKU       SS-59.1-25-3-Blue          VARIANT   Blue / LAWN
+───────────────────────────────────────────────────────────────
+ DATE      21 Jul 2026                EVENT     price_down
+ PRICE     3,432  →  <b>3,290</b>            DIFF      <b>−142 (−4.14%)</b>
+ COMPARE   4,290  →  4,290
+ DISCOUNT  20.0%  →  <b>23.3%</b>
+ STOCK     In     →  In
+───────────────────────────────────────────────────────────────
+ First seen 12 Jan 2026     Last seen 27 Jul 2026
+═══════════════════════════════════════════════════════════════</pre>
+
+    <h4>What the user sees</h4>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Report view</th><th>Reads from</th><th>Question it answers</th></tr></thead>
+        <tbody>
+          <tr><td>Store cards</td><td><code>variants.current_*</code> + <code>scrape_runs</code></td><td>What does this store look like today, and did the scrape run?</td></tr>
+          <tr><td>KPI tiles</td><td><code>variant_history</code> filtered by date range</td><td>How many changes of each kind in this window?</td></tr>
+          <tr><td>Price-changes tab</td><td><code>v_change_report</code> where <code>change_type</code> is a price event</td><td>What moved, by how much, on which day?</td></tr>
+          <tr><td>Stock-out tab</td><td><code>v_change_report</code> where <code>change_type='stock_out'</code></td><td>Which variants sold out, and when?</td></tr>
+          <tr><td>New tab</td><td><code>products.first_seen_at</code> in range</td><td>What arrived in the store?</td></tr>
+          <tr><td>Product timeline</td><td>All <code>variant_history</code> rows for one variant</td><td>Everything that ever happened to this item</td></tr>
+          <tr><td>PDF export</td><td>Same view, rendered server-side</td><td>The complete report, not just the visible rows</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note good">
+      <div class="hd">✓ A working example is included</div>
+      <p><code>Sample-Report-Alkaram-Studio.html</code> in this folder shows all of the above rendered — daily activity, new products, price changes with before/after discounts, stock-outs, stock-ins, removals, and a full product timeline. Real handles, SKUs and prices from the 27 Jul CSV.</p>
+    </div>
+
+    <div class="note good">
+      <div class="hd">✓ Summary — the versioning rules in five lines</div>
+      <p><strong>1.</strong> <code>handle</code> identifies a product forever; <code>variant_key</code> identifies a variant.<br>
+      <strong>2.</strong> Layer 1 (<code>variants</code>) is overwritten daily and holds only "now".<br>
+      <strong>3.</strong> Layer 2 (<code>variant_history</code>) is append-only and holds "when". Nothing in it is ever updated or deleted.<br>
+      <strong>4.</strong> A row is written only when price, compare-at price or stock differs — each row means "this held until the next row".<br>
+      <strong>5.</strong> Any past date is recovered with <code>DISTINCT ON … WHERE observed_date &lt;= $date</code>.</p>
+    </div>
+  </section>
+
+
+  <!-- ============ 07 ============ -->
+  <section id="s7">
+    <h2><span class="num">07</span>Table Mapping — From Card Click to PDF</h2>
+    <p class="sub">Clicking a card supplies only a <code>store_id</code>. The joins take care of everything else.</p>
+    <hr class="hr">
+
+<pre><i>Card click  →  store_id = 12</i>
+<i>URL         →  /stores/12?from=2026-07-01&amp;to=2026-07-27</i></pre>
+
+    <p>Just <strong>three inputs</strong> are needed — <code>store_id</code>, <code>from</code> and <code>to</code>. The entire report is built from them.</p>
+
+    <div class="chain">
+      <div class="link"><div class="tbl">stores</div><div class="dsc">Store name and domain <em>· WHERE id = 12</em></div></div>
+      <div class="link"><div class="tbl">↓ products</div><div class="dsc">handle, title, type, tags <em>· WHERE store_id = 12</em></div></div>
+      <div class="link"><div class="tbl">↓ variants</div><div class="dsc">size, color, fabric, sku <em>· JOIN ON product_id</em></div></div>
+      <div class="link"><div class="tbl">↓ variant_history</div><div class="dsc">price, discount, stock, date <em>· the date filter applies HERE</em></div></div>
+      <div class="link"><div class="tbl">→ REPORT → PDF</div><div class="dsc">Charts + variant table + download</div></div>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>What appears on screen</th><th>Source table</th><th>How</th></tr></thead>
+        <tbody>
+          <tr><td>Store name</td><td><code>stores</code></td><td><code>WHERE id = 12</code></td></tr>
+          <tr><td>Product list</td><td><code>products</code></td><td><code>WHERE store_id = 12</code></td></tr>
+          <tr><td>Size / Color / Fabric</td><td><code>variants</code></td><td>JOIN on <code>product_id</code></td></tr>
+          <tr><td>Price, discount, stock, date</td><td><code>variant_history</code></td><td>JOIN + date filter</td></tr>
+          <tr><td>Whether the scrape ran</td><td><code>scrape_runs</code></td><td><code>WHERE run_date = today</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>API Routes</h3>
+<pre><b>GET</b>  /api/stores                    <i>→ all 100 cards</i>
+<b>GET</b>  /api/stores/:id/summary        <i>→ the KPI tiles</i>
+<b>GET</b>  /api/stores/:id/report         <i>→ charts + table   (?from=&amp;to=)</i>
+<b>GET</b>  /api/stores/:id/report.pdf     <i>→ PDF download     (?from=&amp;to=)</i></pre>
+
+    <div class="note info">
+      <div class="hd">ℹ Generate the PDF on the server, not in the browser</div>
+      <p>The browser only holds what is currently rendered — perhaps 50 rows. The PDF needs the complete report, which can run to 5,000 rows. So run the same query server-side, fill an HTML template, and render it with Puppeteer.</p>
+    </div>
+  </section>
+
+  <!-- ============ 08 ============ -->
+  <section id="s8">
+    <h2><span class="num">08</span>Database Schema</h2>
+    <p class="sub">Five tables. The whole structure at a glance:</p>
+    <hr class="hr">
+
+<pre><b>stores</b>            <i>100 rows — one per store</i>
+   │
+   ├── <b>scrape_runs</b>    <i>one per store per day — did the scrape run or fail</i>
+   │
+   └── <b>products</b>       <i>~2,000 per store · UNIQUE (store_id, handle)</i>
+          │
+          └── <b>variants</b>   <i>~4 per product · size / color / fabric</i>
+                 │
+                 └── <b>variant_history</b>   <i>append-only · price + stock + date</i>
+                                     <i>↑ the heart of the system</i></pre>
+
+    <h3>1 · stores</h3>
+<pre><b>CREATE TABLE</b> stores (
+  id               BIGSERIAL <b>PRIMARY KEY</b>,
+  name             TEXT <b>NOT NULL</b>,
+  domain           TEXT <b>NOT NULL UNIQUE</b>,      <i>-- alkaramstudio.com</i>
+  csv_prefix       TEXT,                       <i>-- to match files on Drive</i>
+  active           BOOLEAN <b>NOT NULL DEFAULT</b> true,
+  last_scraped_at  TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ <b>NOT NULL DEFAULT</b> now()
+);</pre>
+
+    <h3>2 · scrape_runs <span style="font-weight:400;color:var(--muted);font-size:14px">— the reliability backbone</span></h3>
+<pre><b>CREATE TABLE</b> scrape_runs (
+  id              BIGSERIAL <b>PRIMARY KEY</b>,
+  store_id        BIGINT <b>NOT NULL REFERENCES</b> stores(id) <b>ON DELETE CASCADE</b>,
+  run_date        DATE <b>NOT NULL</b>,
+  status          TEXT <b>NOT NULL CHECK</b> (status <b>IN</b> ('pending','success','failed','partial')),
+  file_name       TEXT,
+  rows_ingested   INT <b>DEFAULT</b> 0,
+  products_found  INT <b>DEFAULT</b> 0,
+  variants_found  INT <b>DEFAULT</b> 0,
+  changes_found   INT <b>DEFAULT</b> 0,
+  error_msg       TEXT,
+  started_at      TIMESTAMPTZ <b>DEFAULT</b> now(),
+  finished_at     TIMESTAMPTZ,
+  <b>UNIQUE</b> (store_id, run_date)      <i>-- one run per store per day</i>
+);</pre>
+
+    <div class="note warn">
+      <div class="hd">⚠ Do not skip this table</div>
+      <p>Without it there is no way to know which store's scrape failed. Users will read stale data as if it were current — and <strong>silent scrape failures</strong> are exactly how a daily-report system loses trust.</p>
+    </div>
+
+    <h3>3 · products</h3>
+<pre><b>CREATE TABLE</b> products (
+  id             BIGSERIAL <b>PRIMARY KEY</b>,
+  store_id       BIGINT <b>NOT NULL REFERENCES</b> stores(id) <b>ON DELETE CASCADE</b>,
+  handle         TEXT <b>NOT NULL</b>,            <i>-- the unique ID — not the title</i>
+  title          TEXT,
+  vendor         TEXT,
+  product_type   TEXT,
+  tags           TEXT[],
+  published_at   TIMESTAMPTZ,
+  status         TEXT,
+  image_src      TEXT,                    <i>-- first image only</i>
+  first_seen_at  DATE <b>NOT NULL</b>,            <i>-- detects new products</i>
+  last_seen_at   DATE <b>NOT NULL</b>,            <i>-- detects removals</i>
+  is_active      BOOLEAN <b>NOT NULL DEFAULT</b> true,
+  <b>UNIQUE</b> (store_id, handle)
+);</pre>
+
+    <h3>4 · variants</h3>
+<pre><b>CREATE TABLE</b> variants (
+  id             BIGSERIAL <b>PRIMARY KEY</b>,
+  product_id     BIGINT <b>NOT NULL REFERENCES</b> products(id) <b>ON DELETE CASCADE</b>,
+  sku            TEXT,
+  option1_name   TEXT,  option1_value  TEXT,     <i>-- Size</i>
+  option2_name   TEXT,  option2_value  TEXT,     <i>-- Color</i>
+  option3_name   TEXT,  option3_value  TEXT,     <i>-- Fabric</i>
+  variant_image  TEXT,
+  variant_key    TEXT <b>NOT NULL</b>,      <i>-- sku, or the option combo when sku is missing</i>
+
+  <i>-- Layer 1 cache: overwritten daily, rebuildable from history (see 6.4)</i>
+  current_price            NUMERIC(12,2),
+  current_compare_at_price NUMERIC(12,2),
+  current_discount_pct     NUMERIC(5,2),
+  current_in_stock         BOOLEAN,
+
+  first_seen_at  DATE <b>NOT NULL</b>,
+  last_seen_at   DATE <b>NOT NULL</b>,
+  is_active      BOOLEAN <b>NOT NULL DEFAULT</b> true,
+  <b>UNIQUE</b> (product_id, variant_key)
+);</pre>
+
+    <div class="note crit">
+      <div class="hd">✕ Do not rely on SKU alone</div>
+      <p>Your file contains <strong>52 duplicate SKUs</strong> across 114 rows. For example <code>MKS-EMB26-017-Cream</code> appears four times. That is why <code>variant_key</code> exists — SKU combined with the option values. Keying on SKU alone would merge distinct variants together.</p>
+    </div>
+
+    <h3>5 · variant_history <span style="font-weight:400;color:var(--muted);font-size:14px">— append-only</span></h3>
+<pre><b>CREATE TABLE</b> variant_history (
+  id                BIGSERIAL,
+  variant_id        BIGINT <b>NOT NULL REFERENCES</b> variants(id) <b>ON DELETE CASCADE</b>,
+  scrape_run_id     BIGINT <b>NOT NULL REFERENCES</b> scrape_runs(id),
+  observed_date     DATE <b>NOT NULL</b>,
+  price             NUMERIC(12,2),
+  compare_at_price  NUMERIC(12,2),
+  discount_pct      NUMERIC(5,2) <b>GENERATED ALWAYS AS</b> (
+                      <b>CASE WHEN</b> compare_at_price &gt; 0 <b>AND</b> compare_at_price &gt; price
+                           <b>THEN ROUND</b>((compare_at_price - price) / compare_at_price * 100, 2)
+                           <b>ELSE</b> 0 <b>END</b>
+                    ) <b>STORED</b>,
+  inventory_policy  TEXT,
+  inventory_qty     INT,
+  in_stock          BOOLEAN,
+
+  <i>-- previous values carried on the same row, so reports need no LAG()</i>
+  prev_price             NUMERIC(12,2),
+  prev_compare_at_price  NUMERIC(12,2),
+  prev_in_stock          BOOLEAN,
+
+  change_type       TEXT,   <i>-- new | price_up | price_down | stock_in | stock_out | removed</i>
+  raw               JSONB,  <i>-- the original row, kept for escape hatches</i>
+  <b>PRIMARY KEY</b> (id, observed_date)
+) <b>PARTITION BY RANGE</b> (observed_date);
+
+<i>-- one partition per month — old data stays separate, queries stay fast</i>
+<b>CREATE TABLE</b> variant_history_2026_08 <b>PARTITION OF</b> variant_history
+  <b>FOR VALUES FROM</b> ('2026-08-01') <b>TO</b> ('2026-09-01');</pre>
+
+    <h3>Indexes <span style="font-weight:400;color:var(--muted);font-size:14px">— reports will crawl without these</span></h3>
+<pre><b>CREATE INDEX ON</b> products        (store_id, handle);
+<b>CREATE INDEX ON</b> products        (store_id, first_seen_at);
+<b>CREATE INDEX ON</b> variants        (product_id);
+<b>CREATE INDEX ON</b> variant_history (variant_id, observed_date <b>DESC</b>);
+<b>CREATE INDEX ON</b> variant_history (observed_date, change_type);</pre>
+
+    <h3>Storage — one decision worth flagging</h3>
+    <p>You asked that <em>"every scrape should be saved as a new entry."</em> Taken literally, that means:</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Strategy</th><th>Rows / day</th><th>Rows / year</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td>Every variant, every day (full snapshot)</td><td class="num">~500,000</td><td class="num">~180,000,000</td><td class="no">✕ Wasteful</td></tr>
+          <tr><td><strong>Only what changed (change-only)</strong></td><td class="num">~15,000</td><td class="num">~5,500,000</td><td class="yes">✓ Do this</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note good">
+      <div class="hd">✓ Change-only still answers every question</div>
+      <p><strong>"What changed today?"</strong> → <code>variant_history WHERE observed_date = today</code><br>
+      <strong>"What's new?"</strong> → <code>products WHERE first_seen_at = today</code><br>
+      <strong>"Did the scrape run?"</strong> → <code>scrape_runs</code><br>
+      <strong>"What was the price on 12 March?"</strong> → the last history row on or before that date<br><br>
+      Same answers at roughly <strong>3% of the storage</strong> — and reports stay fast into year three.</p>
+    </div>
+  </section>
+
+  <!-- ============ 09 ============ -->
+  <section id="s9">
+    <h2><span class="num">09</span>Report Query</h2>
+    <p class="sub">A single query feeds both the screen and the PDF. No duplicated logic.</p>
+    <hr class="hr">
+
+<pre><b>SELECT</b> p.handle, p.title,
+       v.option1_value <b>AS</b> size,
+       v.option2_value <b>AS</b> color,
+       h.observed_date, h.price, h.compare_at_price,
+       h.discount_pct, h.in_stock,
+       h.price - <b>LAG</b>(h.price) <b>OVER</b> w   <b>AS</b> price_change,
+       h.in_stock &lt;&gt; <b>LAG</b>(h.in_stock) <b>OVER</b> w <b>AS</b> stock_flipped
+<b>FROM</b>   variant_history h
+<b>JOIN</b>   variants v <b>ON</b> v.id = h.variant_id
+<b>JOIN</b>   products p <b>ON</b> p.id = v.product_id
+<b>WHERE</b>  p.store_id = $1                          <i>-- from the card click</i>
+  <b>AND</b>  h.observed_date <b>BETWEEN</b> $2 <b>AND</b> $3        <i>-- from the date filter</i>
+<b>WINDOW</b> w <b>AS</b> (<b>PARTITION BY</b> h.variant_id <b>ORDER BY</b> h.observed_date)
+<b>ORDER BY</b> p.handle, v.id, h.observed_date;</pre>
+
+    <p><code>LAG()</code> pulls the previous row automatically, so day-over-day comparison comes for free. In MongoDB this has to be written by hand.</p>
+  </section>
+
+  <!-- ============ 10 ============ -->
+  <section id="s10">
+    <h2><span class="num">10</span>Frontend</h2>
+    <p class="sub">Log in → 100 cards → click → report → PDF.</p>
+    <hr class="hr">
+
+    <h3>Screen 1 — Login</h3>
+    <div class="mock">
+      <div class="mock-bar"><i></i><i></i><i></i><span class="url">tracker.app / login</span></div>
+      <div class="mock-body">
+        <div class="login">
+          <div class="brand">ST</div>
+          <h5>Sign in</h5>
+          <p>Shopify Price Tracker</p>
+          <div class="inp">you@company.com</div>
+          <div class="inp">••••••••••</div>
+          <div class="btn pri">Sign in</div>
+        </div>
+      </div>
+    </div>
+    <p class="cap">Comes ready-made with Supabase Auth — nothing to build.</p>
+
+    <h3>Screen 2 — Stores Grid <span style="font-weight:400;color:var(--muted);font-size:14px">(100 cards)</span></h3>
+    <div class="mock">
+      <div class="mock-bar"><i></i><i></i><i></i><span class="url">tracker.app / stores</span></div>
+      <div class="mock-body">
+        <div class="app-top">
+          <div class="lt"><div class="brand">ST</div><div><div class="ttl">All Stores</div><div class="sm">100 stores · 27 Jul 2026</div></div></div>
+          <div style="display:flex;gap:6px"><span class="btn">Search</span><span class="btn">Filter</span></div>
+        </div>
+
+        <div class="sgrid">
+          <div class="scard">
+            <div class="nm">Alkaram Studio</div><div class="dm">alkaramstudio.com</div>
+            <div class="row"><span class="big">1,997</span><span class="unit">products</span><span class="delta dn">142 ↓</span></div>
+            <div class="st ok"><span class="d"></span>Updated today</div>
+          </div>
+          <div class="scard">
+            <div class="nm">Khaadi</div><div class="dm">khaadi.com</div>
+            <div class="row"><span class="big">3,104</span><span class="unit">products</span><span class="delta dn">88 ↓</span></div>
+            <div class="st ok"><span class="d"></span>Updated today</div>
+          </div>
+          <div class="scard">
+            <div class="nm">Sapphire</div><div class="dm">pk.sapphireonline.pk</div>
+            <div class="row"><span class="big">2,412</span><span class="unit">products</span><span class="delta up">31 ↑</span></div>
+            <div class="st ok"><span class="d"></span>Updated today</div>
+          </div>
+          <div class="scard">
+            <div class="nm">Gul Ahmed</div><div class="dm">gulahmedshop.com</div>
+            <div class="row"><span class="big">1,860</span><span class="unit">products</span><span class="delta dn">54 ↓</span></div>
+            <div class="st err"><span class="d"></span>Scrape failed — 2 days old</div>
+          </div>
+          <div class="scard">
+            <div class="nm">Bonanza Satrangi</div><div class="dm">bonanzasatrangi.com</div>
+            <div class="row"><span class="big">1,338</span><span class="unit">products</span><span class="delta dn">12 ↓</span></div>
+            <div class="st wrn"><span class="d"></span>Partial — 3 rows skipped</div>
+          </div>
+          <div class="scard">
+            <div class="nm">Nishat Linen</div><div class="dm">nishatlinen.com</div>
+            <div class="row"><span class="big">2,745</span><span class="unit">products</span><span class="delta up">19 ↑</span></div>
+            <div class="st ok"><span class="d"></span>Updated today</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="cap">Each card is built from <code>stores</code> plus today's <code>scrape_runs</code>. Clicking a card routes to <code>/stores/12</code></p>
+
+    <div class="note warn">
+      <div class="hd">⚠ Show failures in red</div>
+      <p>Look at the Gul Ahmed card above — when a scrape fails, the card must state the <strong>failure and how stale the data is</strong>. Otherwise users will read two-day-old numbers as current. Never rely on color alone — <strong>include the text</strong> so colorblind users get the same signal.</p>
+    </div>
+
+    <h3>Screen 3 — Store Report <span style="font-weight:400;color:var(--muted);font-size:14px">(after clicking a card)</span></h3>
+    <div class="mock">
+      <div class="mock-bar"><i></i><i></i><i></i><span class="url">tracker.app / stores / 12 ?from=2026-07-01&amp;to=2026-07-27</span></div>
+      <div class="mock-body">
+
+        <div class="app-top">
+          <div class="lt"><span class="btn gh">← Stores</span><div><div class="ttl">Alkaram Studio</div><div class="sm">alkaramstudio.com · 1,997 products · 7,588 variants</div></div></div>
+          <span class="btn pri">📥 Download PDF</span>
+        </div>
+
+        <div class="frow">
+          <span class="chip">Today</span><span class="chip">7 days</span>
+          <span class="chip on">30 days</span><span class="chip">90 days</span>
+          <span style="color:var(--rule)">|</span>
+          <span class="chip dt">01 Jul 2026</span><span style="color:var(--muted);font-size:12px">→</span><span class="chip dt">27 Jul 2026</span>
+          <span class="chip">Apply</span>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi c1"><div class="k">Products tracked</div><div class="v">1,997</div></div>
+          <div class="kpi c2"><div class="k">Price drops</div><div class="v">142</div></div>
+          <div class="kpi c3"><div class="k">Went out of stock</div><div class="v">38</div></div>
+          <div class="kpi c4"><div class="k">New products</div><div class="v">23</div></div>
+        </div>
+
+        <div class="cgrid">
+          <div class="chart">
+            <div class="ct">Average variant price</div>
+            <div class="cs">PKR · 1–27 Jul 2026</div>
+            <svg viewBox="0 0 320 96" preserveAspectRatio="none" role="img" aria-label="Average variant price falling from about 4,100 to 3,700 PKR across July 2026">
+              <line x1="0" y1="20" x2="320" y2="20" stroke="var(--line)" stroke-width="1"/>
+              <line x1="0" y1="44" x2="320" y2="44" stroke="var(--line)" stroke-width="1"/>
+              <line x1="0" y1="68" x2="320" y2="68" stroke="var(--line)" stroke-width="1"/>
+              <path d="M0,28 L11,30 L22,29 L33,33 L44,32 L55,36 L66,35 L77,38 L88,37 L99,41 L110,40 L121,44 L132,43 L143,46 L154,45 L165,49 L176,48 L187,52 L198,51 L209,54 L220,53 L231,57 L242,56 L253,59 L264,58 L275,62 L286,61 L297,64 L308,63 L320,66 L320,88 L0,88 Z" fill="var(--blue)" opacity="0.12"/>
+              <path d="M0,28 L11,30 L22,29 L33,33 L44,32 L55,36 L66,35 L77,38 L88,37 L99,41 L110,40 L121,44 L132,43 L143,46 L154,45 L165,49 L176,48 L187,52 L198,51 L209,54 L220,53 L231,57 L242,56 L253,59 L264,58 L275,62 L286,61 L297,64 L308,63 L320,66" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+              <circle cx="320" cy="66" r="4" fill="var(--blue)" stroke="var(--surface)" stroke-width="2"/>
+              <line x1="0" y1="88" x2="320" y2="88" stroke="var(--rule)" stroke-width="1"/>
+            </svg>
+            <div class="blbl"><span>1 Jul</span><span>9 Jul</span><span>18 Jul</span><span>27 Jul</span></div>
+          </div>
+
+          <div class="chart">
+            <div class="ct">Stock in vs out</div>
+            <div class="cs">Variants · weekly</div>
+            <div class="bars">
+              <div class="bcol"><div class="bseg a" style="height:62%"></div><div class="bseg b" style="height:11%"></div></div>
+              <div class="bcol"><div class="bseg a" style="height:58%"></div><div class="bseg b" style="height:15%"></div></div>
+              <div class="bcol"><div class="bseg a" style="height:51%"></div><div class="bseg b" style="height:22%"></div></div>
+              <div class="bcol"><div class="bseg a" style="height:44%"></div><div class="bseg b" style="height:29%"></div></div>
+            </div>
+            <div class="blbl"><span>W1</span><span>W2</span><span>W3</span><span>W4</span></div>
+            <div class="lgnd">
+              <span><i style="background:var(--blue)"></i>In stock</span>
+              <span><i style="background:var(--blue-soft)"></i>Out of stock</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <span class="tab on">Price changes · 142</span>
+          <span class="tab">Stock out · 38</span>
+          <span class="tab">New · 23</span>
+          <span class="tab">Removed · 9</span>
+        </div>
+        <div class="mtw">
+          <table class="mt">
+            <thead><tr><th>Product</th><th>Variant</th><th>Price</th><th>Discount</th><th>Change</th><th>Stock</th><th>Date</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>RTS | Shirt, Trouser &amp; Dupatta</strong><div style="color:var(--muted);font-size:11px">SS-59.1-25-3-Blue</div></td>
+                <td><span class="vpill">M</span><span class="vpill">Blue</span></td>
+                <td class="pr"><s>3,432</s><b>3,290</b></td>
+                <td class="num">23.3%</td>
+                <td class="dn">−142</td>
+                <td><span class="sw out">Out</span></td>
+                <td class="num">26 Jul</td>
+              </tr>
+              <tr>
+                <td><strong>Embroidered Kameez</strong><div style="color:var(--muted);font-size:11px">MKS-EMB26-017</div></td>
+                <td><span class="vpill">S</span><span class="vpill">Cream</span></td>
+                <td class="pr"><s>5,990</s><b>4,490</b></td>
+                <td class="num">25.0%</td>
+                <td class="dn">−1,500</td>
+                <td><span class="sw in">In</span></td>
+                <td class="num">24 Jul</td>
+              </tr>
+              <tr>
+                <td><strong>Printed Lawn Shirt</strong><div style="color:var(--muted);font-size:11px">SS-41.2-25-1-Grey</div></td>
+                <td><span class="vpill">L</span><span class="vpill">Grey</span><span class="vpill">Lawn</span></td>
+                <td class="pr"><s>2,890</s><b>2,290</b></td>
+                <td class="num">20.8%</td>
+                <td class="dn">−600</td>
+                <td><span class="sw in">In</span></td>
+                <td class="num">22 Jul</td>
+              </tr>
+              <tr>
+                <td><strong>Kurta &amp; Shalwar</strong><div style="color:var(--muted);font-size:11px">MKS-STY26-010</div></td>
+                <td><span class="vpill">XL</span><span class="vpill">Wind Chime</span></td>
+                <td class="pr"><s>—</s><b>6,990</b></td>
+                <td class="num">—</td>
+                <td class="up">NEW</td>
+                <td><span class="sw new">New</span></td>
+                <td class="num">21 Jul</td>
+              </tr>
+              <tr>
+                <td><strong>Shirt &amp; Culotte</strong><div style="color:var(--muted);font-size:11px">SS-22.4-25-2-Opal</div></td>
+                <td><span class="vpill">M</span><span class="vpill">Opal Grey</span></td>
+                <td class="pr"><s>4,290</s><b>4,990</b></td>
+                <td class="num">0%</td>
+                <td class="up">+700</td>
+                <td><span class="sw in">In</span></td>
+                <td class="num">19 Jul</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <p class="cap">The table is always at <strong>variant level</strong> — size / color / fabric as separate rows. That was the requirement.</p>
+
+    <div class="note info">
+      <div class="hd">ℹ Charts need hover</div>
+      <p>A crosshair and tooltip on the line chart (exact price for that day), and a per-bar tooltip on the bars. With two series the legend is always present, so identity never depends on color alone.</p>
+    </div>
+
+    <h3>Screen 4 — PDF Output</h3>
+    <div class="mock">
+      <div class="mock-bar"><i></i><i></i><i></i><span class="url">alkaram-studio_2026-07-01_2026-07-27.pdf</span></div>
+      <div class="mock-body">
+        <div class="sheet">
+          <div class="sh">
+            <div><h6>Alkaram Studio — Price &amp; Stock Report</h6><div class="mt-s">alkaramstudio.com · 01 Jul 2026 → 27 Jul 2026</div></div>
+            <div class="mt-s" style="text-align:right">Generated<br>27 Jul 2026</div>
+          </div>
+          <div class="krow">
+            <div><span>Products</span><b>1,997</b></div>
+            <div><span>Price drops</span><b>142</b></div>
+            <div><span>Out of stock</span><b>38</b></div>
+            <div><span>New</span><b>23</b></div>
+            <div><span>Avg discount</span><b>38.0%</b></div>
+          </div>
+          <table>
+            <thead><tr><th>Product</th><th>Variant</th><th>Old</th><th>New</th><th>Change</th><th>Stock</th></tr></thead>
+            <tbody>
+              <tr><td>RTS | Shirt, Trouser &amp; Dupatta</td><td>M / Blue</td><td>3,432</td><td>3,290</td><td>−4.1%</td><td>Out</td></tr>
+              <tr><td>Embroidered Kameez</td><td>S / Cream</td><td>5,990</td><td>4,490</td><td>−25.0%</td><td>In</td></tr>
+              <tr><td>Printed Lawn Shirt</td><td>L / Grey</td><td>2,890</td><td>2,290</td><td>−20.8%</td><td>In</td></tr>
+              <tr><td>Shirt &amp; Culotte</td><td>M / Opal Grey</td><td>4,290</td><td>4,990</td><td>+16.3%</td><td>In</td></tr>
+            </tbody>
+          </table>
+          <div class="mt-s" style="margin-top:11px">… 138 more rows · Page 1 of 12</div>
+        </div>
+      </div>
+    </div>
+    <p class="cap">Rendered on the server — the <strong>complete report</strong>, not just the rows visible on screen.</p>
+
+    <h3>Page structure</h3>
+<pre>app/
+├── login/page.tsx                  <i>Screen 1</i>
+├── stores/page.tsx                 <i>Screen 2 — 100 cards</i>
+├── stores/[id]/page.tsx            <i>Screen 3 — report</i>
+└── api/
+    ├── stores/route.ts                        <i>card data</i>
+    ├── stores/[id]/summary/route.ts           <i>KPI tiles</i>
+    ├── stores/[id]/report/route.ts            <i>charts + table</i>
+    └── stores/[id]/report.pdf/route.ts        <i>Screen 4 — Puppeteer</i></pre>
+
+    <h3>Stack</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Layer</th><th>Tool</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Frontend + API</td><td><strong>Next.js</strong> (App Router)</td><td>Both in one project — no separate backend to build</td></tr>
+          <tr><td>Auth</td><td>Supabase Auth / NextAuth</td><td>Ready-made</td></tr>
+          <tr><td>Database</td><td>PostgreSQL</td><td>See Section 03</td></tr>
+          <tr><td>Charts</td><td>Recharts</td><td>Works natively with React</td></tr>
+          <tr><td>Table</td><td>TanStack Table</td><td>Virtual scrolling for 5,000 rows</td></tr>
+          <tr><td>PDF</td><td>Puppeteer <em>(server-side)</em></td><td>Full report, not just what is on screen</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note info">
+      <div class="hd">ℹ Never leave the date filter unbounded</div>
+      <p>Default it to <strong>30 days</strong>. Otherwise someone will select a two-year range and hang the server.</p>
+    </div>
+  </section>
+
+  <!-- ============ 11 ============ -->
+  <section id="s11">
+    <h2><span class="num">11</span>Warnings — Issues Found in the CSV</h2>
+    <p class="sub">Three things to resolve before development starts. All come from analysing the sample file (Alkaram, 27 Jul 2026).</p>
+    <hr class="hr">
+
+    <div class="note crit">
+      <div class="hd">✕ 1 — There is no stock data</div>
+      <p>In your file, <code>Inventory quantity</code> has <strong>1,922 rows and every one of them is 0</strong>. Total units = 0.<br><br>
+      Relying on that column alone would make the system report <em>"the entire store is out of stock"</em> — which is plainly wrong. And stock in/out is a core requirement.<br><br>
+      <strong>The fix — derive stock like this:</strong></p>
+<pre>Variant present in today's CSV        →  <u>IN STOCK</u>
+Present yesterday but missing today   →  <b>OUT OF STOCK</b></pre>
+      <p>In most Shopify stores a sold-out variant drops out of the feed entirely. That is why <code>last_seen_at</code> exists — <strong>it is the real stock signal</strong>, not <code>Inventory quantity</code>.</p>
+    </div>
+
+    <div class="note warn">
+      <div class="hd">⚠ 2 — Verify against two or three more stores first</div>
+      <p>If their CSVs carry real numbers in <code>Inventory quantity</code>, use that instead. If those are zero too, the <code>last_seen_at</code> approach becomes final. <strong>Confirm this before writing the ingest logic.</strong></p>
+    </div>
+
+    <div class="note warn">
+      <div class="hd">⚠ 3 — Duplicate SKUs</div>
+      <p><strong>52 duplicate SKUs</strong> affecting 114 rows. Example: <code>MKS-EMB26-017-Cream</code> appears four times. That is why <code>variant_key</code> combines SKU with the option values. Keying on SKU alone would merge distinct variants.</p>
+    </div>
+
+    <h3>Smaller issues</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Issue</th><th>Scale</th><th>What to do</th></tr></thead>
+        <tbody>
+          <tr><td>Inconsistent Type values</td><td class="num">—</td><td><code>SHIRT, TROUSER &amp; DUPATTA</code> vs <code>SHIRT , TROUSER &amp; DUPATTA</code> — normalize on ingest</td></tr>
+          <tr><td>Tags differing only by case</td><td class="num">—</td><td><code>ESSENTIALS</code> / <code>Essentials</code> — store lowercase</td></tr>
+          <tr><td>Vendor field polluted</td><td class="num">12 rows</td><td><code>SHIRT COLLAR</code>, <code>Slim Fit</code> — validate on ingest</td></tr>
+          <tr><td>Missing Type</td><td class="num">48 products</td><td>Allow null</td></tr>
+          <tr><td>No image</td><td class="num">1 product</td><td>Use a placeholder</td></tr>
+          <tr><td>No SKU</td><td class="num">1 variant</td><td>Build <code>variant_key</code> from the options</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note good">
+      <div class="hd">✓ Next steps</div>
+      <p><strong>1.</strong> Pull two or three more store CSVs and confirm the <code>Inventory quantity</code> behaviour.<br>
+      <strong>2.</strong> Lock down the file-naming pattern on Drive — the sample (<code>https___www_alkaramstudio_com__shopify 27_07_26.csv</code>) carries both the domain and the date, which works. The other 99 stores must follow the same pattern.<br>
+      <strong>3.</strong> Write the migrations for Approach 1 and start the ingest.</p>
+    </div>
+  </section>
+
+  <footer>
+    Shopify Multi-Store Price &amp; Stock Tracker — Technical Plan · v1<br>
+    Analysis source: <code>https___www_alkaramstudio_com__shopify 27_07_26.csv</code> — 10,193 rows · 1,997 products · 7,588 variants · 49 columns
+  </footer>
+
+  </main>
+</div>
+
+<script>
+(function () {
+  var b = document.getElementById('tg');
+  b.addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme');
+    if (!cur) {
+      cur = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  });
+})();
+</script>
+
+</body>
+</html>

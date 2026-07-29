@@ -1,0 +1,28 @@
+{
+  "name": "shopify-store-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Daily price & stock tracker for Shopify stores — variant-level change history",
+  "scripts": {
+    "init": "node scripts/init-db.mjs",
+    "ingest": "node scripts/ingest.mjs",
+    "reset": "node scripts/init-db.mjs --force",
+    "migrate": "node scripts/migrate.mjs",
+    "migrate:check": "node scripts/migrate.mjs --check",
+    "start": "node server.mjs",
+    "dev": "node server.mjs"
+  },
+  "dependencies": {
+    "csv-parse": "^5.6.0",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.2.17"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

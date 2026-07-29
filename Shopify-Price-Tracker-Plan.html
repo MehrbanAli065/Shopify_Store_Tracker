@@ -1,0 +1,1192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shopify Price Tracker — Project Plan</title>
+<style>
+:root {
+  color-scheme: light;
+  --plane:      #f9f9f7;
+  --surface:    #fcfcfb;
+  --surface-2:  #f2f2ee;
+  --ink:        #0b0b0b;
+  --ink-2:      #52514e;
+  --muted:      #898781;
+  --line:       #e1e0d9;
+  --rule:       #c3c2b7;
+  --border:     rgba(11,11,11,0.10);
+  --blue:       #2a78d6;
+  --blue-soft:  #86b6ef;
+  --orange:     #eb6834;
+  --aqua:       #1baf7a;
+  --violet:     #4a3aa7;
+  --good:       #0ca30c;
+  --warning:    #fab219;
+  --serious:    #ec835a;
+  --critical:   #d03b3b;
+  --good-ink:   #006300;
+  --shadow:     0 1px 2px rgba(11,11,11,.04), 0 8px 24px rgba(11,11,11,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --plane:     #0d0d0d;
+    --surface:   #1a1a19;
+    --surface-2: #232322;
+    --ink:       #ffffff;
+    --ink-2:     #c3c2b7;
+    --muted:     #898781;
+    --line:      #2c2c2a;
+    --rule:      #383835;
+    --border:    rgba(255,255,255,0.10);
+    --blue:      #3987e5;
+    --blue-soft: #184f95;
+    --orange:    #d95926;
+    --aqua:      #199e70;
+    --violet:    #9085e9;
+    --good-ink:  #0ca30c;
+    --shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane:     #0d0d0d;
+  --surface:   #1a1a19;
+  --surface-2: #232322;
+  --ink:       #ffffff;
+  --ink-2:     #c3c2b7;
+  --muted:     #898781;
+  --line:      #2c2c2a;
+  --rule:      #383835;
+  --border:    rgba(255,255,255,0.10);
+  --blue:      #3987e5;
+  --blue-soft: #184f95;
+  --orange:    #d95926;
+  --aqua:      #199e70;
+  --violet:    #9085e9;
+  --good-ink:  #0ca30c;
+  --shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+body {
+  margin: 0;
+  background: var(--plane);
+  color: var(--ink);
+  font: 16px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Layout ---------- */
+.wrap { display: grid; grid-template-columns: 248px minmax(0,1fr); gap: 40px; max-width: 1240px; margin: 0 auto; padding: 0 28px 100px; }
+@media (max-width: 900px) { .wrap { grid-template-columns: 1fr; gap: 0; padding: 0 18px 64px; } }
+
+/* ---------- Header ---------- */
+.hero { border-bottom: 1px solid var(--line); background: var(--surface); margin-bottom: 44px; }
+.hero-in { max-width: 1240px; margin: 0 auto; padding: 44px 28px 38px; }
+.eyebrow { font-size: 12px; letter-spacing: .10em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+h1 { font-size: clamp(28px, 4.2vw, 42px); line-height: 1.15; margin: 12px 0 10px; letter-spacing: -.022em; font-weight: 700; }
+.lede { color: var(--ink-2); font-size: 17px; max-width: 62ch; margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.pill { font-size: 12.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-2); }
+.pill.b { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 32%, transparent); background: color-mix(in srgb, var(--blue) 9%, transparent); }
+
+/* ---------- Nav ---------- */
+nav { position: sticky; top: 24px; align-self: start; max-height: calc(100vh - 48px); overflow-y: auto; }
+@media (max-width: 900px) { nav { position: static; max-height: none; margin-bottom: 34px; padding-bottom: 20px; border-bottom: 1px solid var(--line); } }
+nav .nt { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); font-weight: 650; margin-bottom: 12px; }
+nav a { display: block; padding: 7px 12px; color: var(--ink-2); text-decoration: none; font-size: 14px; border-radius: 7px; border-left: 2px solid transparent; }
+nav a:hover { background: var(--surface-2); color: var(--ink); }
+nav a .n { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 8px; font-size: 12.5px; }
+
+/* ---------- Sections ---------- */
+section { margin-bottom: 62px; scroll-margin-top: 24px; }
+h2 { font-size: 25px; letter-spacing: -.018em; margin: 0 0 6px; font-weight: 680; display: flex; align-items: baseline; gap: 12px; }
+h2 .num { font-size: 13px; color: var(--blue); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+h3 { font-size: 17px; margin: 32px 0 12px; font-weight: 660; letter-spacing: -.01em; }
+h4 { font-size: 14.5px; margin: 22px 0 8px; font-weight: 650; color: var(--ink-2); }
+.sub { color: var(--ink-2); margin: 0 0 24px; font-size: 15.5px; max-width: 70ch; }
+p { max-width: 74ch; }
+.hr { height: 1px; background: var(--line); border: 0; margin: 0 0 26px; }
+
+/* ---------- Cards ---------- */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 24px; box-shadow: var(--shadow); }
+.grid { display: grid; gap: 16px; }
+.g3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.g2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+@media (max-width: 860px) { .g3, .g2 { grid-template-columns: 1fr; } }
+
+/* ---------- Stat tiles ---------- */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; margin: 22px 0; }
+@media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.tile .v { font-size: 30px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+.tile .k { font-size: 12.5px; color: var(--muted); margin-top: 4px; font-weight: 550; }
+.tile.ok  .v { color: var(--good-ink); }
+.tile.bad .v { color: var(--critical); }
+.tile.hi  .v { color: var(--blue); }
+
+/* ---------- Tables ---------- */
+.tw { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); margin: 18px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 520px; }
+th { text-align: left; font-weight: 640; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 12px 16px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+td { padding: 11px 16px; border-bottom: 1px solid var(--line); color: var(--ink-2); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td strong, td b { color: var(--ink); font-weight: 640; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.yes { color: var(--good-ink); font-weight: 640; }
+.no  { color: var(--critical); font-weight: 640; }
+.mid { color: var(--muted); font-weight: 600; }
+
+/* ---------- Code ---------- */
+pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; padding: 16px 18px; overflow-x: auto; font: 13px/1.62 ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace; color: var(--ink-2); margin: 16px 0; }
+pre b { color: var(--blue); font-weight: 600; }
+pre i  { color: var(--muted); font-style: normal; }
+pre u  { color: var(--good-ink); text-decoration: none; font-weight: 600; }
+code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 1.5px 6px; font: 13px ui-monospace, Consolas, monospace; color: var(--ink); }
+
+/* ---------- Callouts ---------- */
+.note { border-radius: 11px; padding: 15px 18px; margin: 18px 0; font-size: 14.5px; border: 1px solid var(--border); border-left-width: 3px; background: var(--surface); }
+.note .hd { font-weight: 660; font-size: 13px; letter-spacing: .02em; margin-bottom: 5px; display: flex; align-items: center; gap: 7px; }
+.note p { margin: 0; color: var(--ink-2); }
+.note.warn { border-left-color: var(--warning); }  .note.warn .hd { color: var(--ink); }
+.note.crit { border-left-color: var(--critical); } .note.crit .hd { color: var(--critical); }
+.note.good { border-left-color: var(--good); }     .note.good .hd { color: var(--good-ink); }
+.note.info { border-left-color: var(--blue); }     .note.info .hd { color: var(--blue); }
+
+/* ---------- Flow diagram ---------- */
+.flow { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 26px 22px; margin: 20px 0; }
+.step { display: flex; gap: 16px; align-items: flex-start; }
+.step + .step { margin-top: 4px; }
+.rail { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 34px; }
+.dot { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 12.5px; font-weight: 700; color: #fff; background: var(--blue); flex-shrink: 0; }
+.dot.o { background: var(--orange); } .dot.a { background: var(--aqua); } .dot.v { background: var(--violet); }
+.line { width: 2px; flex: 1; min-height: 26px; background: var(--line); margin: 5px 0; }
+.step .bd { padding-bottom: 18px; min-width: 0; }
+.step:last-child .bd { padding-bottom: 0; }
+.step .t { font-weight: 650; font-size: 15px; margin-bottom: 3px; }
+.step .d { color: var(--ink-2); font-size: 14px; }
+
+/* ---------- Chain ---------- */
+.chain { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 18px 0; }
+.link { display: grid; grid-template-columns: 168px 1fr; gap: 18px; padding: 14px 18px; border-bottom: 1px solid var(--line); align-items: center; }
+.link:last-child { border-bottom: 0; }
+@media (max-width: 640px) { .link { grid-template-columns: 1fr; gap: 4px; } }
+.link .tbl { font: 13.5px ui-monospace, Consolas, monospace; font-weight: 650; color: var(--blue); }
+.link .dsc { font-size: 14px; color: var(--ink-2); }
+.link .dsc em { color: var(--muted); font-style: normal; font-size: 13px; }
+
+/* ---------- Approach card ---------- */
+.appr { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+.appr.pick { border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+.badge { position: absolute; top: -10px; right: 16px; background: var(--good); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .05em; padding: 3px 10px; border-radius: 999px; text-transform: uppercase; }
+.appr .no-t { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+.appr h3 { margin: 6px 0 4px; font-size: 18px; }
+.appr .tag { font-size: 13px; color: var(--ink-2); margin-bottom: 16px; }
+.appr ul { margin: 0 0 14px; padding-left: 0; list-style: none; font-size: 13.5px; }
+.appr li { padding: 3.5px 0 3.5px 22px; position: relative; color: var(--ink-2); }
+.appr li.p::before { content: "✓"; position: absolute; left: 0; color: var(--good-ink); font-weight: 700; }
+.appr li.m::before { content: "✕"; position: absolute; left: 0; color: var(--critical); font-weight: 700; }
+.appr .foot { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-size: 13px; }
+.appr .foot span { color: var(--muted); }
+.appr .foot b { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+
+/* ---------- Column lists ---------- */
+.cols { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0 4px; }
+.cc { font: 12.5px ui-monospace, Consolas, monospace; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-2); }
+.cc.skip { text-decoration: line-through; opacity: .62; }
+
+/* ---------- UI MOCKUPS ---------- */
+.mock { border: 1px solid var(--border); border-radius: 13px; overflow: hidden; background: var(--plane); box-shadow: var(--shadow); margin: 18px 0 8px; }
+.mock-bar { display: flex; align-items: center; gap: 7px; padding: 9px 13px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.mock-bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--rule); display: block; }
+.mock-bar .url { margin-left: 8px; font: 11.5px ui-monospace, Consolas, monospace; color: var(--muted); background: var(--surface); padding: 3px 10px; border-radius: 5px; border: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mock-body { padding: 18px; }
+.cap { font-size: 12.5px; color: var(--muted); margin: 0 0 26px; }
+
+/* app chrome */
+.app-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--line); margin-bottom: 16px; flex-wrap: wrap; }
+.app-top .lt { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand { width: 26px; height: 26px; border-radius: 7px; background: var(--blue); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.app-top .ttl { font-weight: 660; font-size: 15px; letter-spacing: -.01em; }
+.app-top .sm { font-size: 12px; color: var(--muted); }
+.btn { font-size: 12.5px; font-weight: 600; padding: 6px 13px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); white-space: nowrap; }
+.btn.pri { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn.gh { border: 0; background: transparent; color: var(--muted); padding-left: 0; }
+
+/* store cards */
+.sgrid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+@media (max-width: 720px) { .sgrid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 460px) { .sgrid { grid-template-columns: 1fr; } }
+.scard { background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 14px; }
+.scard:first-child { border-color: color-mix(in srgb, var(--blue) 40%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 11%, transparent); }
+.scard .nm { font-weight: 650; font-size: 13.5px; letter-spacing: -.005em; }
+.scard .dm { font-size: 11.5px; color: var(--muted); margin-top: 1px; font-family: ui-monospace, Consolas, monospace; }
+.scard .row { display: flex; align-items: baseline; gap: 6px; margin-top: 11px; }
+.scard .big { font-size: 20px; font-weight: 700; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+.scard .unit { font-size: 11.5px; color: var(--muted); }
+.scard .delta { margin-left: auto; font-size: 11.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.scard .delta.dn { color: var(--critical); } .scard .delta.up { color: var(--good-ink); }
+.st { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 620; margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--line); width: 100%; }
+.st .d { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.st.ok  .d { background: var(--good); }     .st.ok  { color: var(--good-ink); }
+.st.err .d { background: var(--critical); } .st.err { color: var(--critical); }
+.st.wrn .d { background: var(--warning); }  .st.wrn { color: var(--ink-2); }
+
+/* filter row */
+.frow { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 16px; }
+.chip { font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); }
+.chip.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+.chip.dt { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; }
+
+/* kpi */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 16px; }
+@media (max-width: 620px) { .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 13px; }
+.kpi .k { font-size: 11px; color: var(--muted); font-weight: 600; }
+.kpi .v { font-size: 23px; font-weight: 700; letter-spacing: -.03em; line-height: 1.2; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.kpi.c1 .v { color: var(--ink); } .kpi.c2 .v { color: var(--critical); }
+.kpi.c3 .v { color: var(--orange); } .kpi.c4 .v { color: var(--good-ink); }
+
+/* charts */
+.cgrid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 12px; margin-bottom: 16px; }
+@media (max-width: 700px) { .cgrid { grid-template-columns: 1fr; } }
+.chart { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px 11px; }
+.chart .ct { font-size: 12.5px; font-weight: 650; }
+.chart .cs { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+.chart svg { display: block; width: 100%; height: auto; }
+.ax { font: 9.5px system-ui, sans-serif; fill: var(--muted); }
+.bars { display: flex; align-items: flex-end; gap: 6px; height: 82px; margin-top: 6px; }
+.bcol { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; height: 100%; }
+.bseg { border-radius: 4px 4px 0 0; }
+.bseg.a { background: var(--blue); } .bseg.b { background: var(--blue-soft); border-radius: 0 0 4px 4px; }
+.blbl { display: flex; gap: 6px; margin-top: 6px; }
+.blbl span { flex: 1; text-align: center; font-size: 9.5px; color: var(--muted); }
+.lgnd { display: flex; gap: 13px; margin-top: 9px; font-size: 10.5px; color: var(--ink-2); }
+.lgnd i { display: inline-block; width: 9px; height: 9px; border-radius: 2.5px; margin-right: 5px; vertical-align: -1px; }
+
+/* tabs + mock table */
+.tabs { display: flex; gap: 3px; border-bottom: 1px solid var(--line); margin-bottom: 0; overflow-x: auto; }
+.tab { font-size: 12.5px; font-weight: 600; padding: 8px 13px; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tab.on { color: var(--blue); border-bottom-color: var(--blue); }
+.mtw { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-top: 0; border-radius: 0 0 10px 10px; }
+table.mt { min-width: 560px; font-size: 12.5px; }
+table.mt th { padding: 9px 13px; font-size: 10px; }
+table.mt td { padding: 9px 13px; }
+.sw { display: inline-block; padding: 1.5px 7px; border-radius: 5px; font-size: 11px; font-weight: 620; border: 1px solid var(--border); }
+.sw.in  { color: var(--good-ink); }
+.sw.out { color: var(--critical); }
+.sw.new { color: var(--blue); }
+.pr { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pr s { color: var(--muted); text-decoration: line-through; margin-right: 5px; }
+.pr b { color: var(--ink); }
+.dn { color: var(--critical); font-weight: 650; font-variant-numeric: tabular-nums; }
+.up { color: var(--good-ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+.vpill { font-size: 11px; font-family: ui-monospace, Consolas, monospace; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; margin-right: 4px; }
+
+/* login */
+.login { max-width: 300px; margin: 26px auto 30px; text-align: center; }
+.login .brand { margin: 0 auto 14px; width: 34px; height: 34px; border-radius: 9px; font-size: 15px; }
+.login h5 { margin: 0 0 4px; font-size: 15px; font-weight: 660; }
+.login p { font-size: 12px; color: var(--muted); margin: 0 0 16px; }
+.inp { display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+.login .btn { display: block; width: 100%; text-align: center; padding: 9px; margin-top: 4px; }
+
+/* pdf sheet */
+.sheet { background: #fff; color: #111; border: 1px solid var(--border); border-radius: 8px; padding: 20px 22px; font-size: 11.5px; box-shadow: var(--shadow); }
+.sheet .sh { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 9px; margin-bottom: 12px; }
+.sheet h6 { margin: 0; font-size: 14px; font-weight: 700; color: #111; }
+.sheet .mt-s { font-size: 10px; color: #666; margin-top: 2px; }
+.sheet table { min-width: 0; font-size: 10.5px; }
+.sheet th { color: #666; border-bottom: 1px solid #ccc; padding: 6px 8px; }
+.sheet td { color: #333; border-bottom: 1px solid #eee; padding: 6px 8px; }
+.sheet .krow { display: flex; gap: 22px; margin-bottom: 13px; }
+.sheet .krow div span { display: block; font-size: 9.5px; color: #777; }
+.sheet .krow div b { font-size: 16px; font-weight: 700; color: #111; }
+
+/* ---------- Toggle ---------- */
+.tg { position: fixed; top: 16px; right: 16px; z-index: 20; background: var(--surface); border: 1px solid var(--border); color: var(--ink-2); border-radius: 9px; width: 38px; height: 38px; cursor: pointer; font-size: 16px; box-shadow: var(--shadow); }
+.tg:hover { color: var(--ink); }
+footer { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 22px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<button class="tg" id="tg" title="Theme">◐</button>
+
+<header class="hero">
+  <div class="hero-in">
+    <div class="eyebrow">Technical Plan · v1</div>
+    <h1>Shopify Multi-Store<br>Price &amp; Stock Tracker</h1>
+    <p class="lede">100 Shopify stores ka daily CSV — price, discount aur stock ki variant-level tracking, history log, aur date-range reports ke saath.</p>
+    <div class="meta">
+      <span class="pill b">100 Stores / Daily</span>
+      <span class="pill">UiPath → Drive → PostgreSQL → Next.js</span>
+      <span class="pill">Variant-level</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <nav>
+    <div class="nt">Contents</div>
+    <a href="#s1"><span class="n">01</span>Project Flow</a>
+    <a href="#s2"><span class="n">02</span>3 Approaches</a>
+    <a href="#s3"><span class="n">03</span>Database — Kaunsi &amp; Kyun</a>
+    <a href="#s4"><span class="n">04</span>Required Columns</a>
+    <a href="#s5"><span class="n">05</span>Table Mapping</a>
+    <a href="#s6"><span class="n">06</span>Database Schema</a>
+    <a href="#s7"><span class="n">07</span>Report Query</a>
+    <a href="#s8"><span class="n">08</span>Frontend</a>
+    <a href="#s9"><span class="n">09</span>Warnings</a>
+  </nav>
+
+  <main>
+
+  <!-- ============ 01 ============ -->
+  <section id="s1">
+    <h2><span class="num">01</span>Project Flow</h2>
+    <p class="sub">Google Sheet mein 100 store URLs. Har din har store se ek CSV. Us CSV se price, discount aur stock ki tabdeeli nikalni hai — <strong>variant level par</strong> (size / color), sirf product level par nahi.</p>
+    <hr class="hr">
+
+    <div class="flow">
+      <div class="step">
+        <div class="rail"><div class="dot o">1</div><div class="line"></div></div>
+        <div class="bd">
+          <div class="t">Phase 1 — UiPath</div>
+          <div class="d">Google Sheet se 100 store URLs parhta hai → har store ka CSV download karta hai → Google Drive par upload kar deta hai. Roz automatic.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="rail"><div class="dot">2</div><div class="line"></div></div>
+        <div class="bd">
+          <div class="t">Phase 2 — Ingest Worker</div>
+          <div class="d">Drive se nayi files uthata hai → CSV parse karta hai → sirf zaroori 18 columns nikalta hai → database mein daalta hai. Har file ka record <code>scrape_runs</code> mein rehta hai.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="rail"><div class="dot">3</div><div class="line"></div></div>
+        <div class="bd">
+          <div class="t">Phase 2 — Diff Engine</div>
+          <div class="d">Aaj ka data kal se compare karta hai. Sirf <strong>jo badla</strong> wo history mein likhta hai — price up/down, stock in/out, naya product, hataya gaya product.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="rail"><div class="dot a">4</div><div class="line"></div></div>
+        <div class="bd">
+          <div class="t">PostgreSQL</div>
+          <div class="d">5 tables. <code>handle</code> unique ID hai (title nahi — titles repeat hote hain). Poori history mehfooz rehti hai.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="rail"><div class="dot v">5</div></div>
+        <div class="bd">
+          <div class="t">Frontend — Next.js</div>
+          <div class="d">Login → 100 store cards → card par click → us store ki report (charts + variant table) → date range filter → PDF download.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tiles">
+      <div class="tile hi"><div class="v">100</div><div class="k">Stores daily</div></div>
+      <div class="tile"><div class="v">~500k</div><div class="k">Variants track honge</div></div>
+      <div class="tile"><div class="v">5</div><div class="k">Database tables</div></div>
+      <div class="tile ok"><div class="v">18</div><div class="k">Columns chahiye (49 mein se)</div></div>
+    </div>
+  </section>
+
+  <!-- ============ 02 ============ -->
+  <section id="s2">
+    <h2><span class="num">02</span>3 Approaches / Solutions</h2>
+    <p class="sub">Teenon mein database <strong>PostgreSQL</strong> hi rahega — wo faisla alag hai (Section 03). Farq sirf ye hai ke <em>ingest kaun chalayega</em> aur <em>frontend kaise banega</em>.</p>
+    <hr class="hr">
+
+    <div class="grid g3">
+
+      <div class="appr pick">
+        <span class="badge">Recommended</span>
+        <div class="no-t">Approach 1</div>
+        <h3>Managed Cloud</h3>
+        <div class="tag">Supabase + Next.js + Vercel Cron</div>
+        <ul>
+          <li class="p">2–3 hafte mein live</li>
+          <li class="p">Login system ready-made</li>
+          <li class="p">Backups automatic</li>
+          <li class="p">Server sambhalna nahi parta</li>
+          <li class="p">Custom cards + PDF poora control</li>
+          <li class="m">Function timeout ~60 sec</li>
+          <li class="m">100 CSV alag alag chalane parenge</li>
+        </ul>
+        <div class="foot"><span>Kharcha</span><b>~$45 / mo</b></div>
+      </div>
+
+      <div class="appr">
+        <div class="no-t">Approach 2</div>
+        <h3>Self-Hosted VPS</h3>
+        <div class="tag">Docker + Node worker + BullMQ + Postgres</div>
+        <ul>
+          <li class="p">Koi timeout nahi — bari files bhi chalengi</li>
+          <li class="p">Proper retry queue (fail → 3 baar dobara)</li>
+          <li class="p">Sabse sasta</li>
+          <li class="p">Data aapke apne server par</li>
+          <li class="m">Server khud maintain karna parega</li>
+          <li class="m">Backup + auth khud banana parega</li>
+          <li class="m">4–5 hafte lagenge</li>
+        </ul>
+        <div class="foot"><span>Kharcha</span><b>~$20 / mo</b></div>
+      </div>
+
+      <div class="appr">
+        <div class="no-t">Approach 3</div>
+        <h3>Low-Code</h3>
+        <div class="tag">n8n + Metabase (koi custom frontend nahi)</div>
+        <ul>
+          <li class="p">1 hafte mein chalta hua system</li>
+          <li class="p">Ingest code likhna hi nahi</li>
+          <li class="p">Demo / testing ke liye behtareen</li>
+          <li class="m"><b>Store cards nahi ban sakte</b></li>
+          <li class="m">PDF ka design generic hoga</li>
+          <li class="m">Aage ja kar limit aa jati hai</li>
+        </ul>
+        <div class="foot"><span>Kharcha</span><b>~$25 / mo</b></div>
+      </div>
+
+    </div>
+
+    <h3>Muqabla</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th></th><th>1 · Managed</th><th>2 · Self-Hosted</th><th>3 · Low-Code</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Waqt</strong></td><td>2–3 hafte</td><td>4–5 hafte</td><td class="yes">1 hafta</td></tr>
+          <tr><td><strong>Kharcha / mah</strong></td><td class="num">$45</td><td class="num yes">$20</td><td class="num">$25</td></tr>
+          <tr><td><strong>Custom store cards</strong></td><td class="yes">✓ Poora</td><td class="yes">✓ Poora</td><td class="no">✕ Nahi</td></tr>
+          <tr><td><strong>Apni marzi ka PDF</strong></td><td class="yes">✓</td><td class="yes">✓</td><td class="no">✕</td></tr>
+          <tr><td><strong>Reliability</strong></td><td class="mid">Achi</td><td class="yes">Sabse behtar</td><td class="mid">Theek</td></tr>
+          <tr><td><strong>Server maintenance</strong></td><td class="yes">Nahi</td><td class="no">Haan</td><td class="mid">Thora</td></tr>
+          <tr><td><strong>Mushkil</strong></td><td class="mid">Darmiyani</td><td class="no">Zyada</td><td class="yes">Kam</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note good">
+      <div class="hd">✓ Faisla — Approach 1 se shuru karein</div>
+      <p><strong>1.</strong> Aapko cards + custom PDF chahiye — Approach 3 ye de hi nahi sakta.<br>
+      <strong>2.</strong> Approach 2 behtar hai lekin abhi zaroorat nahi. 100 files roz ek chhota load hai; server ka bojh abhi lena bekaar hai.<br>
+      <strong>3.</strong> Approach 1 mein login free milta hai. Approach 2 mein wo bhi khud banana parega.<br>
+      <strong>4. Sabse ahem —</strong> database dono mein Postgres hi hai. Kal Approach 2 par jana pare to <em>sirf ingest wala hissa</em> shift hoga; database aur frontend jaise hain waise chalte rahenge. Ye phansane wala faisla nahi hai.</p>
+    </div>
+
+    <div class="note info">
+      <div class="hd">ℹ Approach 2 kab chunein</div>
+      <p>Sirf us soorat mein jab stores 100 se barh kar <strong>500+</strong> ho jayen, ya CSV files <strong>20 MB+</strong> ki hon. Us waqt serverless ka timeout tang karega.</p>
+    </div>
+  </section>
+
+  <!-- ============ 03 ============ -->
+  <section id="s3">
+    <h2><span class="num">03</span>Database — Kaunsi Use Karni Hai &amp; Kyun</h2>
+    <p class="sub">Faisla: <strong>PostgreSQL (Relational)</strong>. Vector DB bilkul nahi.</p>
+    <hr class="hr">
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>Database</th><th>Faisla</th><th>Wajah</th></tr></thead>
+        <tbody>
+          <tr><td><strong>PostgreSQL</strong></td><td class="yes">✓ Yehi use karein</td><td>Numbers, dates aur exact comparison — sab kuch perfect. Data already tables ki shakal mein hai.</td></tr>
+          <tr><td><strong>MongoDB</strong></td><td class="mid">⚠ Zaroorat nahi</td><td>Chal to jayega, magar din-ba-din ka comparison khud manually likhna parega. Khwaamakhwa mushkil.</td></tr>
+          <tr><td><strong>Vector DB</strong></td><td class="no">✕ Bilkul nahi</td><td>Price ka farq pakarhta hi nahi. Neeche example dekhein.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Vector DB kyun nahi — asal example</h3>
+    <p>Vector DB sirf ek kaam karta hai: <em>"is se milta julta kya hai?"</em> Wo text ko meaning ke hisaab se dhoondhta hai. <strong>Exact numbers compare nahi karta.</strong></p>
+    <p>Aapki apni file se ek asli variant lein:</p>
+
+<pre><i>Kal :</i>  SS-59.1-25-3-Blue  |  price <u>3,432</u>  |  compare_at 4,290  |  in stock
+<i>Aaj :</i>  SS-59.1-25-3-Blue  |  price <u>3,290</u>  |  compare_at 4,290  |  <b>out of stock</b>
+
+<i>Yehi pakarna hai →</i>  142 rupay kam, discount 20% → 23.3%, aur stock khatam</pre>
+
+    <div class="note crit">
+      <div class="hd">✕ Vector DB yahan fail ho jata hai</div>
+      <p>Dono lines ko embed karein to unke vectors ek doosre ke oopar aa jate hain — cosine similarity ≈ <strong>0.999</strong>. Vector DB kahega <em>"ye to same cheez hai."</em> Usay 3,432 aur 3,290 ka farq <strong>samajh hi nahi aayega</strong> — kyunki dono mein wahi shirt, wahi color, wahi naam hai.<br><br>
+      Doosra masla: vector search <strong>approximate</strong> hota hai (design hi aisa hai). Yani 100% guarantee nahi ke saare results mil gaye. Aapko roz report chahiye jis par log bharosa karein — agar 3 stores ki price drop miss ho gayi to report bekaar.</p>
+    </div>
+
+    <h3>SQL mein wahi kaam</h3>
+    <p>Ek line. Exact, poora, aur fast:</p>
+<pre><b>WHERE</b> aaj_ka_price &lt; kal_ka_price</pre>
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>Sawal</th><th>PostgreSQL</th><th>Vector DB</th></tr></thead>
+        <tbody>
+          <tr><td>Kis product ka price gira?</td><td class="yes">✓ Ek query</td><td class="no">✕ Na-mumkin</td></tr>
+          <tr><td>Kaunsa variant stock out hua?</td><td class="yes">✓ Ek query</td><td class="no">✕ Na-mumkin</td></tr>
+          <tr><td>1 July se 27 July tak ki report</td><td class="yes">✓ <code>BETWEEN</code></td><td class="no">✕ Date ka concept nahi</td></tr>
+          <tr><td>Kaun se naye products aaye?</td><td class="yes">✓ Ek query</td><td class="no">✕ Na-mumkin</td></tr>
+          <tr><td>"Isi jaisa product dhoondo"</td><td class="mid">Mushkil</td><td class="yes">✓ Behtareen</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note info">
+      <div class="hd">ℹ Aage chal kar Vector DB kab kaam aayega</div>
+      <p>Jab aap <strong>do alag stores ke same product</strong> ko match karna chahenge — jaise "Blue Printed Lawn 3-Piece" aur "3 PC Lawn Suit — Blue" (naam alag, cheez same). Lekin aapne khud kaha hai ke abhi stores ko aapas mein compare nahi karna. To filhal chhor dein.<br><br>
+      Achi baat: Postgres mein <code>pgvector</code> already mojood hai — zaroorat pare to usi database mein on kar lena. <strong>DB badalne ki zaroorat nahi paregi.</strong></p>
+    </div>
+  </section>
+
+  <!-- ============ 04 ============ -->
+  <section id="s4">
+    <h2><span class="num">04</span>Required Columns — CSV se DB tak</h2>
+    <p class="sub">CSV mein 49 columns hain. Humein sirf 18 chahiye — baaki 31 ya to bilkul khali hain ya kaam ke nahi.</p>
+    <hr class="hr">
+
+    <div class="tiles">
+      <div class="tile"><div class="v">49</div><div class="k">CSV mein total columns</div></div>
+      <div class="tile ok"><div class="v">14</div><div class="k">Must have</div></div>
+      <div class="tile hi"><div class="v">4</div><div class="k">Good to have</div></div>
+      <div class="tile bad"><div class="v">31</div><div class="k">Skip — kaam ke nahi</div></div>
+    </div>
+
+    <h3>✓ Must Have — inke baghair kaam nahi chalega</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>CSV Column</th><th>DB Column</th><th>Table</th><th>Kyun chahiye</th></tr></thead>
+        <tbody>
+          <tr><td><b>Handle</b></td><td><code>handle</code></td><td>products</td><td><strong>Unique ID</strong> — sabse zaroori</td></tr>
+          <tr><td>Title</td><td><code>title</code></td><td>products</td><td>Report mein naam</td></tr>
+          <tr><td>Vendor</td><td><code>vendor</code></td><td>products</td><td>Brand</td></tr>
+          <tr><td>Type</td><td><code>product_type</code></td><td>products</td><td>Category filter</td></tr>
+          <tr><td>Tags</td><td><code>tags</code></td><td>products</td><td>Filter / grouping</td></tr>
+          <tr><td>Published</td><td><code>published_at</code></td><td>products</td><td>Live hai ya nahi</td></tr>
+          <tr><td>Status</td><td><code>status</code></td><td>products</td><td>active / draft</td></tr>
+          <tr><td><b>Variant SKU</b></td><td><code>sku</code></td><td>variants</td><td>Variant ki pehchan</td></tr>
+          <tr><td>Option1 Name + Value</td><td><code>option1_*</code></td><td>variants</td><td>Size / Color</td></tr>
+          <tr><td>Option2 Name + Value</td><td><code>option2_*</code></td><td>variants</td><td>Color / Fabric</td></tr>
+          <tr><td>Option3 Name + Value</td><td><code>option3_*</code></td><td>variants</td><td>Fabric</td></tr>
+          <tr><td><b>Variant Price</b></td><td><code>price</code></td><td>variant_history</td><td>Aaj ki qeemat</td></tr>
+          <tr><td><b>Variant Compare At Price</b></td><td><code>compare_at_price</code></td><td>variant_history</td><td>Original qeemat — discount isi se</td></tr>
+          <tr><td>Variant Inventory Policy</td><td><code>inventory_policy</code></td><td>variant_history</td><td>Stock ka signal</td></tr>
+          <tr><td>Inventory quantity</td><td><code>inventory_qty</code></td><td>variant_history</td><td>Stock count <span class="no">(dekhein §09)</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note info">
+      <div class="hd">ℹ Teen Options kyun zaroori hain</div>
+      <p>Kyunki aapne <strong>variant level tracking</strong> maangi thi. Aapki file mein: Option1 zyadatar <code>Size</code>, Option2 <code>Color</code>, Option3 <code>Fabric</code> hai. Inke baghair pata hi nahi chalega ke kaunsi size ya color ka price gira.</p>
+    </div>
+
+    <h3>🟡 Good to Have — report achi lagegi</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>CSV Column</th><th>Kaam</th><th>Faisla</th></tr></thead>
+        <tbody>
+          <tr><td>Image Src</td><td>Report mein product ki photo</td><td class="mid">Sirf <b>pehli</b> image lein</td></tr>
+          <tr><td>Variant Image</td><td>Variant ki apni photo</td><td class="yes">Lein</td></tr>
+          <tr><td>Body (HTML)</td><td>Product detail</td><td class="mid">Bhari hai — chahein to chhor dein</td></tr>
+          <tr><td>Variant Grams</td><td>Weight</td><td class="mid">Abhi zaroorat nahi</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note warn">
+      <div class="hd">⚠ Image ka masla</div>
+      <p>Aapki file mein <strong>8,161 image rows</strong> hain magar products sirf <strong>1,997</strong> — yani har product ki ~4 photos. Sab store karne ki zaroorat nahi. Sirf pehli image (<code>Image Position = 1</code>) rakhein, baaki chhor dein. Warna database bewajah bhar jayegi.</p>
+    </div>
+
+    <h3>✕ Skip — ye 31 columns bilkul mat lein</h3>
+    <h4>Poori tarah khali (0% bhare) — aapki file mein ek bhi value nahi</h4>
+    <div class="cols">
+      <span class="cc skip">Variant Barcode</span><span class="cc skip">SEO Title</span><span class="cc skip">SEO Description</span>
+      <span class="cc skip">Variant Weight Unit</span><span class="cc skip">Variant Tax Code</span><span class="cc skip">Cost per item</span>
+      <span class="cc skip">Google Shopping / Category</span><span class="cc skip">/ Gender</span><span class="cc skip">/ Age Group</span>
+      <span class="cc skip">/ MPN</span><span class="cc skip">/ AdWords Grouping</span><span class="cc skip">/ AdWords Labels</span>
+      <span class="cc skip">/ Condition</span><span class="cc skip">/ Custom Product</span><span class="cc skip">/ Custom Label 0</span>
+      <span class="cc skip">/ Custom Label 1</span><span class="cc skip">/ Custom Label 2</span><span class="cc skip">/ Custom Label 3</span>
+      <span class="cc skip">/ Custom Label 4</span>
+    </div>
+    <h4>Kaam ke nahi</h4>
+    <div class="cols">
+      <span class="cc skip">Image Alt Text — 8,160 / 8,161 khali</span>
+      <span class="cc skip">Variant Inventory Tracker — sirf 0.78%</span>
+      <span class="cc skip">Gift Card — sab false</span>
+      <span class="cc skip">Variant Requires Shipping — sab true</span>
+      <span class="cc skip">Variant Taxable — sab true</span>
+      <span class="cc skip">Variant Fulfillment Service — sab manual</span>
+      <span class="cc skip">Image Position — sirf sorting ke liye</span>
+    </div>
+
+    <h3>➕ Ye columns hum KHUD banayenge — CSV mein nahi hain</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>DB Column</th><th>Kaise banega</th></tr></thead>
+        <tbody>
+          <tr><td><code>discount_pct</code></td><td><code>(compare_at − price) / compare_at × 100</code></td></tr>
+          <tr><td><code>in_stock</code></td><td>Inventory policy + variant feed mein maujood hai ya nahi</td></tr>
+          <tr><td><code>observed_date</code></td><td>Scrape ki tareekh</td></tr>
+          <tr><td><code>scrape_run_id</code></td><td>Kaunsi run se aaya</td></tr>
+          <tr><td><code>first_seen_at</code></td><td>Pehli baar kab dikha — <strong>naye products</strong> isse pata chalenge</td></tr>
+          <tr><td><code>last_seen_at</code></td><td>Aakhri baar kab dikha — <strong>hatt gaya</strong> isse pata chalega</td></tr>
+          <tr><td><code>change_type</code></td><td>price_up / price_down / stock_in / stock_out / new / removed</td></tr>
+          <tr><td><code>store_id</code></td><td>Kaunsa store</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note good">
+      <div class="hd">✓ Faida</div>
+      <p><strong>49 columns → 18 chahiye → 31 chhor dein.</strong> Database ~60% chhota rahega, queries tez chalengi, aur report jaldi khulegi.</p>
+    </div>
+  </section>
+
+  <!-- ============ 05 ============ -->
+  <section id="s5">
+    <h2><span class="num">05</span>Table Mapping — Card Click se PDF tak</h2>
+    <p class="sub">Card par click sirf <code>store_id</code> deta hai. Baaki sab JOIN khud nikal leta hai.</p>
+    <hr class="hr">
+
+<pre><i>Card click  →  store_id = 12</i>
+<i>URL        →  /stores/12?from=2026-07-01&amp;to=2026-07-27</i></pre>
+
+    <p>Bas ye <strong>teen cheezein</strong> chahiye — <code>store_id</code>, <code>from</code>, <code>to</code>. Inhi se poori report ban jati hai.</p>
+
+    <div class="chain">
+      <div class="link"><div class="tbl">stores</div><div class="dsc">Store ka naam, domain <em>· WHERE id = 12</em></div></div>
+      <div class="link"><div class="tbl">↓ products</div><div class="dsc">handle, title, type, tags <em>· WHERE store_id = 12</em></div></div>
+      <div class="link"><div class="tbl">↓ variants</div><div class="dsc">size, color, fabric, sku <em>· JOIN ON product_id</em></div></div>
+      <div class="link"><div class="tbl">↓ variant_history</div><div class="dsc">price, discount, stock, date <em>· date filter YAHAN lagta hai</em></div></div>
+      <div class="link"><div class="tbl">→ REPORT → PDF</div><div class="dsc">Charts + variant table + download</div></div>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>Screen par kya dikhega</th><th>Kaunsa table</th><th>Kaise</th></tr></thead>
+        <tbody>
+          <tr><td>Store ka naam</td><td><code>stores</code></td><td><code>WHERE id = 12</code></td></tr>
+          <tr><td>Product list</td><td><code>products</code></td><td><code>WHERE store_id = 12</code></td></tr>
+          <tr><td>Size / Color / Fabric</td><td><code>variants</code></td><td>JOIN on <code>product_id</code></td></tr>
+          <tr><td>Price, discount, stock, date</td><td><code>variant_history</code></td><td>JOIN + date filter</td></tr>
+          <tr><td>Scrape chala ya nahi</td><td><code>scrape_runs</code></td><td><code>WHERE run_date = today</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>API Routes</h3>
+<pre><b>GET</b>  /api/stores                    <i>→ saare 100 cards</i>
+<b>GET</b>  /api/stores/:id/summary        <i>→ upar wale KPI boxes</i>
+<b>GET</b>  /api/stores/:id/report         <i>→ table + charts   (?from=&amp;to=)</i>
+<b>GET</b>  /api/stores/:id/report.pdf     <i>→ PDF download     (?from=&amp;to=)</i></pre>
+
+    <div class="note info">
+      <div class="hd">ℹ PDF server par banayein, browser par nahi</div>
+      <p>Browser mein sirf wo data hota hai jo screen par dikh raha hai (shayad 50 rows). PDF mein poori report chahiye — 5,000 rows bhi ho sakti hain. Isliye server par wahi query chalayein, HTML template mein bharein, phir Puppeteer se PDF bana kar bhej dein.</p>
+    </div>
+  </section>
+
+  <!-- ============ 06 ============ -->
+  <section id="s6">
+    <h2><span class="num">06</span>Database Schema</h2>
+    <p class="sub">5 tables. Ek nazar mein poora structure:</p>
+    <hr class="hr">
+
+<pre><b>stores</b>            <i>100 rows — har store ka ek</i>
+   │
+   ├── <b>scrape_runs</b>    <i>roz ek per store — scrape chala ya fail hua</i>
+   │
+   └── <b>products</b>       <i>~2,000 per store · UNIQUE (store_id, handle)</i>
+          │
+          └── <b>variants</b>   <i>~4 per product · size / color / fabric</i>
+                 │
+                 └── <b>variant_history</b>   <i>append-only · price + stock + date</i>
+                                     <i>↑ ye dil hai poore system ka</i></pre>
+
+    <h3>1 · stores</h3>
+<pre><b>CREATE TABLE</b> stores (
+  id               BIGSERIAL <b>PRIMARY KEY</b>,
+  name             TEXT <b>NOT NULL</b>,
+  domain           TEXT <b>NOT NULL UNIQUE</b>,      <i>-- alkaramstudio.com</i>
+  csv_prefix       TEXT,                       <i>-- Drive file match karne ke liye</i>
+  active           BOOLEAN <b>NOT NULL DEFAULT</b> true,
+  last_scraped_at  TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ <b>NOT NULL DEFAULT</b> now()
+);</pre>
+
+    <h3>2 · scrape_runs <span style="font-weight:400;color:var(--muted);font-size:14px">— reliability ka sabse ahem table</span></h3>
+<pre><b>CREATE TABLE</b> scrape_runs (
+  id              BIGSERIAL <b>PRIMARY KEY</b>,
+  store_id        BIGINT <b>NOT NULL REFERENCES</b> stores(id) <b>ON DELETE CASCADE</b>,
+  run_date        DATE <b>NOT NULL</b>,
+  status          TEXT <b>NOT NULL CHECK</b> (status <b>IN</b> ('pending','success','failed','partial')),
+  file_name       TEXT,
+  rows_ingested   INT <b>DEFAULT</b> 0,
+  products_found  INT <b>DEFAULT</b> 0,
+  variants_found  INT <b>DEFAULT</b> 0,
+  changes_found   INT <b>DEFAULT</b> 0,
+  error_msg       TEXT,
+  started_at      TIMESTAMPTZ <b>DEFAULT</b> now(),
+  finished_at     TIMESTAMPTZ,
+  <b>UNIQUE</b> (store_id, run_date)      <i>-- ek din mein ek hi run</i>
+);</pre>
+
+    <div class="note warn">
+      <div class="hd">⚠ Ye table skip mat karna</div>
+      <p>Iske baghair pata hi nahi chalega ke kis store ka scrape fail hua. Banda purani data ko aaj ka samajh lega — aur <strong>khamoshi se fail hone wale scrapes</strong> hi wo cheez hain jis se daily-report system par se bharosa uth jata hai.</p>
+    </div>
+
+    <h3>3 · products</h3>
+<pre><b>CREATE TABLE</b> products (
+  id             BIGSERIAL <b>PRIMARY KEY</b>,
+  store_id       BIGINT <b>NOT NULL REFERENCES</b> stores(id) <b>ON DELETE CASCADE</b>,
+  handle         TEXT <b>NOT NULL</b>,            <i>-- UNIQUE ID — title nahi!</i>
+  title          TEXT,
+  vendor         TEXT,
+  product_type   TEXT,
+  tags           TEXT[],
+  published_at   TIMESTAMPTZ,
+  status         TEXT,
+  image_src      TEXT,                    <i>-- sirf pehli image</i>
+  first_seen_at  DATE <b>NOT NULL</b>,            <i>-- naye products isse</i>
+  last_seen_at   DATE <b>NOT NULL</b>,            <i>-- hataye gaye isse</i>
+  is_active      BOOLEAN <b>NOT NULL DEFAULT</b> true,
+  <b>UNIQUE</b> (store_id, handle)
+);</pre>
+
+    <h3>4 · variants</h3>
+<pre><b>CREATE TABLE</b> variants (
+  id             BIGSERIAL <b>PRIMARY KEY</b>,
+  product_id     BIGINT <b>NOT NULL REFERENCES</b> products(id) <b>ON DELETE CASCADE</b>,
+  sku            TEXT,
+  option1_name   TEXT,  option1_value  TEXT,     <i>-- Size</i>
+  option2_name   TEXT,  option2_value  TEXT,     <i>-- Color</i>
+  option3_name   TEXT,  option3_value  TEXT,     <i>-- Fabric</i>
+  variant_image  TEXT,
+  variant_key    TEXT <b>NOT NULL</b>,      <i>-- sku, ya options ka combo agar sku na ho</i>
+  first_seen_at  DATE <b>NOT NULL</b>,
+  last_seen_at   DATE <b>NOT NULL</b>,
+  is_active      BOOLEAN <b>NOT NULL DEFAULT</b> true,
+  <b>UNIQUE</b> (product_id, variant_key)
+);</pre>
+
+    <div class="note crit">
+      <div class="hd">✕ SKU par akela bharosa mat karein</div>
+      <p>Aapki file mein <strong>52 duplicate SKUs</strong> hain (114 rows). Misal ke taur par <code>MKS-EMB26-017-Cream</code> 4 baar aata hai. Isi liye <code>variant_key</code> banaya hai — SKU + options ka combo. Warna variants aapas mein gaddmadd ho jayenge.</p>
+    </div>
+
+    <h3>5 · variant_history <span style="font-weight:400;color:var(--muted);font-size:14px">— append-only</span></h3>
+<pre><b>CREATE TABLE</b> variant_history (
+  id                BIGSERIAL,
+  variant_id        BIGINT <b>NOT NULL REFERENCES</b> variants(id) <b>ON DELETE CASCADE</b>,
+  scrape_run_id     BIGINT <b>NOT NULL REFERENCES</b> scrape_runs(id),
+  observed_date     DATE <b>NOT NULL</b>,
+  price             NUMERIC(12,2),
+  compare_at_price  NUMERIC(12,2),
+  discount_pct      NUMERIC(5,2) <b>GENERATED ALWAYS AS</b> (
+                      <b>CASE WHEN</b> compare_at_price &gt; 0 <b>AND</b> compare_at_price &gt; price
+                           <b>THEN ROUND</b>((compare_at_price - price) / compare_at_price * 100, 2)
+                           <b>ELSE</b> 0 <b>END</b>
+                    ) <b>STORED</b>,
+  inventory_policy  TEXT,
+  inventory_qty     INT,
+  in_stock          BOOLEAN,
+  change_type       TEXT,   <i>-- new | price_up | price_down | stock_in | stock_out | removed</i>
+  raw               JSONB,  <i>-- poori original row, zaroorat pare to</i>
+  <b>PRIMARY KEY</b> (id, observed_date)
+) <b>PARTITION BY RANGE</b> (observed_date);
+
+<i>-- har mahine ki apni partition — purana data alag rehta hai, queries tez</i>
+<b>CREATE TABLE</b> variant_history_2026_08 <b>PARTITION OF</b> variant_history
+  <b>FOR VALUES FROM</b> ('2026-08-01') <b>TO</b> ('2026-09-01');</pre>
+
+    <h3>Indexes <span style="font-weight:400;color:var(--muted);font-size:14px">— inke baghair report slow ho jayegi</span></h3>
+<pre><b>CREATE INDEX ON</b> products        (store_id, handle);
+<b>CREATE INDEX ON</b> products        (store_id, first_seen_at);
+<b>CREATE INDEX ON</b> variants        (product_id);
+<b>CREATE INDEX ON</b> variant_history (variant_id, observed_date <b>DESC</b>);
+<b>CREATE INDEX ON</b> variant_history (observed_date, change_type);</pre>
+
+    <h3>Storage — ek ahem faisla</h3>
+    <p>Aapne kaha tha <em>"har scrape naya entry ban kar save ho."</em> Lafzi tor par iska matlab:</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Tareeqa</th><th>Rows / din</th><th>Rows / saal</th><th>Faisla</th></tr></thead>
+        <tbody>
+          <tr><td>Har variant, har din (full snapshot)</td><td class="num">~500,000</td><td class="num">~180,000,000</td><td class="no">✕ Bewajah bhaari</td></tr>
+          <tr><td><strong>Sirf jo badla (change-only)</strong></td><td class="num">~15,000</td><td class="num">~5,500,000</td><td class="yes">✓ Yehi karein</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note good">
+      <div class="hd">✓ Change-only se bhi sab kuch milta hai</div>
+      <p><strong>"Aaj kya badla?"</strong> → <code>variant_history WHERE observed_date = today</code><br>
+      <strong>"Naya kya aaya?"</strong> → <code>products WHERE first_seen_at = today</code><br>
+      <strong>"Scrape chala tha?"</strong> → <code>scrape_runs</code><br>
+      <strong>"12 March ko rate kya tha?"</strong> → us date tak ki aakhri history row<br><br>
+      Wahi jawab, magar <strong>3% storage</strong> mein — aur teesre saal bhi report utni hi tez chalegi.</p>
+    </div>
+  </section>
+
+  <!-- ============ 07 ============ -->
+  <section id="s7">
+    <h2><span class="num">07</span>Report Query</h2>
+    <p class="sub">Ek hi query — yehi screen ko bhi feed karti hai aur PDF ko bhi. Alag alag logic likhne ki zaroorat nahi.</p>
+    <hr class="hr">
+
+<pre><b>SELECT</b> p.handle, p.title,
+       v.option1_value <b>AS</b> size,
+       v.option2_value <b>AS</b> color,
+       h.observed_date, h.price, h.compare_at_price,
+       h.discount_pct, h.in_stock,
+       h.price - <b>LAG</b>(h.price) <b>OVER</b> w   <b>AS</b> price_change,
+       h.in_stock &lt;&gt; <b>LAG</b>(h.in_stock) <b>OVER</b> w <b>AS</b> stock_flipped
+<b>FROM</b>   variant_history h
+<b>JOIN</b>   variants v <b>ON</b> v.id = h.variant_id
+<b>JOIN</b>   products p <b>ON</b> p.id = v.product_id
+<b>WHERE</b>  p.store_id = $1                          <i>-- card se aaya</i>
+  <b>AND</b>  h.observed_date <b>BETWEEN</b> $2 <b>AND</b> $3        <i>-- date filter se aaya</i>
+<b>WINDOW</b> w <b>AS</b> (<b>PARTITION BY</b> h.variant_id <b>ORDER BY</b> h.observed_date)
+<b>ORDER BY</b> p.handle, v.id, h.observed_date;</pre>
+
+    <p><code>LAG()</code> automatically pichli row utha leta hai — isi liye din-ba-din ka comparison khud ba khud ho jata hai. MongoDB mein ye khud likhna parta.</p>
+  </section>
+
+  <!-- ============ 08 ============ -->
+  <section id="s8">
+    <h2><span class="num">08</span>Frontend</h2>
+    <p class="sub">Login → 100 cards → click → report → PDF.</p>
+    <hr class="hr">
+
+    <h3>Screen 1 — Login</h3>
+    <div class="mock">
+      <div class="mock-bar"><i></i><i></i><i></i><span class="url">tracker.app / login</span></div>
+      <div class="mock-body">
+        <div class="login">
+          <div class="brand">ST</div>
+          <h5>Sign in</h5>
+          <p>Shopify Price Tracker</p>
+          <div class="inp">you@company.com</div>
+          <div class="inp">••••••••••</div>
+          <div class="btn pri">Sign in</div>
+        </div>
+      </div>
+    </div>
+    <p class="cap">Supabase Auth se ready-made — banane ki zaroorat nahi.</p>
+
+    <h3>Screen 2 — Stores Grid <span style="font-weight:400;color:var(--muted);font-size:14px">(100 cards)</span></h3>
+    <div class="mock">
+      <div class="mock-bar"><i></i><i></i><i></i><span class="url">tracker.app / stores</span></div>
+      <div class="mock-body">
+        <div class="app-top">
+          <div class="lt"><div class="brand">ST</div><div><div class="ttl">All Stores</div><div class="sm">100 stores · 27 Jul 2026</div></div></div>
+          <div style="display:flex;gap:6px"><span class="btn">Search</span><span class="btn">Filter</span></div>
+        </div>
+
+        <div class="sgrid">
+          <div class="scard">
+            <div class="nm">Alkaram Studio</div><div class="dm">alkaramstudio.com</div>
+            <div class="row"><span class="big">1,997</span><span class="unit">products</span><span class="delta dn">142 ↓</span></div>
+            <div class="st ok"><span class="d"></span>Updated today</div>
+          </div>
+          <div class="scard">
+            <div class="nm">Khaadi</div><div class="dm">khaadi.com</div>
+            <div class="row"><span class="big">3,104</span><span class="unit">products</span><span class="delta dn">88 ↓</span></div>
+            <div class="st ok"><span class="d"></span>Updated today</div>
+          </div>
+          <div class="scard">
+            <div class="nm">Sapphire</div><div class="dm">pk.sapphireonline.pk</div>
+            <div class="row"><span class="big">2,412</span><span class="unit">products</span><span class="delta up">31 ↑</span></div>
+            <div class="st ok"><span class="d"></span>Updated today</div>
+          </div>
+          <div class="scard">
+            <div class="nm">Gul Ahmed</div><div class="dm">gulahmedshop.com</div>
+            <div class="row"><span class="big">1,860</span><span class="unit">products</span><span class="delta dn">54 ↓</span></div>
+            <div class="st err"><span class="d"></span>Scrape failed — 2 days old</div>
+          </div>
+          <div class="scard">
+            <div class="nm">Bonanza Satrangi</div><div class="dm">bonanzasatrangi.com</div>
+            <div class="row"><span class="big">1,338</span><span class="unit">products</span><span class="delta dn">12 ↓</span></div>
+            <div class="st wrn"><span class="d"></span>Partial — 3 rows skipped</div>
+          </div>
+          <div class="scard">
+            <div class="nm">Nishat Linen</div><div class="dm">nishatlinen.com</div>
+            <div class="row"><span class="big">2,745</span><span class="unit">products</span><span class="delta up">19 ↑</span></div>
+            <div class="st ok"><span class="d"></span>Updated today</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="cap">Har card <code>stores</code> + aaj ke <code>scrape_runs</code> se banta hai. Card par click → <code>/stores/12</code></p>
+
+    <div class="note warn">
+      <div class="hd">⚠ Fail hone par red dikhayein</div>
+      <p>Upar Gul Ahmed wala card dekhein — us din ka scrape fail hua to card par <strong>red status + kitna purana hai</strong> saaf likha ho. Warna banda 2 din purani data ko aaj ka samajh lega. Sirf rang par bharosa mat karein — <strong>text bhi likhein</strong>, taake colorblind user ko bhi pata chale.</p>
+    </div>
+
+    <h3>Screen 3 — Store Report <span style="font-weight:400;color:var(--muted);font-size:14px">(card click ke baad)</span></h3>
+    <div class="mock">
+      <div class="mock-bar"><i></i><i></i><i></i><span class="url">tracker.app / stores / 12 ?from=2026-07-01&amp;to=2026-07-27</span></div>
+      <div class="mock-body">
+
+        <div class="app-top">
+          <div class="lt"><span class="btn gh">← Stores</span><div><div class="ttl">Alkaram Studio</div><div class="sm">alkaramstudio.com · 1,997 products · 7,588 variants</div></div></div>
+          <span class="btn pri">📥 Download PDF</span>
+        </div>
+
+        <div class="frow">
+          <span class="chip">Today</span><span class="chip">7 days</span>
+          <span class="chip on">30 days</span><span class="chip">90 days</span>
+          <span style="color:var(--rule)">|</span>
+          <span class="chip dt">01 Jul 2026</span><span style="color:var(--muted);font-size:12px">→</span><span class="chip dt">27 Jul 2026</span>
+          <span class="chip">Apply</span>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi c1"><div class="k">Products tracked</div><div class="v">1,997</div></div>
+          <div class="kpi c2"><div class="k">Price drops</div><div class="v">142</div></div>
+          <div class="kpi c3"><div class="k">Went out of stock</div><div class="v">38</div></div>
+          <div class="kpi c4"><div class="k">New products</div><div class="v">23</div></div>
+        </div>
+
+        <div class="cgrid">
+          <div class="chart">
+            <div class="ct">Average variant price</div>
+            <div class="cs">PKR · 1–27 Jul 2026</div>
+            <svg viewBox="0 0 320 96" preserveAspectRatio="none" role="img" aria-label="Average variant price falling from about 4,100 to 3,700 PKR across July 2026">
+              <line x1="0" y1="20" x2="320" y2="20" stroke="var(--line)" stroke-width="1"/>
+              <line x1="0" y1="44" x2="320" y2="44" stroke="var(--line)" stroke-width="1"/>
+              <line x1="0" y1="68" x2="320" y2="68" stroke="var(--line)" stroke-width="1"/>
+              <path d="M0,28 L11,30 L22,29 L33,33 L44,32 L55,36 L66,35 L77,38 L88,37 L99,41 L110,40 L121,44 L132,43 L143,46 L154,45 L165,49 L176,48 L187,52 L198,51 L209,54 L220,53 L231,57 L242,56 L253,59 L264,58 L275,62 L286,61 L297,64 L308,63 L320,66 L320,88 L0,88 Z" fill="var(--blue)" opacity="0.12"/>
+              <path d="M0,28 L11,30 L22,29 L33,33 L44,32 L55,36 L66,35 L77,38 L88,37 L99,41 L110,40 L121,44 L132,43 L143,46 L154,45 L165,49 L176,48 L187,52 L198,51 L209,54 L220,53 L231,57 L242,56 L253,59 L264,58 L275,62 L286,61 L297,64 L308,63 L320,66" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+              <circle cx="320" cy="66" r="4" fill="var(--blue)" stroke="var(--surface)" stroke-width="2"/>
+              <line x1="0" y1="88" x2="320" y2="88" stroke="var(--rule)" stroke-width="1"/>
+            </svg>
+            <div class="blbl"><span>1 Jul</span><span>9 Jul</span><span>18 Jul</span><span>27 Jul</span></div>
+          </div>
+
+          <div class="chart">
+            <div class="ct">Stock in vs out</div>
+            <div class="cs">Variants · weekly</div>
+            <div class="bars">
+              <div class="bcol"><div class="bseg a" style="height:62%"></div><div class="bseg b" style="height:11%"></div></div>
+              <div class="bcol"><div class="bseg a" style="height:58%"></div><div class="bseg b" style="height:15%"></div></div>
+              <div class="bcol"><div class="bseg a" style="height:51%"></div><div class="bseg b" style="height:22%"></div></div>
+              <div class="bcol"><div class="bseg a" style="height:44%"></div><div class="bseg b" style="height:29%"></div></div>
+            </div>
+            <div class="blbl"><span>W1</span><span>W2</span><span>W3</span><span>W4</span></div>
+            <div class="lgnd">
+              <span><i style="background:var(--blue)"></i>In stock</span>
+              <span><i style="background:var(--blue-soft)"></i>Out of stock</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <span class="tab on">Price changes · 142</span>
+          <span class="tab">Stock out · 38</span>
+          <span class="tab">New · 23</span>
+          <span class="tab">Removed · 9</span>
+        </div>
+        <div class="mtw">
+          <table class="mt">
+            <thead><tr><th>Product</th><th>Variant</th><th>Price</th><th>Discount</th><th>Change</th><th>Stock</th><th>Date</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>RTS | Shirt, Trouser &amp; Dupatta</strong><div style="color:var(--muted);font-size:11px">SS-59.1-25-3-Blue</div></td>
+                <td><span class="vpill">M</span><span class="vpill">Blue</span></td>
+                <td class="pr"><s>3,432</s><b>3,290</b></td>
+                <td class="num">23.3%</td>
+                <td class="dn">−142</td>
+                <td><span class="sw out">Out</span></td>
+                <td class="num">26 Jul</td>
+              </tr>
+              <tr>
+                <td><strong>Embroidered Kameez</strong><div style="color:var(--muted);font-size:11px">MKS-EMB26-017</div></td>
+                <td><span class="vpill">S</span><span class="vpill">Cream</span></td>
+                <td class="pr"><s>5,990</s><b>4,490</b></td>
+                <td class="num">25.0%</td>
+                <td class="dn">−1,500</td>
+                <td><span class="sw in">In</span></td>
+                <td class="num">24 Jul</td>
+              </tr>
+              <tr>
+                <td><strong>Printed Lawn Shirt</strong><div style="color:var(--muted);font-size:11px">SS-41.2-25-1-Grey</div></td>
+                <td><span class="vpill">L</span><span class="vpill">Grey</span><span class="vpill">Lawn</span></td>
+                <td class="pr"><s>2,890</s><b>2,290</b></td>
+                <td class="num">20.8%</td>
+                <td class="dn">−600</td>
+                <td><span class="sw in">In</span></td>
+                <td class="num">22 Jul</td>
+              </tr>
+              <tr>
+                <td><strong>Kurta &amp; Shalwar</strong><div style="color:var(--muted);font-size:11px">MKS-STY26-010</div></td>
+                <td><span class="vpill">XL</span><span class="vpill">Wind Chime</span></td>
+                <td class="pr"><s>—</s><b>6,990</b></td>
+                <td class="num">—</td>
+                <td class="up">NEW</td>
+                <td><span class="sw new">New</span></td>
+                <td class="num">21 Jul</td>
+              </tr>
+              <tr>
+                <td><strong>Shirt &amp; Culotte</strong><div style="color:var(--muted);font-size:11px">SS-22.4-25-2-Opal</div></td>
+                <td><span class="vpill">M</span><span class="vpill">Opal Grey</span></td>
+                <td class="pr"><s>4,290</s><b>4,990</b></td>
+                <td class="num">0%</td>
+                <td class="up">+700</td>
+                <td><span class="sw in">In</span></td>
+                <td class="num">19 Jul</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <p class="cap">Table hamesha <strong>variant level</strong> par — size / color / fabric alag alag rows. Yehi requirement thi.</p>
+
+    <div class="note info">
+      <div class="hd">ℹ Charts par hover zaroori hai</div>
+      <p>Line chart par crosshair + tooltip (us din ka exact price), aur bars par per-bar tooltip. Sirf 2 series hain to legend hamesha maujood ho — taake pehchan sirf rang par na ho.</p>
+    </div>
+
+    <h3>Screen 4 — PDF Output</h3>
+    <div class="mock">
+      <div class="mock-bar"><i></i><i></i><i></i><span class="url">alkaram-studio_2026-07-01_2026-07-27.pdf</span></div>
+      <div class="mock-body">
+        <div class="sheet">
+          <div class="sh">
+            <div><h6>Alkaram Studio — Price &amp; Stock Report</h6><div class="mt-s">alkaramstudio.com · 01 Jul 2026 → 27 Jul 2026</div></div>
+            <div class="mt-s" style="text-align:right">Generated<br>27 Jul 2026</div>
+          </div>
+          <div class="krow">
+            <div><span>Products</span><b>1,997</b></div>
+            <div><span>Price drops</span><b>142</b></div>
+            <div><span>Out of stock</span><b>38</b></div>
+            <div><span>New</span><b>23</b></div>
+            <div><span>Avg discount</span><b>38.0%</b></div>
+          </div>
+          <table>
+            <thead><tr><th>Product</th><th>Variant</th><th>Old</th><th>New</th><th>Change</th><th>Stock</th></tr></thead>
+            <tbody>
+              <tr><td>RTS | Shirt, Trouser &amp; Dupatta</td><td>M / Blue</td><td>3,432</td><td>3,290</td><td>−4.1%</td><td>Out</td></tr>
+              <tr><td>Embroidered Kameez</td><td>S / Cream</td><td>5,990</td><td>4,490</td><td>−25.0%</td><td>In</td></tr>
+              <tr><td>Printed Lawn Shirt</td><td>L / Grey</td><td>2,890</td><td>2,290</td><td>−20.8%</td><td>In</td></tr>
+              <tr><td>Shirt &amp; Culotte</td><td>M / Opal Grey</td><td>4,290</td><td>4,990</td><td>+16.3%</td><td>In</td></tr>
+            </tbody>
+          </table>
+          <div class="mt-s" style="margin-top:11px">… 138 more rows · Page 1 of 12</div>
+        </div>
+      </div>
+    </div>
+    <p class="cap">Server par banta hai — <strong>poori report</strong>, sirf screen par dikhne wali rows nahi.</p>
+
+    <h3>Page structure</h3>
+<pre>app/
+├── login/page.tsx                  <i>Screen 1</i>
+├── stores/page.tsx                 <i>Screen 2 — 100 cards</i>
+├── stores/[id]/page.tsx            <i>Screen 3 — report</i>
+└── api/
+    ├── stores/route.ts                        <i>cards ka data</i>
+    ├── stores/[id]/summary/route.ts           <i>KPI boxes</i>
+    ├── stores/[id]/report/route.ts            <i>charts + table</i>
+    └── stores/[id]/report.pdf/route.ts        <i>Screen 4 — Puppeteer</i></pre>
+
+    <h3>Stack</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Layer</th><th>Tool</th><th>Kyun</th></tr></thead>
+        <tbody>
+          <tr><td>Frontend + API</td><td><strong>Next.js</strong> (App Router)</td><td>Dono ek hi project mein — alag backend nahi banana parega</td></tr>
+          <tr><td>Login</td><td>Supabase Auth / NextAuth</td><td>Ready-made</td></tr>
+          <tr><td>Database</td><td>PostgreSQL</td><td>Section 03</td></tr>
+          <tr><td>Charts</td><td>Recharts</td><td>React ke saath seedha chalta hai</td></tr>
+          <tr><td>Table</td><td>TanStack Table</td><td>5,000 rows ke liye virtual scroll</td></tr>
+          <tr><td>PDF</td><td>Puppeteer <em>(server par)</em></td><td>Poori report, sirf screen wali nahi</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note info">
+      <div class="hd">ℹ Date filter kabhi khali na chhorein</div>
+      <p>Default <strong>30 din</strong> rakhein. Warna koi banda 2 saal ka range daal kar server hang kar dega.</p>
+    </div>
+  </section>
+
+  <!-- ============ 09 ============ -->
+  <section id="s9">
+    <h2><span class="num">09</span>Warnings — CSV se milne wale masail</h2>
+    <p class="sub">Ye teen cheezein build shuru karne se pehle hal karni hain. Sample file (Alkaram, 27 Jul 2026) ke analysis se nikli hain.</p>
+    <hr class="hr">
+
+    <div class="note crit">
+      <div class="hd">✕ 1 — Stock ka data hai hi nahi</div>
+      <p>Aapki file mein <code>Inventory quantity</code> ki <strong>1,922 rows hain aur sab ki value 0</strong>. Total units = 0.<br><br>
+      Yani sirf is column par bharosa karenge to system kahega <em>"saara store out of stock hai"</em> — jo bilkul ghalat hoga. Aur stock in/out aapki core requirement hai.<br><br>
+      <strong>Hal:</strong> stock aise nikalein —</p>
+<pre>Variant aaj ke CSV mein maujood hai      →  <u>IN STOCK</u>
+Kal tha lekin aaj gayab hai              →  <b>OUT OF STOCK</b></pre>
+      <p>Shopify stores mein aksar sold-out variant feed se hat jata hai. Isi liye <code>last_seen_at</code> column banaya hai — <strong>wahi asal stock signal hai</strong>, <code>Inventory quantity</code> nahi.</p>
+    </div>
+
+    <div class="note warn">
+      <div class="hd">⚠ 2 — Pehle 2–3 aur stores check karein</div>
+      <p>Agar un stores ki CSV mein <code>Inventory quantity</code> ke asli numbers hain, to wo use kar lenge. Agar wahan bhi 0 hai, to <code>last_seen_at</code> wala tareeqa final hai. <strong>Ye ingest logic likhne se pehle confirm karna zaroori hai.</strong></p>
+    </div>
+
+    <div class="note warn">
+      <div class="hd">⚠ 3 — Duplicate SKUs</div>
+      <p><strong>52 duplicate SKUs</strong>, 114 rows par asar. Misal: <code>MKS-EMB26-017-Cream</code> 4 baar. Isi liye <code>variant_key</code> = SKU + options ka combo banaya hai. Sirf SKU par bharosa karenge to variants gaddmadd ho jayenge.</p>
+    </div>
+
+    <h3>Choti cheezein</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Masla</th><th>Kitna</th><th>Kya karein</th></tr></thead>
+        <tbody>
+          <tr><td>Type inconsistent</td><td class="num">—</td><td><code>SHIRT, TROUSER &amp; DUPATTA</code> vs <code>SHIRT , TROUSER &amp; DUPATTA</code> — ingest par normalize karein</td></tr>
+          <tr><td>Tags case duplicate</td><td class="num">—</td><td><code>ESSENTIALS</code> / <code>Essentials</code> — lowercase kar ke store karein</td></tr>
+          <tr><td>Vendor field kharab</td><td class="num">12 rows</td><td><code>SHIRT COLLAR</code>, <code>Slim Fit</code> — validate karein</td></tr>
+          <tr><td>Type khali</td><td class="num">48 products</td><td>Null allow karein</td></tr>
+          <tr><td>Image nahi</td><td class="num">1 product</td><td>Placeholder image</td></tr>
+          <tr><td>SKU nahi</td><td class="num">1 variant</td><td><code>variant_key</code> options se banayein</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note good">
+      <div class="hd">✓ Agla qadam</div>
+      <p><strong>1.</strong> 2–3 aur stores ki CSV le kar <code>Inventory quantity</code> confirm karein.<br>
+      <strong>2.</strong> Drive par file naming ka pattern tay karein — sample file (<code>https___www_alkaramstudio_com__shopify 27_07_26.csv</code>) mein domain aur date dono maujood hain, ye theek hai. Baaki 99 stores bhi isi pattern mein aane chahiyen.<br>
+      <strong>3.</strong> Approach 1 par migrations likh kar ingest shuru karein.</p>
+    </div>
+  </section>
+
+  <footer>
+    Shopify Multi-Store Price &amp; Stock Tracker — Technical Plan · v1<br>
+    Analysis source: <code>https___www_alkaramstudio_com__shopify 27_07_26.csv</code> — 10,193 rows · 1,997 products · 7,588 variants · 49 columns
+  </footer>
+
+  </main>
+</div>
+
+<script>
+(function () {
+  var b = document.getElementById('tg');
+  b.addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme');
+    if (!cur) {
+      cur = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  });
+})();
+</script>
+
+</body>
+</html>
