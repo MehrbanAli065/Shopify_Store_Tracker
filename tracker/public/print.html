@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Report</title>
+<style>
+/* Print output is paper: always light, no remote images, no theme. */
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:#111;
+  font:12px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.sheet{max-width:1000px;margin:0 auto;padding:26px 30px 60px}
+
+.bar{position:sticky;top:0;background:#f4f4f2;border-bottom:1px solid #ddd;padding:10px 30px;
+  display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.bar b{font-size:13px}
+.bar button{font:12.5px system-ui,sans-serif;font-weight:620;padding:7px 15px;border-radius:7px;
+  border:1px solid #ccc;background:#fff;cursor:pointer}
+.bar button.p{background:#2a78d6;border-color:#2a78d6;color:#fff}
+.bar .note{font-size:11.5px;color:#666}
+
+h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.015em}
+.sub{font-size:12px;color:#555;margin-top:3px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;
+  border-bottom:2px solid #111;padding-bottom:11px;margin-bottom:16px}
+.head .r{text-align:right;font-size:11px;color:#666;line-height:1.7}
+.head .r b{display:block;color:#111;font-size:12px}
+
+.kpis{display:flex;gap:26px;flex-wrap:wrap;margin-bottom:20px;
+  border:1px solid #e2e2df;border-radius:8px;padding:13px 18px;background:#fafaf9}
+.kpis div span{display:block;font-size:10px;color:#666;font-weight:620;text-transform:uppercase;letter-spacing:.04em}
+.kpis div b{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+
+h2{font-size:13.5px;margin:22px 0 8px;font-weight:670;display:flex;align-items:center;gap:8px}
+h2 .n{font-size:11px;font-weight:640;color:#555;background:#eee;border-radius:99px;padding:1px 8px}
+h2 .sq{width:8px;height:8px;border-radius:2px}
+
+table{border-collapse:collapse;width:100%;font-size:11px}
+th{text-align:left;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:#666;
+  font-weight:650;padding:7px 8px;border-bottom:1px solid #999;white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top;color:#333}
+tr{break-inside:avoid;page-break-inside:avoid}
+thead{display:table-header-group}          /* repeat headers on every page */
+.pt{color:#111;font-weight:640}
+.hd{font:9.5px ui-monospace,Consolas,monospace;color:#666;word-break:break-all}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.old{color:#888;text-decoration:line-through}
+.dn{color:#c0392b;font-weight:650}
+.up{color:#1e7d1e;font-weight:650}
+.vp{font:9.5px ui-monospace,Consolas,monospace;color:#444;background:#f2f2ef;
+  border:1px solid #e0e0dc;border-radius:4px;padding:0 5px;margin-right:3px;white-space:nowrap}
+section{break-inside:auto}
+.empty{color:#888;font-size:11px;padding:10px 0}
+footer{margin-top:26px;padding-top:12px;border-top:1px solid #ddd;font-size:10px;color:#777}
+
+@media print{
+  .bar{display:none}
+  .sheet{max-width:none;padding:0}
+  @page{margin:14mm 12mm}
+  h2{break-after:avoid;page-break-after:avoid}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b id="ttl">Preparing report…</b>
+  <span class="note" id="note"></span>
+  <span style="flex:1"></span>
+  <button class="p" id="print">🖨 Print / Save as PDF</button>
+  <button id="close">Close</button>
+</div>
+
+<div class="sheet" id="sheet"></div>
+
+<script>
+const P    = new URLSearchParams(location.search)
+const ID   = P.get('id') || '1'
+const FROM = P.get('from') || ''
+const TO   = P.get('to') || ''
+const BASE = P.get('baseline') === '1'
+const MAX  = 1500
+
+const nf  = n => n == null ? '—' : new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n)
+const dt  = s => s ? new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—'
+const dts = s => s ? new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '—'
+const esc = s => String(s ?? '').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
+
+const SECTIONS = [
+  { key:'new',     label:'New products',     hue:'#1baf7a' },
+  { key:'price',   label:'Price changes',    hue:'#c0392b' },
+  { key:'stock',   label:'Stock movements',  hue:'#eb6834' },
+  { key:'removed', label:'Removed from store', hue:'#888' }
+]
+
+const qs = extra => (FROM?`from=${FROM}&`:'') + (TO?`to=${TO}&`:'') + (BASE?'baseline=1&':'') + extra
+
+function priceCell (r) {
+  if (r.change_type === 'new' || r.is_baseline)
+    return `<b>${nf(r.price)}</b>` + (r.compare_at_price ? `<div class="hd">was ${nf(r.compare_at_price)}</div>` : '')
+  if (r.prev_price != null && Number(r.prev_price) !== Number(r.price))
+    return `<span class="old">${nf(r.prev_price)}</span> → <b>${nf(r.price)}</b>`
+  return `<b>${nf(r.price)}</b>`
+}
+function changeCell (r) {
+  if (r.is_baseline)                 return 'first import'
+  if (r.change_type === 'new')       return '<span class="up">NEW</span>'
+  if (r.change_type === 'removed')   return 'REMOVED'
+  if (r.change_type === 'stock_out') return '<span class="dn">SOLD OUT</span>'
+  if (r.change_type === 'stock_in')  return '<span class="up">RESTOCKED</span>'
+  if (r.price_diff == null || Number(r.price_diff) === 0) return 'discount only'
+  const v = Number(r.price_diff)
+  return `<span class="${v<0?'dn':'up'}">${v>0?'+':''}${nf(v)} (${r.price_diff_pct}%)</span>`
+}
+
+function tableFor (rows, cur) {
+  if (!rows.length) return `<div class="empty">Nothing in this period.</div>`
+  return `<table>
+    <thead><tr>
+      <th>Product</th><th>Variant</th><th class="num">Price (${esc(cur)})</th>
+      <th class="num">Change</th><th class="num">Discount</th><th>Stock</th><th class="num">Date</th>
+    </tr></thead><tbody>
+    ${rows.map(r => `<tr>
+      <td><div class="pt">${esc(r.title||'—')}</div>
+          <div class="hd">${esc(r.handle)}${r.sku?` · ${esc(r.sku)}`:''}</div></td>
+      <td>${(r.variant_label||'—').split(' / ').map(v=>`<span class="vp">${esc(v)}</span>`).join('')}</td>
+      <td class="num">${priceCell(r)}</td>
+      <td class="num">${changeCell(r)}</td>
+      <td class="num">${Number(r.discount_pct)?`${r.discount_pct}%`:'—'}</td>
+      <td>${r.is_baseline||r.change_type==='new' ? 'In'
+           : r.change_type==='removed' ? 'Removed'
+           : r.in_stock ? 'In' : 'Out'}</td>
+      <td class="num">${dts(r.observed_date)}</td>
+    </tr>`).join('')}
+    </tbody></table>`
+}
+
+async function build () {
+  const [store, sum] = await Promise.all([
+    (await fetch(`/api/stores/${ID}`)).json(),
+    (await fetch(`/api/stores/${ID}/summary?${qs('')}`)).json()
+  ])
+  const cur = store.currency
+  const from = sum.from, to = sum.to
+  document.title = `${store.name} — ${from} to ${to}`
+  ttl.textContent = `${store.name} · ${dts(from)} – ${dts(to)}`
+
+  // one request per section, no images anywhere — this is what keeps it fast
+  const parts = await Promise.all(SECTIONS.map(async s => {
+    const r = await (await fetch(`/api/stores/${ID}/report?${qs(`type=${s.key}&limit=${MAX}`)}`)).json()
+    return { ...s, rows: r.rows, total: r.total }
+  }))
+
+  const priceTotal = sum.price_down + sum.price_up + sum.discount_change
+  const capped = parts.filter(p => p.total > p.rows.length)
+
+  sheet.innerHTML = `
+    <div class="head">
+      <div>
+        <h1>${esc(store.name)} — Price &amp; Stock Report</h1>
+        <div class="sub">${esc(store.domain)} · Store ID ${store.id} · ${dt(from)} → ${dt(to)}</div>
+      </div>
+      <div class="r">
+        <b>Generated ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</b>
+        ${nf(sum.products)} products · ${nf(sum.variants)} variants<br>
+        ${store.runs.length} scrape${store.runs.length===1?'':'s'} in range
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div><span>Products</span><b>${nf(sum.products)}</b></div>
+      <div><span>Variants</span><b>${nf(sum.variants)}</b></div>
+      <div><span>New</span><b>${nf(sum.new_items)}</b></div>
+      <div><span>Price changes</span><b>${nf(priceTotal)}</b></div>
+      <div><span>Out of stock</span><b>${nf(sum.stock_out)}</b></div>
+      <div><span>Removed</span><b>${nf(sum.removed)}</b></div>
+      <div><span>Avg discount</span><b>${sum.avg_discount ?? 0}%</b></div>
+    </div>
+
+    <h2>Daily activity</h2>
+    <table><thead><tr>
+      <th>Date</th><th class="num">New</th><th class="num">Price Δ</th><th class="num">Stock out</th>
+      <th class="num">Stock in</th><th class="num">Removed</th><th class="num">History rows</th>
+    </tr></thead><tbody>
+      ${sum.daily.map(d => `<tr>
+        <td>${dts(d.observed_date)}</td>
+        <td class="num">${d.new_items}${d.baseline_items?` <span class="hd">(+${nf(d.baseline_items)} initial)</span>`:''}</td>
+        <td class="num">${d.price}</td><td class="num">${d.stock_out}</td>
+        <td class="num">${d.stock_in}</td><td class="num">${d.removed}</td>
+        <td class="num"><b>${d.total}</b></td></tr>`).join('')}
+    </tbody></table>
+
+    ${parts.map(p => `<section>
+      <h2><span class="sq" style="background:${p.hue}"></span>${p.label}
+          <span class="n">${nf(p.total)}</span></h2>
+      ${tableFor(p.rows, cur)}
+      ${p.total > p.rows.length
+        ? `<div class="empty">Showing the first ${nf(p.rows.length)} of ${nf(p.total)} — download the CSV for the complete list.</div>`
+        : ''}
+    </section>`).join('')}
+
+    <footer>
+      ${esc(store.name)} · ${esc(store.domain)} · ${dt(from)} → ${dt(to)}<br>
+      ${BASE ? 'Includes the initial import. ' : 'Excludes the initial import (the store\'s first ingest). '}
+      Generated from the tracker database.
+    </footer>`
+
+  const rows = parts.reduce((a,p)=>a+p.rows.length,0)
+  note.textContent = `${nf(rows)} rows` + (capped.length ? ' · some sections truncated' : '')
+
+  // give layout a beat, then open the print dialog
+  if (P.get('auto') !== '0') setTimeout(() => window.print(), 350)
+}
+
+print.onclick = () => window.print()
+close.onclick = () => window.close()
+build().catch(e => { sheet.innerHTML = `<div class="empty">Could not build the report — ${esc(e.message)}</div>` })
+</script>
+</body>
+</html>

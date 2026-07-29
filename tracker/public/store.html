@@ -24,7 +24,7 @@
         <a class="segb" id="tabHistory">History</a>
       </div>
       <button class="btn" id="csv" title="Download the full change log as CSV">📄 CSV</button>
-      <button class="btn pri" id="pdf" title="Print or save as PDF">📥 PDF</button>
+      <button class="btn pri" id="pdf" title="Open a clean, print-ready report">📥 PDF</button>
       <button class="btn ico" id="tg" title="Switch theme">◐</button>
     </div>
   </div>
@@ -421,7 +421,8 @@ qc.onclick = () => { $q.value=''; q=''; qc.hidden=true; paint(); $q.focus() }
 baseChk.onchange = () => { showBase = baseChk.checked; loadRows() }
 csv.onclick = () => location.href =
   `/api/stores/${ID}/report.csv?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1':''}`
-pdf.onclick = () => window.print()
+pdf.onclick = () => window.open(
+  `/print.html?id=${ID}&${qsDates()}${showBase?'baseline=1':''}`, '_blank', 'noopener')
 tg.onclick = () => {
   const cur = document.documentElement.getAttribute('data-theme')
     || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
