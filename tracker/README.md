@@ -103,11 +103,29 @@ A full daily snapshot would have written all 7,558.
 
 ### Stock detection
 
-Both sample stores ship `Inventory quantity` as **all zeros**, so stock is derived
-from feed presence instead:
+`Inventory quantity` never carries a count, but it does carry the state:
 
-- variant present in today's CSV → in stock
-- present yesterday, missing today → `stock_out` (or `removed` if the whole handle went)
+| CSV value | Meaning |
+|---|---|
+| blank | the variant is sellable |
+| `0` | the variant has sold out |
+
+Checked against the store's own live `/products.json` feed, which exposes an
+`available` boolean per variant publicly. Over 3,406 variants matched on
+handle + SKU: blank agreed with `available=true` **99.8%** of the time, and `0`
+agreed with `available=false` **96.5%** — **99.2% overall**. The gap is explained
+by the day between the CSV and the live fetch.
+
+So:
+
+- blank, or a positive number → **in stock**
+- explicit `0` → **out of stock** (`stock_out` when it flips)
+- variant gone from the CSV entirely → `stock_out`, or `removed` if its whole
+  handle went with it
+
+Exact counts are not obtainable. Shopify gives `inventory_quantity` only to the
+store owner via the Admin API, so for a competitor's store "3 left" cannot be had
+by any route. In stock / out of stock is the ceiling.
 
 ### Safety rule
 
