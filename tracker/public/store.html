@@ -94,7 +94,7 @@
   <div class="tw"><table>
     <thead><tr>
       <th>Product</th><th>Variant</th><th>Price</th><th>Change</th>
-      <th>Discount</th><th>Stock</th><th>Date</th><th></th>
+      <th>Discount</th><th>Stock</th><th>Qty</th><th>Date</th><th></th>
     </tr></thead>
     <tbody id="rows"></tbody>
   </table></div>
@@ -287,7 +287,7 @@ function priceCell (r) {
 }
 function changeCell (r) {
   if (r.is_baseline) return `<span class="mut">FIRST IMPORT</span>`
-  const M = { new:['up','NEW'], removed:['mut','REMOVED'], stock_out:['dn','SOLD OUT'], stock_in:['up','RESTOCKED'] }
+  const M = { new:['up','NEW'], removed:['mut','REMOVED'], stock_out:['dn','STOCK OUT'], stock_in:['up','RESTOCKED'] }
   if (M[r.change_type]) return `<span class="${M[r.change_type][0]}">${M[r.change_type][1]}</span>`
   if (r.price_diff == null || Number(r.price_diff) === 0) return `<span class="mut">DISCOUNT ONLY</span>`
   const v = Number(r.price_diff)
@@ -296,6 +296,11 @@ function changeCell (r) {
 const stockCell = r => r.change_type==='new' ? STOCK.nw
                      : r.change_type==='removed' ? STOCK.rm
                      : r.in_stock ? STOCK.in : STOCK.out
+/** The store's own count, when it publishes one. Blank and 0 tell us nothing. */
+const qtyCell = r => r.inventory_qty > 0
+  ? `<b style="color:var(--ink)">${nf(r.inventory_qty)}</b>`
+  : `<span class="unk" title="This store does not publish a stock count">unknown</span>`
+
 function discCell (r) {
   const p = Number(r.prev_discount_pct||0), n = Number(r.discount_pct||0)
   if (r.change_type === 'new') return n ? `${n}%` : '—'
@@ -303,7 +308,7 @@ function discCell (r) {
 }
 
 async function loadRows () {
-  rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="8"><div class="skl w90"></div></td></tr>`).join('')
+  rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="9"><div class="skl w90"></div></td></tr>`).join('')
   const r = await (await fetch(
     `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}limit=600`)).json()
   ROWS = r.rows; window.__total = r.total
@@ -334,11 +339,12 @@ function paint () {
       <td>${changeCell(x)}</td>
       <td class="num">${discCell(x)}</td>
       <td>${stockCell(x)}</td>
+      <td class="num">${qtyCell(x)}</td>
       <td class="num">${dt(x.observed_date)}</td>
       <td><a class="lnk" href="${esc(x.product_url)}" target="_blank" rel="noopener"
              onclick="event.stopPropagation()">Open ↗</a></td>
     </tr>`).join('')
-    : `<tr><td colspan="8"><div class="nores" style="border:0;background:none;padding:40px 10px">
+    : `<tr><td colspan="9"><div class="nores" style="border:0;background:none;padding:40px 10px">
          <div class="ne">🔍</div><div class="nt">Nothing found</div>
          <div class="nd">${q ? `No rows match “${esc(q)}”.` : 'No changes of this type in the selected period.'}</div>
        </div></td></tr>`

@@ -365,3 +365,6 @@ td.tight{font-size:11.5px;color:var(--ink-2);max-width:150px}
 .tg2{display:inline-block;font-size:10px;color:var(--ink-2);background:var(--surface-2);
   border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin:0 3px 3px 0;
   max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+
+/* a stock count the store never published */
+.unk{color:var(--muted);font-size:11px;font-style:italic}

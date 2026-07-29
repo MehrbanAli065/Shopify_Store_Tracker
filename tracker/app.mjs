@@ -133,7 +133,7 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
            observed_date, change_type, is_baseline,
            prev_price, price, price_diff, price_diff_pct,
            prev_compare_at_price, compare_at_price, prev_discount_pct, discount_pct,
-           prev_in_stock, in_stock, product_first_seen, currency
+           prev_in_stock, in_stock, inventory_qty, product_first_seen, currency
       FROM v_change_report
      WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
        ${types ? 'AND change_type = ANY($5)' : ''}
@@ -206,7 +206,7 @@ app.get('/api/stores/:id/report.csv', wrap(async (req, res) => {
     SELECT store_name, handle, title, sku, variant_label, observed_date, change_type,
            prev_price, price, price_diff, price_diff_pct,
            prev_compare_at_price, compare_at_price, prev_discount_pct, discount_pct,
-           prev_in_stock, in_stock, currency, product_url
+           prev_in_stock, in_stock, inventory_qty, currency, product_url
       FROM v_change_report
      WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
        ${types ? 'AND change_type = ANY($4)' : ''}
@@ -244,7 +244,7 @@ const SNAPSHOT_SQL = (search, extra = '') => `
   WITH state AS (
     SELECT DISTINCT ON (h.variant_id)
            h.variant_id, h.price, h.compare_at_price, h.discount_pct,
-           h.in_feed, h.in_stock, h.observed_date AS last_changed
+           h.in_feed, h.in_stock, h.inventory_qty, h.observed_date AS last_changed
       FROM variant_history h
       JOIN variants v ON v.id = h.variant_id
       JOIN products p ON p.id = v.product_id
@@ -258,7 +258,7 @@ const SNAPSHOT_SQL = (search, extra = '') => `
          v.option3_name, v.option3_value,
          NULLIF(CONCAT_WS(' / ', NULLIF(v.option1_value,''), NULLIF(v.option2_value,''),
                                  NULLIF(v.option3_value,'')), '') AS variant_label,
-         s.price, s.compare_at_price, s.discount_pct, s.in_stock, s.last_changed,
+         s.price, s.compare_at_price, s.discount_pct, s.in_stock, s.inventory_qty, s.last_changed,
          v.first_seen_at,
          'https://' || st.domain || '/products/' || p.handle AS product_url,
          st.currency
@@ -313,7 +313,7 @@ app.get('/api/stores/:id/snapshot.csv', wrap(async (req, res) => {
   const cols = ['handle','title','vendor','product_type','tags','status','sku','variant_label',
                 'option1_name','option1_value','option2_name','option2_value',
                 'option3_name','option3_value','price','compare_at_price','discount_pct',
-                'in_stock','currency','last_changed','first_seen_at','product_first_seen',
+                'in_stock','inventory_qty','currency','last_changed','first_seen_at','product_first_seen',
                 'image_src','variant_image','product_url']
   const esc = v => v == null ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g,'""')}"` : String(v)
   const csv = [cols.join(','),

@@ -42,6 +42,18 @@ function available (raw) {
   return Number.isFinite(n) ? n > 0 : true
 }
 
+/**
+ * The raw Inventory quantity, or null when the store gave us nothing usable.
+ * A 0 is a state marker, not a count — it tells us the variant sold out but
+ * says nothing about how many were there, so it is not reported as a quantity.
+ */
+function qty (raw) {
+  const t = s(raw)
+  if (t === '') return null
+  const n = Number(t)
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null
+}
+
 /** Insert rows in chunks — PGlite is WASM, one statement per row is far too slow. */
 async function bulk (table, cols, rows, { returning = null, chunk = 400 } = {}) {
   const out = []
@@ -109,7 +121,8 @@ for (const r of rows) {
     // Inventory quantity carries the stock signal after all: blank means the
     // variant is sellable, an explicit 0 means it has sold out. Checked against
     // the store's live /products.json feed — 99.2% agreement over 3,406 variants.
-    available: available(r['Inventory quantity'])
+    available: available(r['Inventory quantity']),
+    qty: qty(r['Inventory quantity'])
   })
 }
 
@@ -143,8 +156,10 @@ if (prior) {
   await q(`
     UPDATE variants v
        SET current_price = h.price, current_compare_at_price = h.compare_at_price,
-           current_in_stock = h.in_stock, is_active = h.in_stock, last_seen_at = h.observed_date
-      FROM (SELECT DISTINCT ON (variant_id) variant_id, price, compare_at_price, in_stock, observed_date
+           current_in_stock = h.in_stock, is_active = h.in_stock, last_seen_at = h.observed_date,
+           current_qty = h.inventory_qty
+      FROM (SELECT DISTINCT ON (variant_id) variant_id, price, compare_at_price, in_stock,
+                   inventory_qty, observed_date
               FROM variant_history ORDER BY variant_id, observed_date DESC) h
      WHERE h.variant_id = v.id
        AND v.product_id IN (SELECT id FROM products WHERE store_id = $1)`, [STORE_ID])
@@ -221,13 +236,13 @@ if (newVariants.length) {
   const inserted = await bulk('variants',
     ['product_id','sku','option1_name','option1_value','option2_name','option2_value',
      'option3_name','option3_value','variant_image','variant_key',
-     'current_price','current_compare_at_price','current_in_stock',
+     'current_price','current_compare_at_price','current_in_stock','current_qty',
      'first_seen_at','last_seen_at','is_active'],   // current_discount_pct is generated
     newVariants.map(([, v]) => [
       dbProducts.get(v.handle).id, v.sku,
       v.option1_name, v.option1_value, v.option2_name, v.option2_value,
       v.option3_name, v.option3_value, v.variant_image, v.variant_key,
-      v.price, v.compare_at, v.available, RUN_DATE, RUN_DATE, v.available]),
+      v.price, v.compare_at, v.available, v.qty, RUN_DATE, RUN_DATE, v.available]),
     { returning: 'id, product_id, variant_key' })
 
   const byPid = new Map([...dbProducts.values()].map(p => [String(p.id), p.handle]))
@@ -238,15 +253,15 @@ if (newVariants.length) {
 }
 
 // ── 7 · THE DIFF — one history row per variant that actually changed ──
-const history = []            // [variant_id, run_id, date, price, compare, in_feed, in_stock, pp, pc, pis, type]
-const cacheUpdates = []       // [variant_id, price, compare, in_stock]
+const history = []            // [variant_id, run_id, date, price, compare, in_feed, in_stock, qty, pp, pc, pis, type]
+const cacheUpdates = []       // [variant_id, price, compare, in_stock, qty]
 
 for (const [key, v] of csvVariants) {
   const dbv = dbVariants.get(key)
   const isNew = newVariants.some(([k]) => k === key)
 
   if (isNew) {
-    history.push([dbv.id, RUN_ID, RUN_DATE, v.price, v.compare_at, true, v.available, null, null, null, 'new'])
+    history.push([dbv.id, RUN_ID, RUN_DATE, v.price, v.compare_at, true, v.available, v.qty, null, null, null, 'new'])
     continue
   }
 
@@ -262,9 +277,9 @@ for (const [key, v] of csvVariants) {
   else if (priceChanged)       type = v.price > num(dbv.current_price) ? 'price_up' : 'price_down'
   else                         type = 'discount_change'
 
-  history.push([dbv.id, RUN_ID, RUN_DATE, v.price, v.compare_at, true, v.available,
+  history.push([dbv.id, RUN_ID, RUN_DATE, v.price, v.compare_at, true, v.available, v.qty,
                 num(dbv.current_price), num(dbv.current_compare_at_price), dbv.current_in_stock, type])
-  cacheUpdates.push([dbv.id, v.price, v.compare_at, v.available])
+  cacheUpdates.push([dbv.id, v.price, v.compare_at, v.available, v.qty])
 }
 
 // ── 8 · things that vanished from the feed ────────────────────────
@@ -283,9 +298,9 @@ if (allowRemovals && !isFirstRun) {
 
     const type = delisted ? 'removed' : 'stock_out'
     history.push([dbv.id, RUN_ID, RUN_DATE,
-                  num(dbv.current_price), num(dbv.current_compare_at_price), false, false,
+                  num(dbv.current_price), num(dbv.current_compare_at_price), false, false, null,
                   num(dbv.current_price), num(dbv.current_compare_at_price), dbv.current_in_stock, type])
-    cacheUpdates.push([dbv.id, num(dbv.current_price), num(dbv.current_compare_at_price), false])
+    cacheUpdates.push([dbv.id, num(dbv.current_price), num(dbv.current_compare_at_price), false, null])
     goneVariants++
   }
 
@@ -300,16 +315,18 @@ if (allowRemovals && !isFirstRun) {
 if (history.length) {
   await bulk('variant_history',
     ['variant_id','scrape_run_id','observed_date','price','compare_at_price','in_feed','in_stock',
-     'prev_price','prev_compare_at_price','prev_in_stock','change_type'], history)
+     'inventory_qty','prev_price','prev_compare_at_price','prev_in_stock','change_type'], history)
 }
 for (let i = 0; i < cacheUpdates.length; i += 400) {
   const slice = cacheUpdates.slice(i, i + 400)
   await q(`UPDATE variants v SET current_price = d.p, current_compare_at_price = d.c,
-                                 current_in_stock = d.s, is_active = d.s
-             FROM (SELECT * FROM UNNEST($1::bigint[], $2::numeric[], $3::numeric[], $4::boolean[])
-                        AS t(id, p, c, s)) d
+                                 current_in_stock = d.s, is_active = d.s, current_qty = d.q
+             FROM (SELECT * FROM UNNEST($1::bigint[], $2::numeric[], $3::numeric[],
+                                        $4::boolean[], $5::int[])
+                        AS t(id, p, c, s, q)) d
             WHERE v.id = d.id`,
-    [slice.map(r => r[0]), slice.map(r => r[1]), slice.map(r => r[2]), slice.map(r => r[3])])
+    [slice.map(r => r[0]), slice.map(r => r[1]), slice.map(r => r[2]),
+     slice.map(r => r[3]), slice.map(r => r[4])])
 }
 const seenKeys = [...csvVariants.keys()].map(k => k.split('\u0000')[1])
 if (seenKeys.length) {

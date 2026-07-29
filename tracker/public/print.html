@@ -106,7 +106,7 @@ function changeCell (r) {
   if (r.is_baseline)                 return 'first import'
   if (r.change_type === 'new')       return '<span class="up">NEW</span>'
   if (r.change_type === 'removed')   return 'REMOVED'
-  if (r.change_type === 'stock_out') return '<span class="dn">SOLD OUT</span>'
+  if (r.change_type === 'stock_out') return '<span class="dn">STOCK OUT</span>'
   if (r.change_type === 'stock_in')  return '<span class="up">RESTOCKED</span>'
   if (r.price_diff == null || Number(r.price_diff) === 0) return 'discount only'
   const v = Number(r.price_diff)
@@ -118,7 +118,7 @@ function tableFor (rows, cur) {
   return `<table>
     <thead><tr>
       <th>Product</th><th>Variant</th><th class="num">Price (${esc(cur)})</th>
-      <th class="num">Change</th><th class="num">Discount</th><th>Stock</th><th class="num">Date</th>
+      <th class="num">Change</th><th class="num">Discount</th><th>Stock</th><th class="num">Qty</th><th class="num">Date</th>
     </tr></thead><tbody>
     ${rows.map(r => `<tr>
       <td><div class="pt">${esc(r.title||'—')}</div>
@@ -130,6 +130,7 @@ function tableFor (rows, cur) {
       <td>${r.is_baseline||r.change_type==='new' ? 'In'
            : r.change_type==='removed' ? 'Removed'
            : r.in_stock ? 'In' : 'Out'}</td>
+      <td class="num">${r.inventory_qty > 0 ? nf(r.inventory_qty) : 'unknown'}</td>
       <td class="num">${dts(r.observed_date)}</td>
     </tr>`).join('')}
     </tbody></table>`

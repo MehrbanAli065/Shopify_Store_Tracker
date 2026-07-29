@@ -87,6 +87,7 @@ CREATE TABLE variants (
   current_price            NUMERIC(12,2),
   current_compare_at_price NUMERIC(12,2),
   current_in_stock         BOOLEAN,
+  current_qty              INT,                  -- raw Inventory quantity; usually absent
   current_discount_pct     NUMERIC(6,2) GENERATED ALWAYS AS (
                              CASE WHEN current_compare_at_price > 0
                                    AND current_compare_at_price > current_price
@@ -124,6 +125,10 @@ CREATE TABLE variant_history (
   --   in_stock = it was sellable (Inventory quantity blank rather than 0)
   in_feed           BOOLEAN NOT NULL DEFAULT true,
   in_stock          BOOLEAN,
+  -- The raw Inventory quantity exactly as the CSV gave it. Most stores leave it
+  -- blank or 0, which says nothing about how many are left — only the boolean
+  -- above is trustworthy. Kept so a store that DOES publish counts is not lost.
+  inventory_qty     INT,
 
   -- previous values on the same row, so reports need no LAG()
   prev_price             NUMERIC(12,2),

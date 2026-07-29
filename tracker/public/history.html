@@ -60,7 +60,7 @@
       <table>
         <thead><tr>
           <th>Product</th><th>Vendor</th><th>Type</th><th>Variant</th>
-          <th>Price</th><th>Compare at</th><th>Discount</th><th>Stock</th>
+          <th>Price</th><th>Compare at</th><th>Discount</th><th>Stock</th><th>Qty</th>
           <th>First seen</th><th>Unchanged since</th><th>Tags</th><th></th>
         </tr></thead>
         <tbody id="rows"></tbody>
@@ -97,6 +97,11 @@ function optCell (x) {
   return parts.map(([n, v]) =>
     `<span class="vp" title="${esc(n||'')}">${n ? `<i>${esc(n)}</i> ` : ''}${esc(v)}</span>`).join('')
 }
+/** The store's own count, when it publishes one. Blank and 0 tell us nothing. */
+const qtyCell = r => r.inventory_qty > 0
+  ? `<b style="color:var(--ink)">${nf(r.inventory_qty)}</b>`
+  : `<span class="unk" title="This store does not publish a stock count">unknown</span>`
+
 function tagCell (tags) {
   if (!tags || !tags.length) return '<span class="s2">—</span>'
   const shown = tags.slice(0, 3).map(t => `<span class="tg2">${esc(t)}</span>`).join('')
@@ -144,7 +149,7 @@ function select (date) {
 }
 
 async function load () {
-  rows.innerHTML = Array.from({length:8},()=>`<tr class="skr"><td colspan="12"><div class="skl w90"></div></td></tr>`).join('')
+  rows.innerHTML = Array.from({length:8},()=>`<tr class="skr"><td colspan="13"><div class="skl w90"></div></td></tr>`).join('')
   const r = await (await fetch(
     `/api/stores/${ID}/snapshot?date=${DATE}&offset=${OFF}&limit=${LIMIT}${Q?`&q=${encodeURIComponent(Q)}`:''}`)).json()
 
@@ -186,12 +191,13 @@ async function load () {
       <td class="num">${x.compare_at_price ? nf(x.compare_at_price) : '—'}</td>
       <td class="num">${Number(x.discount_pct) ? `<b style="color:var(--ink)">${x.discount_pct}%</b>` : '—'}</td>
       <td>${x.in_stock ? STOCK.in : STOCK.out}</td>
+      <td class="num">${qtyCell(x)}</td>
       <td class="num">${dt(x.first_seen_at)}</td>
       <td class="num">${dt(x.last_changed)}</td>
       <td class="tagcell">${tagCell(x.tags)}</td>
       <td><a class="lnk" href="${esc(x.product_url)}" target="_blank" rel="noopener">Open ↗</a></td>
     </tr>`).join('')
-    : `<tr><td colspan="12"><div class="nores" style="border:0;background:none;padding:40px 10px">
+    : `<tr><td colspan="13"><div class="nores" style="border:0;background:none;padding:40px 10px">
          <div class="ne">🔍</div><div class="nt">Nothing found</div>
          <div class="nd">${Q?`No rows match “${esc(Q)}” on this date.`:'This day has no catalogue data.'}</div>
        </div></td></tr>`
