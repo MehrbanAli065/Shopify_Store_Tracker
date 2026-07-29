@@ -25,6 +25,23 @@ unset and it uses the local PGlite file. Nothing else changes.
 
 ## Step 1 · Create a hosted Postgres
 
+### Easiest: create it inside Vercel
+
+If the project is already on Vercel, you do not need a separate account:
+
+1. Open the project → **Storage** tab → **Create Database** → **Postgres**
+2. Pick a region near your users → **Create**
+3. Connect it to the project when prompted
+
+Vercel provisions Neon underneath and injects the connection string into the project
+automatically (`DATABASE_URL` / `POSTGRES_URL` — the app accepts either). **Redeploy**
+once so the running build picks the variable up.
+
+To run migrations and ingest from your machine, copy the string from
+**Storage → your database → `.env.local` tab** into `tracker/.env`.
+
+### Or create it directly on Neon
+
 **Neon** is the easiest for this (recommended):
 
 1. Go to <https://neon.tech> → sign up → **Create project**

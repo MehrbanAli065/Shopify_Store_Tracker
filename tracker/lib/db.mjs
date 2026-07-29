@@ -21,7 +21,14 @@ if (fs.existsSync(path.join(root, '.env'))) {
   config({ path: path.join(root, '.env') })
 }
 
-const URL = process.env.DATABASE_URL || ''
+// Vercel's Postgres/Neon integration injects one of these depending on how the
+// store was created, so accept any of them rather than failing confusingly.
+const URL =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_URL_NON_POOLING ||
+  process.env.DATABASE_URL_UNPOOLED || ''
+
 export const MODE = URL ? 'postgres' : 'pglite'
 
 let _pool = null   // hosted Postgres
@@ -45,9 +52,10 @@ async function pool () {
 async function lite () {
   if (process.env.VERCEL) {
     throw new Error(
-      'DATABASE_URL is not set. Vercel has no persistent filesystem, so the local ' +
-      'PGlite database cannot be used there — add DATABASE_URL in Project Settings → ' +
-      'Environment Variables and redeploy.')
+      'No database connection string found. Vercel has no persistent filesystem, so the ' +
+      'local PGlite database cannot be used there. Create a Postgres store under the ' +
+      'project\'s Storage tab (or set DATABASE_URL yourself in Settings → Environment ' +
+      'Variables), then redeploy.')
   }
   if (!_lite) {
     const { PGlite } = await import('@electric-sql/pglite')
