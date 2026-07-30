@@ -23,11 +23,10 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import os from 'node:os'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { q, close, describe, MODE, ROOT } from '../lib/db.mjs'
-import { folderId, describeAuth, listCsvFiles, downloadFile,
+import { folderId, describeAuth, readOnlyAuth, listCsvFiles, downloadFile,
          trashFile, moveFile, ensureFolder } from '../lib/drive.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -49,7 +48,7 @@ const FORCE    = flag('force')
 const CACHE = path.join(ROOT, 'data', 'drive-cache')
 
 // ── helpers ───────────────────────────────────────────────────────
-const iso = d => `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`
+const iso = d => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 
 /** Date from the filename if it carries one, else the file's own Drive timestamp. */
 function dateFor (name, modifiedTime) {
@@ -57,7 +56,7 @@ function dateFor (name, modifiedTime) {
   let m = name.match(/(\d{4})[-_](\d{2})[-_](\d{2})/)
   if (m) return `${m[1]}-${m[2]}-${m[3]}`
   m = name.match(/(\d{2})[-_](\d{2})[-_](\d{2,4})/)
-  if (m) return `${m[3].length === 2 ? '20'+m[3] : m[3]}-${m[2]}-${m[1]}`
+  if (m) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${m[2]}-${m[1]}`
   return iso(new Date(modifiedTime))
 }
 
@@ -100,13 +99,32 @@ if (!FOLDER) {
   console.error('\n  ✗ No Drive folder. Set DRIVE_FOLDER_ID in .env, or pass --folder <id|url>.\n')
   process.exit(1)
 }
+
 const auth = describeAuth()
 if (!auth) {
-  console.error(
-    '\n  ✗ No Google credentials found.\n' +
-    '    Set GOOGLE_SERVICE_ACCOUNT_JSON (or GOOGLE_APPLICATION_CREDENTIALS),\n' +
-    '    or the GOOGLE_OAUTH_CLIENT_ID / _SECRET / _REFRESH_TOKEN trio.\n' +
-    '    DRIVE.md has the five-minute setup.\n')
+  console.error([
+    '',
+    '  ✗ No Google credentials found. Pick the simplest one that fits:',
+    '',
+    '    GOOGLE_API_KEY                  — folder shared as "Anyone with the link"',
+    '    GOOGLE_APPLICATION_CREDENTIALS  — service account key, folder shared with it',
+    '    GOOGLE_OAUTH_* trio             — reuse an existing OAuth app',
+    '',
+    '    DRIVE.md walks through each.',
+    ''
+  ].join('\n'))
+  process.exit(1)
+}
+
+// An API key can read, and that is all. Say so before any work happens.
+if ((ARCHIVE || TRASH) && readOnlyAuth()) {
+  console.error([
+    '',
+    '  ✗ An API key can only read, so --archive and --trash cannot work.',
+    '    Drop the flag — already-ingested days are skipped anyway — or use a',
+    '    service account.',
+    ''
+  ].join('\n'))
   process.exit(1)
 }
 

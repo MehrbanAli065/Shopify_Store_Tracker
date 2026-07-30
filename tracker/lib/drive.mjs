@@ -2,7 +2,12 @@
  * Google Drive access for the ingest job.
  *
  * The daily CSVs live in a Drive folder, so this is the real source — nothing
- * is read from a local project path. Two credential styles are supported:
+ * is read from a local project path. Three credential styles are supported,
+ * in this order:
+ *
+ *   0. API key — the simplest, and enough when the folder is link-shareable
+ *        GOOGLE_API_KEY
+ *      Read-only: --archive and --trash need a real identity, not a key.
  *
  *   1. Service account (recommended for the nightly job — no browser, ever)
  *        GOOGLE_SERVICE_ACCOUNT_JSON   the key file's contents, inline
@@ -33,11 +38,21 @@ export function folderId (raw = process.env.DRIVE_FOLDER_ID) {
   return m ? m[1] : v
 }
 
+/** True when the credential can only read — an API key cannot modify files. */
+export const readOnlyAuth = () =>
+  !!process.env.GOOGLE_API_KEY &&
+  !process.env.GOOGLE_SERVICE_ACCOUNT_JSON &&
+  !process.env.GOOGLE_APPLICATION_CREDENTIALS &&
+  !process.env.GOOGLE_OAUTH_REFRESH_TOKEN
+
+/** What will actually be used — same precedence as call() below, so the banner
+ *  never names a credential the request will not use. */
 export function describeAuth () {
   if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return 'service account (inline JSON)'
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS)
     return `service account (${path.basename(process.env.GOOGLE_APPLICATION_CREDENTIALS)})`
   if (process.env.GOOGLE_OAUTH_REFRESH_TOKEN) return 'OAuth refresh token'
+  if (process.env.GOOGLE_API_KEY) return 'API key (folder must be link-shareable)'
   return null
 }
 
@@ -93,13 +108,26 @@ async function tokenSource (writable) {
 }
 
 async function call (url, { writable = false, raw = false, ...init } = {}) {
-  const token = await (await tokenSource(writable))()
-  const res = await fetch(url, { ...init, headers: { Authorization: `Bearer ${token}`, ...init.headers } })
+  const key = process.env.GOOGLE_API_KEY
+  let headers = init.headers
+  if (key && readOnlyAuth()) {
+    if (writable) throw new Error(
+      'An API key can only read. Use --archive/--trash with a service account, ' +
+      'or leave the files in Drive — already-ingested days are skipped anyway.')
+    url += (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key)
+  } else {
+    const token = await (await tokenSource(writable))()
+    headers = { Authorization: `Bearer ${token}`, ...init.headers }
+  }
+  const res = await fetch(url, { ...init, headers })
   if (!res.ok) {
     let detail = ''
     try { detail = (await res.json())?.error?.message || '' } catch {}
     if (res.status === 404)
-      throw new Error(`Drive returned 404. Is the folder shared with the credential? ${detail}`)
+      throw new Error(
+        'Drive returned 404. With an API key the folder must be shared as ' +
+        '"Anyone with the link"; with a service account it must be shared with ' +
+        `its client_email. ${detail}`)
     throw new Error(`Drive ${res.status}: ${detail || res.statusText}`)
   }
   return raw ? res : res.json()
