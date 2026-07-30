@@ -363,6 +363,23 @@ export async function buildFacts ({ storeId, from, to }) {
              WHERE p.store_id = $1 AND h.inventory_qty IS NOT NULL)::int AS rows_with_qty`,
     [storeId, from])
 
+  /* Feed reconciliation — not in the spec, because the spec's reader owns the
+     feed and cannot drift from it. Here the carry-forward state and the count
+     the ingest took off each CSV are two separate things, and they must agree:
+     if a departure is ever missed, carry-forward keeps the variant listed on
+     every later day and nothing downstream notices. */
+  const recon = await q(`
+    WITH ${DAILY}
+    SELECT r.run_date, r.variants_found::int AS csv_variants,
+           count(d.variant_id)::int AS carried_forward
+      FROM scrape_runs r
+      LEFT JOIN daily d ON d.run_date = r.run_date
+     WHERE r.store_id = $1 AND r.run_date BETWEEN $2 AND $3
+       AND r.status IN ('success','partial')
+     GROUP BY r.run_date, r.variants_found ORDER BY r.run_date`, A)
+
+  const drift = recon.filter(r => r.carried_forward !== r.csv_variants)
+
   /* §6 — the spec's sanity checks, run on the ones whose inputs exist. */
   const observedDays = counts.variant_days
   const continuity = oos.oos_variant_days + oos.in_stock_variant_days + oos.unknown_variant_days
@@ -370,6 +387,13 @@ export async function buildFacts ({ storeId, from, to }) {
     { rule: 4, name: 'Variant-day continuity',
       detail: `in-stock ${oos.in_stock_variant_days} + OOS ${oos.oos_variant_days} + unknown ${oos.unknown_variant_days} = ${continuity} vs ${observedDays} observed variant-days`,
       pass: continuity === observedDays },
+    { rule: 8, name: 'Feed reconciliation', added: true,
+      detail: drift.length
+        ? drift.map(r => `${String(r.run_date).slice(0, 10)}: carried ${r.carried_forward} vs ` +
+            `${r.csv_variants} in the file (${r.carried_forward - r.csv_variants > 0 ? '+' : ''}` +
+            `${r.carried_forward - r.csv_variants})`).join(' · ')
+        : `carry-forward matches the ingested variant count on all ${recon.length} run date(s)`,
+      pass: drift.length === 0 },
     { rule: 6, name: 'Ad attribution sanity', skipped: 'no ad data' },
     { rule: 1, name: 'Sum-check on total opportunity', skipped: 'no monetary components to sum' },
     { rule: 2, name: 'Sign-check on revenue delta', skipped: 'no revenue projection' },

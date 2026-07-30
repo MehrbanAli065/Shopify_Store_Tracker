@@ -524,7 +524,8 @@ svg.bandbar{width:100%;height:10px;display:block;border-radius:2px;overflow:hidd
       <h4>Sanity checks · specification §6</h4>
       <ul class="mlist">
         ${f.sanity_checks.map(c => `<li><span class="i">${String(c.rule).padStart(2, '0')}</span>
-          <span><strong>${esc(c.name)}.</strong> ${c.skipped
+          <span><strong>${esc(c.name)}.</strong>${c.added
+            ? ' <span class="pill no">added</span>' : ''} ${c.skipped
             ? `<span style="color:var(--gray)">skipped, ${esc(c.skipped)}</span>`
             : `<span style="color:${c.pass ? 'var(--good)' : 'var(--accent)'}">${c.pass ? 'pass' : 'FAIL'}</span> · <span style="color:var(--gray)">${esc(c.detail)}</span>`}</span></li>`).join('')}
       </ul>
