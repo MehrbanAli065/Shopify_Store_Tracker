@@ -26,7 +26,19 @@
       <a class="btn" id="csv" href="#" title="Download the full change log as CSV">📄 CSV</a>
       <a class="btn pri" id="pdf" href="#" target="_blank" rel="noopener"
          title="Open a clean, print-ready report">📥 PDF</a>
+      <button class="btn" id="gen" aria-expanded="false" aria-controls="genbar"
+              title="Generate a link to this report">⚙ Generate</button>
       <button class="btn ico" id="tg" title="Switch theme">◐</button>
+    </div>
+  </div>
+
+  <!-- ── generated link, revealed by the Generate button ── -->
+  <div class="genbar" id="genbar" hidden>
+    <div class="genbar-in">
+      <input id="genurl" type="text" spellcheck="false"
+             placeholder="Link will appear here…" aria-label="Generated link">
+      <button class="btn" id="genopen" disabled>Open ↗</button>
+      <button class="btn pri" id="gendl" disabled>Download</button>
     </div>
   </div>
 </header>
@@ -479,6 +491,35 @@ tg.onclick = () => {
   const cur = document.documentElement.getAttribute('data-theme')
     || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
   document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark')
+}
+
+// ═══ generate: the bar and its two actions ═══
+// What fills the box is still to be decided, so nothing is generated yet —
+// Open and Download act on whatever link the box is holding.
+gen.onclick = () => {
+  const open = genbar.hidden
+  genbar.hidden = !open
+  gen.setAttribute('aria-expanded', String(open))
+  if (open) genurl.focus()
+}
+const syncGenActions = () => {
+  const has = !!genurl.value.trim()
+  genopen.disabled = gendl.disabled = !has
+}
+genurl.addEventListener('input', syncGenActions)
+syncGenActions()
+
+genopen.onclick = () => {
+  const u = genurl.value.trim()
+  if (u) window.open(u, '_blank', 'noopener')
+}
+gendl.onclick = () => {
+  const u = genurl.value.trim()
+  if (!u) return
+  const a = document.createElement('a')
+  a.href = u
+  a.download = ''            // let the server's filename win when it sends one
+  document.body.appendChild(a); a.click(); a.remove()
 }
 
 boot()
