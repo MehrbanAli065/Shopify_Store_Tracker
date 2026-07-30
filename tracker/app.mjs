@@ -380,10 +380,14 @@ app.get('/reports/:id', wrap(async (req, res) => {
 // ── the same report as a download rather than a page ──────────────
 app.get('/reports/:id/download', wrap(async (req, res) => {
   const r = await one(
-    `SELECT html, doc_no, store_id FROM audit_reports WHERE id = $1`, [req.params.id])
+    `SELECT html, doc_no, store_id, from_date, to_date FROM audit_reports WHERE id = $1`,
+    [req.params.id])
   if (!r) return res.status(404).json({ error: 'no such report' })
-  const st = await one(`SELECT domain FROM stores WHERE id = $1`, [r.store_id])
-  const name = `${(st?.domain || 'store').replace(/\W+/g, '_')}_${r.doc_no}`
+  const st = await one(`SELECT name FROM stores WHERE id = $1`, [r.store_id])
+  // Becomes the suggested PDF filename, so it carries the store and the window.
+  const name = [st?.name || 'store', 'Sales Curve Audit',
+                `${d(r.from_date)} to ${d(r.to_date)}`, r.doc_no]
+    .join(' · ').replace(/[\\/:*?"<>|]/g, '-')
   // The browser prints this to PDF; the page carries its own print stylesheet,
   // and auto-print fires only on this route so opening the link stays quiet.
   res.type('html').send(r.html.replace('</body>',

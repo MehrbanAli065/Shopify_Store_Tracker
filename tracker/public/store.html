@@ -37,8 +37,10 @@
     <div class="genbar-in">
       <input id="genurl" type="text" spellcheck="false"
              placeholder="Link will appear here…" aria-label="Generated link">
-      <button class="btn" id="genopen" disabled>Open ↗</button>
-      <button class="btn pri" id="gendl" disabled>Download</button>
+      <!-- Real anchors, not buttons calling window.open: a popup blocker kills
+           the scripted open silently, which is how the PDF button broke once. -->
+      <a class="btn" id="genopen" target="_blank" rel="noopener" aria-disabled="true">Open ↗</a>
+      <a class="btn pri" id="gendl" target="_blank" rel="noopener" aria-disabled="true">Download</a>
     </div>
     <div class="genbar-note" id="genNote" hidden></div>
   </div>
@@ -496,8 +498,13 @@ tg.onclick = () => {
 
 // ═══ generate: build the audit, then hand back its link ═══
 const syncGenActions = () => {
-  const has = /^https?:\/\/|^\//.test(genurl.value.trim())
-  genopen.disabled = gendl.disabled = !has
+  const u = genurl.value.trim()
+  const has = /^https?:\/\/|^\//.test(u)
+  for (const [el, href] of [[genopen, u], [gendl, u.replace(/\/+$/, '') + '/download']]) {
+    el.setAttribute('aria-disabled', String(!has))
+    if (has) el.href = href
+    else el.removeAttribute('href')
+  }
 }
 genurl.addEventListener('input', syncGenActions)
 syncGenActions()
@@ -543,17 +550,9 @@ gen.onclick = async () => {
   }
 }
 
-genopen.onclick = () => {
-  const u = genurl.value.trim()
-  if (u) window.open(u, '_blank', 'noopener')
-}
-// The report is a full HTML document, so the PDF comes from the browser's own
-// print engine against the page's print stylesheet — the /download route opens
-// it and fires print, which keeps the layout identical to the screen.
-gendl.onclick = () => {
-  const u = genurl.value.trim()
-  if (u) window.open(u.replace(/\/+$/, '') + '/download', '_blank', 'noopener')
-}
+// Open and Download need no handlers: syncGenActions sets their href, and the
+// browser follows it. The PDF comes from the browser's own print engine against
+// the report's print stylesheet, which is why /download is just another link.
 
 boot()
 </script>

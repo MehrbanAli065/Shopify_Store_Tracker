@@ -12,12 +12,16 @@ import { writeNarrative } from './narrative.mjs'
 import { renderReport } from './report-html.mjs'
 
 /** Short, url-safe, no ambiguous characters. */
-function token (n = 10) {
+function token (n = 6) {
   const A = '23456789abcdefghijkmnpqrstuvwxyz'
   let s = ''
   for (const b of crypto.getRandomValues(new Uint8Array(n))) s += A[b % A.length]
   return s
 }
+
+const slug = s => String(s).toLowerCase()
+  .normalize('NFKD').replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '').slice(0, 44)
 
 export async function generateAudit ({ storeId, from, to, signal }) {
   const started = Date.now()
@@ -32,7 +36,11 @@ export async function generateAudit ({ storeId, from, to, signal }) {
   const facts = await buildFacts({ storeId, from: f0, to: t0 })
   const narrative = await writeNarrative(facts, { signal })
 
-  const id = token()
+  // The link is read and pasted by people, so it says which store and which
+  // window it covers. The random tail keeps two runs of the same window apart
+  // and stops a link being guessable from the store name alone.
+  const id = `${slug(facts.store.name)}-${f0}-to-${t0}-${token()}`
+
   const seq = await one(
     `SELECT count(*)::int AS n FROM audit_reports WHERE store_id = $1`, [storeId])
   const docNo = `SCA-${String(t0).slice(0, 4)}-${String(storeId).padStart(2, '0')}${String((seq?.n ?? 0) + 1).padStart(3, '0')}`
