@@ -292,8 +292,9 @@ if (allowRemovals && !isFirstRun) {
     const handle = key.split('\u0000')[0]
     const delisted = missingHandles.has(handle)
 
-    // A variant that had already sold out and is merely still absent is not news.
-    // A product leaving the catalogue is — even if its variants sold out first.
+    // Record a departure once, then stay quiet. Without the first check every
+    // run would re-log the same removals for as long as the product stays gone.
+    if (delisted && dbProducts.get(handle)?.is_active === false) continue
     if (!delisted && dbv.current_in_stock === false) continue
 
     const type = delisted ? 'removed' : 'stock_out'
@@ -304,10 +305,12 @@ if (allowRemovals && !isFirstRun) {
     goneVariants++
   }
 
-  if (missingHandles.size) {
+  // only the ones that were still listed as of the previous run
+  const newlyGone = [...missingHandles].filter(x => dbProducts.get(x)?.is_active !== false)
+  if (newlyGone.length) {
     await q(`UPDATE products SET is_active = false WHERE store_id = $1 AND handle = ANY($2)`,
-            [STORE_ID, [...missingHandles]])
-    goneProducts = missingHandles.size
+            [STORE_ID, newlyGone])
+    goneProducts = newlyGone.length
   }
 }
 
@@ -343,13 +346,15 @@ await q(`UPDATE stores SET last_scraped_at = $2 WHERE id = $1`, [STORE_ID, RUN_D
 
 // ── report ────────────────────────────────────────────────────────
 const counts = {}
-for (const h of history) counts[h[9]] = (counts[h[9]] || 0) + 1
+const TYPE = 11   // index of change_type in the history tuple
+for (const h of history) counts[h[TYPE]] = (counts[h[TYPE]] || 0) + 1
 console.log(`\n  ── changes recorded: ${history.length} ──`)
 for (const t of ['new','price_up','price_down','discount_change','stock_in','stock_out','removed']) {
   if (counts[t]) console.log(`     ${t.padEnd(16)} ${counts[t]}`)
 }
 if (goneProducts) console.log(`     (products delisted: ${goneProducts})`)
-const unchanged = csvVariants.size - history.filter(h => h[9] !== 'stock_out' && h[9] !== 'removed').length
+const unchanged = csvVariants.size -
+  history.filter(h => h[TYPE] !== 'stock_out' && h[TYPE] !== 'removed').length
 console.log(`     ${'unchanged'.padEnd(16)} ${unchanged}  ← no row written`)
 console.log(`\n✓ run ${RUN_ID} ${allowRemovals ? 'success' : 'PARTIAL'}\n`)
 
