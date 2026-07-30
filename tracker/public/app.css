@@ -56,6 +56,16 @@ a{color:inherit;text-decoration:none}
 .genbar-in a.btn[aria-disabled="true"]{opacity:.4;pointer-events:none}
 .genbar-note{max-width:1240px;margin:0 auto;padding:0 24px 10px;font-size:11.5px;
   color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+
+/* date headings inside the change log */
+.dgrp td{background:var(--surface-2);border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);padding:9px 12px !important}
+.dgrp .dg-d{font-weight:680;font-size:12.5px;color:var(--ink);margin-right:10px;
+  font-variant-numeric:tabular-nums}
+.dgrp .dg-n{font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.dgrp .dg-h{font-size:11px;color:var(--muted);margin-left:10px}
+.dgrp.quiet .dg-d{color:var(--ink-2);font-weight:600}
+.dgrp.quiet .dg-n{color:var(--muted);font-style:italic}
 @media(max-width:600px){
   .genbar-in{padding-left:14px;padding-right:14px}
   .genbar-in input{flex:1 1 100%}

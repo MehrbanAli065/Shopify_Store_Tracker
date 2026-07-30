@@ -147,6 +147,7 @@ const TABS = [
 ]
 const CHANGE_HUES = { new:'var(--s1)', price:'var(--s2)', stock:'var(--s3)', removed:'var(--s4)' }
 let tab = '', CUR = 'PKR', RANGE = {}, ROWS = [], q = '', showBase = false, BASE_N = 0
+let PER_DATE = []
 
 const STOCK = { in:'<span class="bdg in"><span class="d"></span>In</span>',
                 out:'<span class="bdg out"><span class="d"></span>Out</span>',
@@ -326,7 +327,7 @@ async function loadRows () {
   rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="9"><div class="skl w90"></div></td></tr>`).join('')
   const r = await (await fetch(
     `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}limit=600`)).json()
-  ROWS = r.rows; window.__total = r.total
+  ROWS = r.rows; window.__total = r.total; PER_DATE = r.per_date || []
   paint()
 }
 
@@ -338,9 +339,38 @@ function paint () {
 
   cnt.innerHTML = ROWS.length
     ? (q ? `<b>${list.length}</b> matching “${esc(q)}” · ` : '') +
-      `showing ${ROWS.length} of ${window.__total} change events` : ''
+      `showing ${nf(ROWS.length)} of ${nf(window.__total)} change events` +
+      (PER_DATE.length > 1 ? ` across ${PER_DATE.length} dates` : '') : ''
 
-  rows.innerHTML = list.length ? list.map(x => `
+  // Grouped under a heading per date, so the range reads as "what changed on
+  // the 27th, then the 28th", not as one undated pile.
+  const grouped = new Map()
+  for (const x of list) {
+    if (!grouped.has(x.observed_date)) grouped.set(x.observed_date, [])
+    grouped.get(x.observed_date).push(x)
+  }
+
+  const head = (p, n) => {
+    const held = !q && p.total > p.shown ? p.total - p.shown : 0
+    const what = q ? `${nf(n)} matching`
+                   : p.total ? `${nf(p.total)} change${p.total === 1 ? '' : 's'}`
+                             : 'no changes · the scrape ran and every variant was checked'
+    return `<tr class="dgrp${p.total ? '' : ' quiet'}"><td colspan="9">
+      <span class="dg-d">${dt(p.date)}</span>
+      <span class="dg-n">${what}</span>
+      ${held ? `<span class="dg-h">showing the ${nf(p.shown)} largest · ${nf(held)} more</span>` : ''}
+    </td></tr>`
+  }
+
+  // Walk the dates rather than the rows, so a day with nothing to show still
+  // appears and says so. A missing heading reads as a day that was never looked
+  // at, which is a different thing entirely. While a search is running the
+  // quiet days are dropped, because "no changes" would then be answering a
+  // question nobody asked.
+  const shownDates = q ? PER_DATE.filter(p => grouped.has(p.date)) : PER_DATE
+
+  rows.innerHTML = shownDates.length ? shownDates.map(p =>
+    head(p, (grouped.get(p.date) || []).length) + (grouped.get(p.date) || []).map(x => `
     <tr class="crow" data-handle="${esc(x.handle)}" data-title="${esc(x.title||'')}">
       <td><div class="pcell">
         ${x.image_src ? `<img class="thumb" src="${esc(x.image_src)}" loading="lazy" alt="">` : `<div class="thumb"></div>`}
@@ -358,7 +388,7 @@ function paint () {
       <td class="num">${dt(x.observed_date)}</td>
       <td><a class="lnk" href="${esc(x.product_url)}" target="_blank" rel="noopener"
              onclick="event.stopPropagation()">Open ↗</a></td>
-    </tr>`).join('')
+    </tr>`).join('')).join('')
     : `<tr><td colspan="9"><div class="nores" style="border:0;background:none;padding:40px 10px">
          <div class="ne">🔍</div><div class="nt">Nothing found</div>
          <div class="nd">${q ? `No rows match “${esc(q)}”.` : 'No changes of this type in the selected period.'}</div>

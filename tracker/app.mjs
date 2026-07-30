@@ -134,28 +134,67 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   // starting inventory, not news. Keep it out unless explicitly requested.
   const baseFilter = req.query.baseline === '1' ? '' : 'AND NOT is_baseline'
 
-  const rows = await q(`
-    SELECT handle, title, sku, variant_label, product_url, image_src,
-           observed_date, change_type, is_baseline,
-           prev_price, price, price_diff, price_diff_pct,
-           prev_compare_at_price, compare_at_price, prev_discount_pct, discount_pct,
-           prev_in_stock, in_stock, inventory_qty, product_first_seen, currency
-      FROM v_change_report
-     WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
-       ${types ? 'AND change_type = ANY($5)' : ''}
-     ORDER BY observed_date DESC, handle
-     LIMIT $4`,
-    types ? [id, from, to, limit, types] : [id, from, to, limit])
-
-  const total = await one(`
-    SELECT count(*)::int AS n FROM v_change_report
-     WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
-       ${types ? 'AND change_type = ANY($4)' : ''}`,
+  // How many events each date holds, before any row budget is spent. One busy
+  // day can hold most of the range: Alkaram's 30 Jul carries 6,838 of 7,018, so
+  // a flat "newest first, LIMIT 300" never reaches the days before it and the
+  // earlier dates look empty when they are not.
+  // Driven by scrape_runs so a day that ran and changed nothing still appears
+  // and reads zero, rather than vanishing and looking like a day never checked.
+  const perDate = await q(`
+    SELECT r.run_date AS observed_date, count(h.change_type)::int AS n
+      FROM scrape_runs r
+      LEFT JOIN v_change_report h
+             ON h.store_id = r.store_id AND h.observed_date = r.run_date
+            ${baseFilter.replace('AND NOT is_baseline', 'AND NOT h.is_baseline')}
+            ${types ? 'AND h.change_type = ANY($4)' : ''}
+     WHERE r.store_id = $1 AND r.run_date BETWEEN $2 AND $3
+       AND r.status IN ('success','partial')
+     GROUP BY r.run_date ORDER BY r.run_date DESC`,
     types ? [id, from, to, types] : [id, from, to])
 
-  res.json({ from, to, total: total.n, shown: rows.length,
-             rows: rows.map(r => ({ ...r, observed_date: d(r.observed_date),
-                                    product_first_seen: d(r.product_first_seen) })) })
+  const total = perDate.reduce((s, r) => s + r.n, 0)
+
+  // Share the budget out, then hand back what the quiet days do not need, so a
+  // four-row date does not cost the same as a four-thousand-row one.
+  const caps = new Map()
+  const busy = perDate.filter(r => r.n > 0)
+  let pool = limit, left = busy.length
+  for (const r of [...busy].sort((a, b) => a.n - b.n)) {
+    const share = Math.max(1, Math.floor(pool / left))
+    const take = Math.min(r.n, share)
+    caps.set(String(r.observed_date), take)
+    pool -= take; left--
+  }
+
+  const rows = caps.size ? await q(`
+    WITH ranked AS (
+      SELECT handle, title, sku, variant_label, product_url, image_src,
+             observed_date, change_type, is_baseline,
+             prev_price, price, price_diff, price_diff_pct,
+             prev_compare_at_price, compare_at_price, prev_discount_pct, discount_pct,
+             prev_in_stock, in_stock, inventory_qty, product_first_seen, currency,
+             ROW_NUMBER() OVER (PARTITION BY observed_date
+                                ORDER BY abs(COALESCE(price_diff_pct, 0)) DESC, handle) AS rn
+        FROM v_change_report
+       WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
+         ${types ? 'AND change_type = ANY($5)' : ''}
+    )
+    SELECT r.* FROM ranked r
+      JOIN (SELECT * FROM unnest($4::date[], $${types ? 6 : 5}::int[]) AS t(d, cap)) c
+        ON c.d = r.observed_date AND r.rn <= c.cap
+     ORDER BY r.observed_date DESC, r.rn`,
+    types
+      ? [id, from, to, [...caps.keys()], types, [...caps.values()]]
+      : [id, from, to, [...caps.keys()], [...caps.values()]]) : []
+
+  res.json({
+    from, to, total, shown: rows.length,
+    // Lets the table head each date and say what it is holding back.
+    per_date: perDate.map(r => ({
+      date: d(r.observed_date), total: r.n, shown: caps.get(String(r.observed_date)) || 0 })),
+    rows: rows.map(r => ({ ...r, observed_date: d(r.observed_date),
+                           product_first_seen: d(r.product_first_seen) }))
+  })
 }))
 
 // ── distribution charts (current catalogue shape) ─────────────────
