@@ -4,3 +4,6 @@ data/
 .vercel/
 
 logs/
+
+# downloaded Drive copies
+data/

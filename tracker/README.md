@@ -25,28 +25,40 @@ layer holds the newest values and diffing against it would produce nonsense.
 
 ## Nightly automation
 
-Ingest does not run on Vercel — it reads multi-megabyte CSVs and takes minutes.
-It belongs on whichever machine the scraper drops files onto, which for this
-project is the UiPath VM. Those files are already on disk there **before** they
-reach Drive, so there is no need to download them back.
+The daily CSVs live in a **Google Drive folder**, and that folder is the source.
+Ingest reads it directly — see **[DRIVE.md](DRIVE.md)** for the one-time
+credential setup.
+
+```bash
+npm run ingest:drive -- --dry-run     # see the plan, change nothing
+npm run ingest:drive -- --archive     # ingest, then move files to Drive/Ingested/
+```
+
+Ingest does not run on Vercel — it downloads multi-megabyte CSVs and takes
+minutes, while Vercel functions cap at 30–60s. It belongs on a machine you
+control: your own, or the UiPath VM.
+
+There is also a local-folder variant, for when the files are already on disk:
 
 ```bash
 node scripts/ingest-folder.mjs --dir "C:\...\Scrapped_Csv_Files" --archive "C:\...\Ingested"
 ```
 
-It scans the folder, matches each file to a store by `csv_prefix` (longest match
-wins), works out the date, and ingests. Each store runs as its own child process
-with a small worker pool, so one bad file cannot take the batch down.
+Both match each file to a store by `csv_prefix` (longest match wins), work out
+the date, and run each store as its own child process behind a small worker
+pool, so one bad file cannot take the batch down.
 
 | Flag | Effect |
 |---|---|
-| `--dir <path>` | folder to scan (required) |
 | `--date YYYY-MM-DD` | force one date for every file |
 | `--concurrency N` | stores at once, default 3 |
-| `--archive <path>` | move each file there after a **successful** ingest |
-| `--delete` | delete it instead |
+| `--archive` | Drive: move into an `Ingested` subfolder · local: `--archive <path>` |
+| `--trash` | Drive only — send to the Drive trash |
+| `--delete` | local only — delete the file |
 | `--dry-run` | print the plan, change nothing |
 | `--force` | re-ingest dates already recorded |
+| `--folder <id\|url>` | Drive only — override `DRIVE_FOLDER_ID` |
+| `--dir <path>` | local only — folder to scan |
 
 Safeguards worth knowing:
 
@@ -61,8 +73,8 @@ Safeguards worth knowing:
 
 ### Scheduling it
 
-`scripts/nightly.bat` wraps the command for Windows Task Scheduler — edit the
-three paths at the top, then create a daily task pointing at it. It writes a
+`scripts/nightly.bat` runs the Drive job under Windows Task Scheduler — set
+`APPDIR` at the top, then create a daily task pointing at it. It writes a
 per-day log under `logs/` and exits non-zero if any store failed, so a broken
 night shows up in the task history instead of passing silently.
 

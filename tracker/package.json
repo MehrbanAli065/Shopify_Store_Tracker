@@ -13,12 +13,14 @@
     "start": "node server.mjs",
     "dev": "node server.mjs",
     "views": "node scripts/apply-views.mjs",
-    "ingest:folder": "node scripts/ingest-folder.mjs"
+    "ingest:folder": "node scripts/ingest-folder.mjs",
+    "ingest:drive": "node scripts/ingest-drive.mjs"
   },
   "dependencies": {
     "csv-parse": "^5.6.0",
     "dotenv": "^17.4.2",
     "express": "^4.21.2",
+    "google-auth-library": "^10.9.1",
     "pg": "^8.22.0"
   },
   "devDependencies": {
