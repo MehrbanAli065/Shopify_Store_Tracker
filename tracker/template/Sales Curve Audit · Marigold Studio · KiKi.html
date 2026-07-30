@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<!-- saved from url=(0066)file:///C:/Users/E%20LAPTOP/Downloads/sales-curve-audit%20(1).html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Curve Audit · Marigold Studio · KiKi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+<link href="./Sales Curve Audit · Marigold Studio · KiKi_files/css2" rel="stylesheet">
+<style>
+:root {
+  --ink: #16140F;
+  --ink-soft: #38332C;
+  --gray: #6F6960;
+  --gray-light: #A39C8F;
+  --cream: #F6F2E8;
+  --cream-deep: #EDE7D8;
+  --paper: #FBF8F0;
+  --accent: #B0532D;
+  --accent-deep: #8A3F22;
+  --accent-soft: #E8CFBE;
+  --line: #D9D2C2;
+  --line-soft: #E5DFD0;
+  --good: #5C7A4F;
+  --warn: #B0532D;
+  --serif: 'Fraunces', 'Times New Roman', serif;
+  --sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: 'Geist Mono', 'Courier New', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--sans);
+  background: var(--cream);
+  color: var(--ink);
+  line-height: 1.55;
+  font-size: 15px;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.doc {
+  max-width: 1180px;
+  margin: 0 auto;
+  background: var(--paper);
+  box-shadow: 0 0 60px rgba(22, 20, 15, 0.06);
+}
+
+section {
+  padding: 96px 80px;
+  position: relative;
+}
+
+section + section {
+  border-top: 1px solid var(--line);
+}
+
+/* ─── Typography ─── */
+h1, h2, h3, h4 {
+  font-family: var(--serif);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+h1 { font-size: 92px; font-weight: 300; }
+h2 { font-size: 52px; margin-bottom: 16px; font-weight: 400; }
+h3 { font-size: 28px; line-height: 1.2; font-weight: 500; }
+h4 { font-size: 20px; line-height: 1.3; font-weight: 500; }
+
+.lead {
+  font-family: var(--serif);
+  font-size: 22px;
+  line-height: 1.45;
+  font-weight: 300;
+  color: var(--ink-soft);
+  letter-spacing: -0.01em;
+  max-width: 720px;
+}
+
+p { color: var(--ink-soft); line-height: 1.65; }
+
+.eyebrow {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.eyebrow::before {
+  content: "";
+  width: 36px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--gray);
+}
+
+.caps {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gray);
+}
+
+/* ─── Cover ─── */
+.cover {
+  padding: 80px 80px 60px;
+  min-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--paper);
+}
+.cover-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--line);
+}
+.wordmark {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.wordmark sup {
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-left: 6px;
+  vertical-align: top;
+  position: relative;
+  top: 4px;
+}
+.cover-meta {
+  text-align: right;
+}
+.cover-meta .mono { display: block; line-height: 1.8; }
+
+.cover-title {
+  padding: 0;
+}
+.cover-title h1 {
+  font-size: 120px;
+  line-height: 0.95;
+  font-weight: 300;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+}
+.cover-title h1 em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--accent);
+}
+.cover-subtitle {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--gray);
+  margin-top: 32px;
+  max-width: 640px;
+  line-height: 1.4;
+}
+
+.cover-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 60px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+.cover-bottom-block .caps { margin-bottom: 8px; display: block; }
+.cover-bottom-block .value {
+  font-family: var(--serif);
+  font-size: 18px;
+  color: var(--ink);
+  font-weight: 400;
+}
+
+/* ─── Headline section ─── */
+.headline-wrap {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 48px;
+}
+.headline-number {
+  font-family: var(--serif);
+  font-size: 220px;
+  font-weight: 300;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  color: var(--ink);
+  margin: 16px 0 24px;
+}
+.headline-number .currency {
+  font-size: 96px;
+  font-weight: 300;
+  color: var(--accent);
+  vertical-align: top;
+  margin-right: 8px;
+  position: relative;
+  top: 32px;
+}
+.headline-number .denom {
+  font-size: 60px;
+  font-weight: 300;
+  color: var(--gray);
+  margin-left: 6px;
+  vertical-align: baseline;
+}
+.headline-context {
+  font-family: var(--serif);
+  font-size: 26px;
+  line-height: 1.4;
+  font-weight: 300;
+  color: var(--ink-soft);
+  max-width: 760px;
+  font-style: italic;
+  letter-spacing: -0.01em;
+}
+.headline-context strong {
+  font-weight: 500;
+  color: var(--ink);
+  font-style: normal;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  margin-top: 64px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.stat {
+  padding: 32px 24px;
+  border-right: 1px solid var(--line-soft);
+}
+.stat:last-child { border-right: none; }
+.stat-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gray);
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+.stat-value {
+  font-family: var(--serif);
+  font-size: 42px;
+  line-height: 1;
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.stat-value .small { font-size: 22px; color: var(--gray); margin-left: 2px; }
+.stat-sub {
+  font-size: 12px;
+  color: var(--gray);
+  margin-top: 10px;
+  line-height: 1.4;
+}
+
+/* ─── Opportunity Stack ─── */
+.stack-section { background: var(--cream-deep); }
+.stack-chart-wrap {
+  margin-top: 56px;
+}
+.stack-bar {
+  display: flex;
+  height: 80px;
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(22, 20, 15, 0.04);
+}
+.stack-seg {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 20px;
+  color: var(--paper);
+  position: relative;
+  cursor: default;
+  transition: filter 0.2s;
+}
+.stack-seg:hover { filter: brightness(1.08); }
+.stack-seg .seg-value {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.stack-seg .seg-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 6px;
+  opacity: 0.85;
+}
+.stack-seg-1 { background: #16140F; flex: 387; }
+.stack-seg-2 { background: #B0532D; flex: 216; }
+.stack-seg-3 { background: #8A3F22; flex: 144; }
+.stack-seg-4 { background: #6F5746; flex: 100; }
+
+.stack-legend-detail {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 32px;
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+.stack-detail-item .stack-detail-bar {
+  width: 24px;
+  height: 4px;
+  margin-bottom: 16px;
+  border-radius: 2px;
+}
+.stack-detail-item .stack-detail-label {
+  font-family: var(--serif);
+  font-size: 18px;
+  color: var(--ink);
+  margin-bottom: 8px;
+  line-height: 1.3;
+  font-weight: 500;
+}
+.stack-detail-item .stack-detail-desc {
+  font-size: 13px;
+  color: var(--gray);
+  line-height: 1.55;
+}
+
+/* ─── Diagnostic ─── */
+.diagnostic-block {
+  margin-top: 56px;
+}
+.diagnostic-block + .diagnostic-block {
+  margin-top: 88px;
+  padding-top: 64px;
+  border-top: 1px solid var(--line-soft);
+}
+.diag-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 40px;
+  margin-bottom: 16px;
+}
+.diag-num {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+}
+.diag-title {
+  font-family: var(--serif);
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+  margin-bottom: 8px;
+}
+.diag-sub {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-style: italic;
+  font-weight: 300;
+  color: var(--gray);
+  margin-bottom: 32px;
+}
+
+.chart-frame {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 32px;
+  margin-top: 24px;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 28px;
+  margin-bottom: 20px;
+  font-size: 12px;
+  color: var(--gray);
+}
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chart-legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+.chart-canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: 280px;
+}
+
+.diag-read {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 16px;
+  margin-top: 28px;
+  padding: 20px 24px;
+  background: var(--cream-deep);
+  border-left: 2px solid var(--accent);
+  border-radius: 0 4px 4px 0;
+}
+.diag-read-marker {
+  font-family: var(--serif);
+  font-weight: 500;
+  color: var(--accent);
+  font-size: 14px;
+  font-style: italic;
+}
+.diag-read p {
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+.diag-read p strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* Stockout-corrected reveal */
+.reveal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 24px;
+}
+.reveal-card {
+  padding: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+}
+.reveal-card-dim { background: var(--paper); }
+.reveal-card-bright { background: var(--ink); border-color: var(--ink); }
+.reveal-card-bright .reveal-label { color: var(--gray-light); }
+.reveal-card-bright .reveal-num { color: var(--paper); }
+.reveal-card-bright .reveal-foot { color: var(--accent-soft); }
+.reveal-card-bright .reveal-num .delta { color: var(--accent-soft); }
+.reveal-label {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gray);
+  margin-bottom: 18px;
+  font-weight: 500;
+}
+.reveal-num {
+  font-family: var(--serif);
+  font-size: 64px;
+  line-height: 1;
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.reveal-num .pct { font-size: 28px; color: var(--gray); margin-left: 4px; vertical-align: baseline; }
+.reveal-num .delta {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--sans);
+  color: var(--accent);
+  margin-top: 16px;
+  letter-spacing: 0;
+}
+.reveal-foot {
+  font-size: 12px;
+  color: var(--gray);
+  margin-top: 16px;
+  line-height: 1.5;
+}
+
+/* Broken size timeline */
+.timeline {
+  margin-top: 8px;
+}
+.timeline-row {
+  display: grid;
+  grid-template-columns: 180px 1fr 100px;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.timeline-row:last-child { border-bottom: none; }
+.timeline-sku {
+  font-family: var(--serif);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.timeline-sku .sku-meta {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--gray);
+  margin-top: 2px;
+  font-weight: 400;
+}
+.timeline-bar {
+  position: relative;
+  height: 18px;
+  background: var(--cream-deep);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.timeline-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: var(--good);
+}
+.timeline-broken {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+  opacity: 0.85;
+}
+.timeline-week-markers {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.timeline-week {
+  flex: 1;
+  border-right: 1px dashed rgba(22, 20, 15, 0.08);
+}
+.timeline-week:last-child { border-right: none; }
+.timeline-loss {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  text-align: right;
+  font-weight: 500;
+}
+.timeline-scale {
+  display: grid;
+  grid-template-columns: 180px 1fr 100px;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 8px;
+}
+.timeline-scale-axis {
+  display: flex;
+  font-size: 10px;
+  color: var(--gray);
+  font-family: var(--mono);
+}
+.timeline-scale-axis span {
+  flex: 1;
+  text-align: left;
+}
+
+/* ─── Plays ─── */
+.plays-section { background: var(--ink); color: var(--paper); }
+.plays-section .eyebrow { color: var(--accent-soft); }
+.plays-section .eyebrow::before { background: var(--accent-soft); }
+.plays-section h2 { color: var(--paper); }
+.plays-section .lead { color: var(--gray-light); }
+
+.plays-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin-top: 64px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.play-card {
+  background: var(--ink);
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  min-height: 380px;
+}
+.play-num {
+  font-family: var(--serif);
+  font-size: 14px;
+  font-style: italic;
+  color: var(--accent-soft);
+  margin-bottom: 24px;
+  letter-spacing: 0.04em;
+}
+.play-title {
+  font-family: var(--serif);
+  font-size: 28px;
+  line-height: 1.2;
+  color: var(--paper);
+  margin-bottom: 20px;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+.play-desc {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--gray-light);
+  margin-bottom: 28px;
+  flex: 1;
+}
+.play-meta {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.play-meta-block .play-meta-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gray-light);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.play-meta-block .play-meta-value {
+  font-family: var(--serif);
+  font-size: 22px;
+  color: var(--accent-soft);
+  line-height: 1.1;
+  font-weight: 400;
+}
+.play-meta-block.full { grid-column: span 2; }
+.play-mechanic {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent-soft);
+  background: rgba(176, 83, 45, 0.12);
+  padding: 6px 10px;
+  border-radius: 2px;
+  display: inline-block;
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+
+/* ─── Recipe table ─── */
+.recipe-section {}
+.recipe-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 48px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.recipe-tab {
+  padding: 12px 20px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gray);
+  border-bottom: 2px solid transparent;
+  cursor: default;
+}
+.recipe-tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.recipe-tab-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  margin-left: 6px;
+  color: var(--accent);
+}
+
+.recipe-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+.recipe-table thead th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gray);
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.recipe-table thead th.num { text-align: right; }
+.recipe-table tbody tr {
+  border-bottom: 1px solid var(--line-soft);
+  transition: background 0.15s;
+}
+.recipe-table tbody tr:hover { background: var(--cream); }
+.recipe-table tbody td {
+  padding: 18px 12px;
+  font-size: 14px;
+  color: var(--ink-soft);
+  vertical-align: middle;
+}
+.recipe-table tbody td.num {
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+}
+.recipe-style {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--ink);
+  line-height: 1.3;
+}
+.recipe-style .recipe-id {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--gray);
+  margin-top: 2px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+.recipe-variant {
+  display: inline-block;
+  padding: 4px 10px;
+  background: var(--cream-deep);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+.recipe-confidence {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.recipe-confidence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.recipe-conf-high { background: var(--good); }
+.recipe-conf-med { background: var(--accent); }
+.recipe-impact {
+  font-family: var(--serif);
+  font-weight: 500;
+  color: var(--accent);
+  font-size: 14px;
+}
+.recipe-waitlist {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+/* Markdown table tone */
+.markdown-table .recipe-impact { color: var(--good); }
+
+/* ─── Trajectory ─── */
+.trajectory-section { background: var(--cream-deep); }
+.trajectory-chart-wrap {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 40px;
+  margin-top: 48px;
+}
+.trajectory-canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: 340px;
+}
+.trajectory-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+.trajectory-meta-block {
+  padding: 0 24px;
+  border-right: 1px solid var(--line-soft);
+}
+.trajectory-meta-block:first-child { padding-left: 0; }
+.trajectory-meta-block:last-child { border-right: none; padding-right: 0; }
+.trajectory-meta-label {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gray);
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+.trajectory-meta-value {
+  font-family: var(--serif);
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
+.trajectory-meta-value .plus { color: var(--accent); margin-right: 2px; }
+.trajectory-meta-value .pct { font-size: 18px; color: var(--gray); }
+.trajectory-meta-sub {
+  font-size: 12px;
+  color: var(--gray);
+  margin-top: 8px;
+}
+
+/* ─── Closing ─── */
+.closing-section { padding-top: 80px; padding-bottom: 80px; }
+.closing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  margin-top: 48px;
+  align-items: start;
+}
+.closing-left h3 {
+  font-family: var(--serif);
+  font-size: 36px;
+  line-height: 1.15;
+  font-weight: 400;
+  color: var(--ink);
+  margin-bottom: 24px;
+  letter-spacing: -0.015em;
+}
+.closing-left p {
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+  margin-bottom: 20px;
+}
+.cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 28px;
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
+  border-radius: 2px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  margin-top: 12px;
+  transition: background 0.2s;
+}
+.cta-btn:hover { background: var(--accent-deep); }
+.cta-btn .arrow {
+  font-family: var(--serif);
+  font-size: 18px;
+}
+
+.method-block {
+  background: var(--cream-deep);
+  border-left: 2px solid var(--accent);
+  padding: 28px 32px;
+  border-radius: 0 4px 4px 0;
+}
+.method-block h4 {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  color: var(--ink);
+}
+.method-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.method-list li {
+  font-size: 13px;
+  color: var(--ink-soft);
+  padding: 8px 0;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 12px;
+  border-bottom: 1px solid var(--line-soft);
+  line-height: 1.5;
+}
+.method-list li:last-child { border-bottom: none; }
+.method-list li .method-icon {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: 2px;
+}
+
+/* ─── Footer ─── */
+.doc-footer {
+  padding: 32px 80px;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--gray);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.doc-footer-left { font-family: var(--mono); }
+.doc-footer-right { font-family: var(--mono); }
+
+/* ─── Responsive ─── */
+@media (max-width: 900px) {
+  section { padding: 64px 36px; }
+  .cover { padding: 48px 36px; }
+  .cover-title h1 { font-size: 64px; }
+  h1 { font-size: 56px; }
+  h2 { font-size: 36px; }
+  .headline-number { font-size: 120px; }
+  .headline-number .currency { font-size: 56px; }
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+  .stat:nth-child(2) { border-right: none; }
+  .stack-legend-detail { grid-template-columns: repeat(2, 1fr); }
+  .plays-grid { grid-template-columns: 1fr; }
+  .closing-grid { grid-template-columns: 1fr; gap: 48px; }
+  .reveal-grid { grid-template-columns: 1fr; }
+  .timeline-row { grid-template-columns: 1fr; gap: 8px; }
+  .timeline-scale { display: none; }
+  .recipe-table { font-size: 12px; }
+  .trajectory-meta { grid-template-columns: 1fr; gap: 24px; }
+  .trajectory-meta-block { border-right: none; padding: 0; }
+  .cover-bottom { grid-template-columns: 1fr; gap: 24px; }
+}
+
+/* ─── Print ─── */
+@media print {
+  body { background: white; }
+  .doc { box-shadow: none; max-width: none; }
+  section { page-break-after: always; padding: 60px 50px; }
+  .plays-section, .stack-section, .trajectory-section { background: var(--paper); }
+  .plays-section, .plays-section h2, .plays-section .lead { color: var(--ink); }
+  .reveal-card-bright { background: var(--paper); color: var(--ink); }
+  .reveal-card-bright .reveal-num { color: var(--ink); }
+}
+
+/* Animation - subtle reveal */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.cover-title h1, .headline-number, h2 {
+  animation: fadeUp 0.8s ease-out both;
+}
+</style>
+</head>
+<body>
+
+<div class="doc">
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- COVER -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section class="cover">
+  <div class="cover-top">
+    <div class="wordmark">KiKi<sup>Category intelligence</sup></div>
+    <div class="cover-meta">
+      <span class="mono">Confidential · prepared for the named recipient</span>
+      <span class="mono">Document №.&nbsp;SCA-2025-1187</span>
+    </div>
+  </div>
+
+  <div class="cover-title">
+    <span class="eyebrow">Volume 01 · An assessment for Marigold Studio</span>
+    <h1>The Sales<br>Curve <em>Audit.</em></h1>
+    <p class="cover-subtitle">A reading of ninety days of trade, eighty-four styles, one thousand two hundred and forty-seven variants — and the opportunity hiding inside them.</p>
+  </div>
+
+  <div class="cover-bottom">
+    <div class="cover-bottom-block">
+      <span class="caps">Prepared for</span>
+      <span class="value">Marigold Studio</span>
+    </div>
+    <div class="cover-bottom-block">
+      <span class="caps">Analysis window</span>
+      <span class="value">Sep 1 — Nov 30, 2025</span>
+    </div>
+    <div class="cover-bottom-block">
+      <span class="caps">Prepared by</span>
+      <span class="value">KiKi · for Shopify</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- THE HEADLINE -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section>
+  <div class="eyebrow">Section 01 · The headline</div>
+  <div class="headline-wrap">
+    <div>
+      <h2>The opportunity, in one number.</h2>
+      <p class="lead">We read your sales, your stock, your returns, and the ad spend pointing at both. Here is what your data is telling you — that no dashboard currently shows you.</p>
+      <div class="headline-number"><span class="currency">$</span>847<span class="denom">K</span></div>
+      <p class="headline-context">recoverable across the next ninety days. <strong>Not theoretical.</strong> Tied to specific styles, specific sizes, specific weeks, specific actions — itemised on the pages that follow.</p>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="stat-label">Styles read</div>
+      <div class="stat-value">84</div>
+      <div class="stat-sub">across tops, bottoms, dresses, knitwear</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Variants analysed</div>
+      <div class="stat-value">1,247</div>
+      <div class="stat-sub">size × colour, location-aware</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Net sell-through</div>
+      <div class="stat-value">41<span class="small">%</span></div>
+      <div class="stat-sub">vs target 60% · gap of 19 pts</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Bestsellers broken by week 8</div>
+      <div class="stat-value">47<span class="small">%</span></div>
+      <div class="stat-sub">missing one or more core sizes</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- THE OPPORTUNITY STACK -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section class="stack-section">
+  <div class="eyebrow">Section 02 · Where the $847K lives</div>
+  <h2>Four leaks, one bucket.</h2>
+  <p class="lead">The opportunity is not in one place. It is spread across four mechanics — each individually addressable, each measured against your specific variants, each priced in dollars below.</p>
+
+  <div class="stack-chart-wrap">
+    <div class="stack-bar">
+      <div class="stack-seg stack-seg-1">
+        <div class="seg-value">$387K</div>
+        <div class="seg-label">Broken size</div>
+      </div>
+      <div class="stack-seg stack-seg-2">
+        <div class="seg-value">$216K</div>
+        <div class="seg-label">Markdown avoidance</div>
+      </div>
+      <div class="stack-seg stack-seg-3">
+        <div class="seg-value">$144K</div>
+        <div class="seg-label">Ad waste</div>
+      </div>
+      <div class="stack-seg stack-seg-4">
+        <div class="seg-value">$100K</div>
+        <div class="seg-label">Reorder chase</div>
+      </div>
+    </div>
+
+    <div class="stack-legend-detail">
+      <div class="stack-detail-item">
+        <div class="stack-detail-bar" style="background: #16140F;"></div>
+        <div class="stack-detail-label">Broken size · $387K</div>
+        <div class="stack-detail-desc">Revenue lost when bestsellers drop a core size mid-season. Recoverable through targeted reorder and pack-ratio correction.</div>
+      </div>
+      <div class="stack-detail-item">
+        <div class="stack-detail-bar" style="background: #B0532D;"></div>
+        <div class="stack-detail-label">Markdown avoidance · $216K</div>
+        <div class="stack-detail-desc">Margin saved by clearing identified residuals at 20–25% now, rather than 40–50% at terminal markdown in 6–8 weeks.</div>
+      </div>
+      <div class="stack-detail-item">
+        <div class="stack-detail-bar" style="background: #8A3F22;"></div>
+        <div class="stack-detail-label">Wasted ad spend · $144K</div>
+        <div class="stack-detail-desc">Meta and Google spend over 90 days that landed on PDPs already out of stock at the bought size. A media problem hiding as an inventory one.</div>
+      </div>
+      <div class="stack-detail-item">
+        <div class="stack-detail-bar" style="background: #6F5746;"></div>
+        <div class="stack-detail-label">Reorder chase · $100K</div>
+        <div class="stack-detail-desc">Contribution recoverable on seven specific variants where lead time still fits the season window — net of airfreight surcharge.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- THE DIAGNOSTIC -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section>
+  <div class="eyebrow">Section 03 · The diagnostic</div>
+  <h2>Why each leak exists.</h2>
+  <p class="lead">Three readings of the same ninety days. Each one isolates one cause and quantifies it. Read together, they explain the $847K.</p>
+
+  <!-- 3a: Size curve -->
+  <div class="diagnostic-block">
+    <div class="diag-header">
+      <div>
+        <div class="diag-num">03 / a</div>
+        <div class="diag-title">The buy is flat. The customer is not.</div>
+        <div class="diag-sub">Tops category · planned pack vs demonstrated sell-through</div>
+      </div>
+    </div>
+    <div class="chart-frame">
+      <div class="chart-legend">
+        <div class="chart-legend-item"><div class="chart-legend-swatch" style="background: #D9D2C2;"></div>Planned pack ratio (% of units)</div>
+        <div class="chart-legend-item"><div class="chart-legend-swatch" style="background: #B0532D;"></div>Actual sell-through (% of units)</div>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="sizeCurveChart" role="img" aria-label="Bar chart comparing planned pack ratio (flat 20% across XS to XL) against actual sell-through (14% XS, 28% S, 32% M, 18% L, 8% XL)" width="1193" height="350" style="display: block; box-sizing: border-box; height: 280px; width: 954px;"></canvas>
+      </div>
+    </div>
+    <div class="diag-read">
+      <div class="diag-read-marker">Read</div>
+      <p>You buy 1:1:1:1:1 across XS–XL. Demand runs roughly 0.7:1.4:1.6:0.9:0.4. The gap at M and L is where revenue lives. The gap at XS and XL is where future markdown lives. <strong>Carry-forward modelling shows ~62% of XL residuals will terminal-markdown if next buy isn't corrected.</strong></p>
+    </div>
+  </div>
+
+  <!-- 3b: Stockout-corrected -->
+  <div class="diagnostic-block">
+    <div class="diag-header">
+      <div>
+        <div class="diag-num">03 / b</div>
+        <div class="diag-title">Your dashboard is lying — politely.</div>
+        <div class="diag-sub">Stockout-corrected demand vs Shopify-reported sell-through</div>
+      </div>
+    </div>
+    <div class="reveal-grid">
+      <div class="reveal-card reveal-card-dim">
+        <div class="reveal-label">What Shopify shows you</div>
+        <div class="reveal-num">41<span class="pct">%</span></div>
+        <div class="reveal-foot">Gross net sell-through across all variants in the period, as reported by Shopify Admin and Stocky.</div>
+      </div>
+      <div class="reveal-card reveal-card-bright">
+        <div class="reveal-label">What your customers actually wanted</div>
+        <div class="reveal-num">58<span class="pct">%</span><span class="delta">+17 pts of latent demand</span></div>
+        <div class="reveal-foot">Sell-through corrected for 312 variant-days OOS, adjusted for returns by size, and reconciled against 1,840 back-in-stock waitlist signups.</div>
+      </div>
+    </div>
+    <div class="diag-read">
+      <div class="diag-read-marker">Read</div>
+      <p>You did not have a demand problem this quarter. <strong>You had a distribution problem.</strong> The 17-point gap is what walked away because the right size wasn't there at the right week. The reorder stack in Section 05 closes the largest part of it.</p>
+    </div>
+  </div>
+
+  <!-- 3c: Broken size timeline -->
+  <div class="diagnostic-block">
+    <div class="diag-header">
+      <div>
+        <div class="diag-num">03 / c</div>
+        <div class="diag-title">The week your bestsellers broke.</div>
+        <div class="diag-sub">Top 7 styles · weeks in full size vs weeks broken · 14-week season</div>
+      </div>
+    </div>
+    <div class="chart-frame">
+      <div class="chart-legend">
+        <div class="chart-legend-item"><div class="chart-legend-swatch" style="background: #5C7A4F;"></div>Full size ladder available</div>
+        <div class="chart-legend-item"><div class="chart-legend-swatch" style="background: #B0532D;"></div>Broken — at least one core size OOS</div>
+      </div>
+      <div class="timeline">
+        <div class="timeline-row">
+          <div class="timeline-sku">The Featherweight Cardigan<span class="sku-meta">STYLE 4012 · KNITWEAR</span></div>
+          <div class="timeline-bar">
+            <div class="timeline-week-markers"><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span></div>
+            <div class="timeline-fill" style="width: 36%;"></div>
+            <div class="timeline-broken" style="left: 36%; width: 64%;"></div>
+          </div>
+          <div class="timeline-loss">–$78K</div>
+        </div>
+        <div class="timeline-row">
+          <div class="timeline-sku">The Boxy Tee<span class="sku-meta">STYLE 3712 · TOPS</span></div>
+          <div class="timeline-bar">
+            <div class="timeline-week-markers"><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span></div>
+            <div class="timeline-fill" style="width: 29%;"></div>
+            <div class="timeline-broken" style="left: 29%; width: 71%;"></div>
+          </div>
+          <div class="timeline-loss">–$71K</div>
+        </div>
+        <div class="timeline-row">
+          <div class="timeline-sku">The Knit Tank<span class="sku-meta">STYLE 3308 · TOPS</span></div>
+          <div class="timeline-bar">
+            <div class="timeline-week-markers"><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span></div>
+            <div class="timeline-fill" style="width: 43%;"></div>
+            <div class="timeline-broken" style="left: 43%; width: 57%;"></div>
+          </div>
+          <div class="timeline-loss">–$62K</div>
+        </div>
+        <div class="timeline-row">
+          <div class="timeline-sku">The Linen Trouser<span class="sku-meta">STYLE 4527 · BOTTOMS</span></div>
+          <div class="timeline-bar">
+            <div class="timeline-week-markers"><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span></div>
+            <div class="timeline-fill" style="width: 50%;"></div>
+            <div class="timeline-broken" style="left: 50%; width: 50%;"></div>
+          </div>
+          <div class="timeline-loss">–$54K</div>
+        </div>
+        <div class="timeline-row">
+          <div class="timeline-sku">The Cropped Blazer<span class="sku-meta">STYLE 3204 · TOPS</span></div>
+          <div class="timeline-bar">
+            <div class="timeline-week-markers"><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span></div>
+            <div class="timeline-fill" style="width: 57%;"></div>
+            <div class="timeline-broken" style="left: 57%; width: 43%;"></div>
+          </div>
+          <div class="timeline-loss">–$48K</div>
+        </div>
+        <div class="timeline-row">
+          <div class="timeline-sku">The Wrap Dress<span class="sku-meta">STYLE 3404 · DRESSES</span></div>
+          <div class="timeline-bar">
+            <div class="timeline-week-markers"><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span></div>
+            <div class="timeline-fill" style="width: 64%;"></div>
+            <div class="timeline-broken" style="left: 64%; width: 36%;"></div>
+          </div>
+          <div class="timeline-loss">–$41K</div>
+        </div>
+        <div class="timeline-row">
+          <div class="timeline-sku">The Twill Skirt<span class="sku-meta">STYLE 4118 · BOTTOMS</span></div>
+          <div class="timeline-bar">
+            <div class="timeline-week-markers"><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span><span class="timeline-week"></span></div>
+            <div class="timeline-fill" style="width: 71%;"></div>
+            <div class="timeline-broken" style="left: 71%; width: 29%;"></div>
+          </div>
+          <div class="timeline-loss">–$33K</div>
+        </div>
+      </div>
+      <div class="timeline-scale">
+        <div></div>
+        <div class="timeline-scale-axis">
+          <span>WK 1</span><span>WK 3</span><span>WK 5</span><span>WK 7</span><span>WK 9</span><span>WK 11</span><span>WK 13</span>
+        </div>
+        <div></div>
+      </div>
+    </div>
+    <div class="diag-read">
+      <div class="diag-read-marker">Read</div>
+      <p>Four of your top seven sellers broke before week 7. <strong>The Boxy Tee broke at week 4</strong> and spent 10 weeks selling broken-size at full price — a slow leak that always ends in markdown. The aggregate loss across this top-7 list alone is $387K, before we count the long tail.</p>
+    </div>
+  </div>
+
+  <!-- 3d: Wasted ad spend -->
+  <div class="diagnostic-block">
+    <div class="diag-header">
+      <div>
+        <div class="diag-num">03 / d</div>
+        <div class="diag-title">The media problem your CMO doesn't know is yours.</div>
+        <div class="diag-sub">Paid traffic landing on OOS-at-buyer's-size PDPs · 90 days</div>
+      </div>
+    </div>
+    <div class="reveal-grid">
+      <div class="reveal-card reveal-card-dim">
+        <div class="reveal-label">Meta + Google spend on OOS-at-size PDPs</div>
+        <div class="reveal-num"><span class="pct">$</span>144<span class="pct">K</span></div>
+        <div class="reveal-foot">11.4% of total paid spend over the period landed on a PDP where the visitor's most-likely size was unavailable. Most of these PDPs remained in active ad sets long after the OOS event.</div>
+      </div>
+      <div class="reveal-card reveal-card-dim">
+        <div class="reveal-label">Sessions that hit "Out of stock"</div>
+        <div class="reveal-num">31<span class="pct">,</span>800</div>
+        <div class="reveal-foot">Across 47 distinct variants. Average CR on these sessions: 0.4% vs. 3.1% site-wide. Most of this is solved by feed rules — but nobody is writing them.</div>
+      </div>
+    </div>
+    <div class="diag-read">
+      <div class="diag-read-marker">Read</div>
+      <p><strong>Every dollar spent sending a customer to an OOS variant trains your model to bid against you.</strong> The Shopify mechanic is Meta and Google feed rules tied to variant-level inventory; Klaviyo back-in-stock list as the bridge while supply catches up. We name the rules in Section 04.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- THE THREE PLAYS -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section class="plays-section">
+  <div class="eyebrow">Section 04 · The three plays</div>
+  <h2>What to do, in order.</h2>
+  <p class="lead">Diagnosis is half the work. These are the three moves that close the biggest part of the gap — sequenced by lead time, named by mechanic, sized by impact.</p>
+
+  <div class="plays-grid">
+    <div class="play-card">
+      <div class="play-num">— Play 01</div>
+      <h3 class="play-title">Reorder the eight variants that still fit the season.</h3>
+      <p class="play-desc">Seven specific style-and-size combinations have remaining season weeks that exceed lead time, net of airfreight. Each shows healthy net STR, a back-in-stock waitlist signal, and a residual risk under 8% on the reorder quantity.</p>
+      <div class="play-meta">
+        <div class="play-meta-block full">
+          <div class="play-meta-label">Projected lift · 90 days</div>
+          <div class="play-meta-value">+$324K revenue</div>
+        </div>
+        <div class="play-meta-block full">
+          <div class="play-meta-label">Shopify mechanic</div>
+          <div class="play-mechanic">Stocky PO · Klaviyo BIS · Search &amp; Discovery boost</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="play-card">
+      <div class="play-num">— Play 02</div>
+      <h3 class="play-title">Cut the wasted ad spend before the OOS compounds.</h3>
+      <p class="play-desc">Apply variant-level inventory rules to your Meta and Google product feeds so OOS-at-size variants pause automatically. Tie Klaviyo back-in-stock as the recovery surface. Reroute the $144K from impressions that don't convert toward variants that will.</p>
+      <div class="play-meta">
+        <div class="play-meta-block full">
+          <div class="play-meta-label">Recovered spend · 90 days</div>
+          <div class="play-meta-value">+$144K efficiency</div>
+        </div>
+        <div class="play-meta-block full">
+          <div class="play-meta-label">Shopify mechanic</div>
+          <div class="play-mechanic">Feed rules · Shopify Flow · Klaviyo BIS</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="play-card">
+      <div class="play-num">— Play 03</div>
+      <h3 class="play-title">Walk down four overstocks at 20–25%, not 40–50% later.</h3>
+      <p class="play-desc">Four specific variants are in the 70–95 day age bucket with cover above 18 weeks. Compare-at markdown now, into the Sale auto-collection, clears 80%+ of units in the next 6 weeks at a 22-point margin saving versus waiting for terminal-markdown depth.</p>
+      <div class="play-meta">
+        <div class="play-meta-block full">
+          <div class="play-meta-label">Margin saved · 90 days</div>
+          <div class="play-meta-value">+$216K avoided</div>
+        </div>
+        <div class="play-meta-block full">
+          <div class="play-meta-label">Shopify mechanic</div>
+          <div class="play-mechanic">Compare-at price · Sale auto-collection · Klaviyo dedicated send</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- THE RECIPE (Reorder + Markdown) -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section class="recipe-section">
+  <div class="eyebrow">Section 05 · The recipe</div>
+  <h2>Named variants, sized in units.</h2>
+  <p class="lead">The recommendations above as a working list. Variant-level — because product-level hides the broken size that's costing you. Open these in Stocky tomorrow morning.</p>
+
+  <!-- Reorder tab -->
+  <div class="recipe-tabs">
+    <div class="recipe-tab active">Reorder stack <span class="recipe-tab-count">07 variants</span></div>
+    <div class="recipe-tab">Markdown stack <span class="recipe-tab-count">04 variants</span></div>
+  </div>
+
+  <table class="recipe-table">
+    <thead>
+      <tr>
+        <th>Style</th>
+        <th>Variant</th>
+        <th class="num">Reorder Qty</th>
+        <th class="num">Lead time</th>
+        <th class="num">Waitlist</th>
+        <th class="num">Projected STR</th>
+        <th class="num">Δ Contribution</th>
+        <th>Confidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="recipe-style">The Boxy Tee<span class="recipe-id">STYLE 3712 · ECRU</span></span></td>
+        <td><span class="recipe-variant">M</span></td>
+        <td class="num">142</td>
+        <td class="num">14 days</td>
+        <td class="num"><span class="recipe-waitlist">+87</span></td>
+        <td class="num">96%</td>
+        <td class="num"><span class="recipe-impact">+$58,400</span></td>
+        <td><span class="recipe-confidence"><span class="recipe-confidence-dot recipe-conf-high"></span>High</span></td>
+      </tr>
+      <tr>
+        <td><span class="recipe-style">The Boxy Tee<span class="recipe-id">STYLE 3712 · ECRU</span></span></td>
+        <td><span class="recipe-variant">S</span></td>
+        <td class="num">108</td>
+        <td class="num">14 days</td>
+        <td class="num"><span class="recipe-waitlist">+62</span></td>
+        <td class="num">93%</td>
+        <td class="num"><span class="recipe-impact">+$43,100</span></td>
+        <td><span class="recipe-confidence"><span class="recipe-confidence-dot recipe-conf-high"></span>High</span></td>
+      </tr>
+      <tr>
+        <td><span class="recipe-style">The Knit Tank<span class="recipe-id">STYLE 3308 · BLACK</span></span></td>
+        <td><span class="recipe-variant">M</span></td>
+        <td class="num">124</td>
+        <td class="num">21 days</td>
+        <td class="num"><span class="recipe-waitlist">+34</span></td>
+        <td class="num">91%</td>
+        <td class="num"><span class="recipe-impact">+$48,600</span></td>
+        <td><span class="recipe-confidence"><span class="recipe-confidence-dot recipe-conf-high"></span>High</span></td>
+      </tr>
+      <tr>
+        <td><span class="recipe-style">The Featherweight Cardigan<span class="recipe-id">STYLE 4012 · OAT</span></span></td>
+        <td><span class="recipe-variant">M</span></td>
+        <td class="num">96</td>
+        <td class="num">28 days</td>
+        <td class="num"><span class="recipe-waitlist">+18</span></td>
+        <td class="num">94%</td>
+        <td class="num"><span class="recipe-impact">+$52,200</span></td>
+        <td><span class="recipe-confidence"><span class="recipe-confidence-dot recipe-conf-high"></span>High</span></td>
+      </tr>
+      <tr>
+        <td><span class="recipe-style">The Featherweight Cardigan<span class="recipe-id">STYLE 4012 · OAT</span></span></td>
+        <td><span class="recipe-variant">S</span></td>
+        <td class="num">78</td>
+        <td class="num">28 days</td>
+        <td class="num"><span class="recipe-waitlist">+12</span></td>
+        <td class="num">89%</td>
+        <td class="num"><span class="recipe-impact">+$41,600</span></td>
+        <td><span class="recipe-confidence"><span class="recipe-confidence-dot recipe-conf-med"></span>Medium</span></td>
+      </tr>
+      <tr>
+        <td><span class="recipe-style">The Linen Trouser<span class="recipe-id">STYLE 4527 · BONE</span></span></td>
+        <td><span class="recipe-variant">SIZE 6</span></td>
+        <td class="num">86</td>
+        <td class="num">35 days</td>
+        <td class="num"><span class="recipe-waitlist">+24</span></td>
+        <td class="num">92%</td>
+        <td class="num"><span class="recipe-impact">+$47,300</span></td>
+        <td><span class="recipe-confidence"><span class="recipe-confidence-dot recipe-conf-high"></span>High</span></td>
+      </tr>
+      <tr>
+        <td><span class="recipe-style">The Linen Trouser<span class="recipe-id">STYLE 4527 · BONE</span></span></td>
+        <td><span class="recipe-variant">SIZE 4</span></td>
+        <td class="num">64</td>
+        <td class="num">35 days</td>
+        <td class="num"><span class="recipe-waitlist">+15</span></td>
+        <td class="num">87%</td>
+        <td class="num"><span class="recipe-impact">+$32,800</span></td>
+        <td><span class="recipe-confidence"><span class="recipe-confidence-dot recipe-conf-med"></span>Medium</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Markdown tab content (shown stacked below for completeness) -->
+  <div style="margin-top: 64px; padding-top: 32px; border-top: 1px solid var(--line);">
+    <h3 style="font-size: 22px; font-weight: 500; margin-bottom: 8px;">Markdown stack · 04 variants</h3>
+    <p style="font-size: 14px; color: var(--gray); margin-bottom: 24px;">Walk down now at moderate depth; clear in 4–6 weeks rather than terminal-markdown at end of season.</p>
+
+    <table class="recipe-table markdown-table">
+      <thead>
+        <tr>
+          <th>Style</th>
+          <th>Variant</th>
+          <th class="num">Units on hand</th>
+          <th class="num">Days in stock</th>
+          <th class="num">Suggested depth</th>
+          <th class="num">Mechanic</th>
+          <th class="num">Margin saved</th>
+          <th>Confidence</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="recipe-style">The Cropped Blazer<span class="recipe-id">STYLE 3204 · NAVY</span></span></td>
+          <td><span class="recipe-variant">XL</span></td>
+          <td class="num">38</td>
+          <td class="num">87</td>
+          <td class="num">25%</td>
+          <td class="num"><span class="play-mechanic" style="font-size: 10px;">Compare-at</span></td>
+          <td class="num"><span class="recipe-impact">+$84,000</span></td>
+          <td><span class="recipe-confidence"><span class="recipe-confidence-dot recipe-conf-high"></span>High</span></td>
+        </tr>
+        <tr>
+          <td><span class="recipe-style">The Featherweight Cardigan<span class="recipe-id">STYLE 4012 · OAT</span></span></td>
+          <td><span class="recipe-variant">XL</span></td>
+          <td class="num">28</td>
+          <td class="num">62</td>
+          <td class="num">20%</td>
+          <td class="num"><span class="play-mechanic" style="font-size: 10px;">Compare-at</span></td>
+          <td class="num"><span class="recipe-impact">+$52,400</span></td>
+          <td><span class="recipe-confidence"><span class="recipe-confidence-dot recipe-conf-high"></span>High</span></td>
+        </tr>
+        <tr>
+          <td><span class="recipe-style">The Boxy Tee<span class="recipe-id">STYLE 3712 · ECRU</span></span></td>
+          <td><span class="recipe-variant">XS</span></td>
+          <td class="num">42</td>
+          <td class="num">71</td>
+          <td class="num">30%</td>
+          <td class="num"><span class="play-mechanic" style="font-size: 10px;">Auto-discount</span></td>
+          <td class="num"><span class="recipe-impact">+$48,200</span></td>
+          <td><span class="recipe-confidence"><span class="recipe-confidence-dot recipe-conf-med"></span>Medium</span></td>
+        </tr>
+        <tr>
+          <td><span class="recipe-style">The Wrap Dress<span class="recipe-id">STYLE 3404 · OLIVE</span></span></td>
+          <td><span class="recipe-variant">XS</span></td>
+          <td class="num">22</td>
+          <td class="num">95</td>
+          <td class="num">40%</td>
+          <td class="num"><span class="play-mechanic" style="font-size: 10px;">Sale collection</span></td>
+          <td class="num"><span class="recipe-impact">+$31,400</span></td>
+          <td><span class="recipe-confidence"><span class="recipe-confidence-dot recipe-conf-med"></span>Medium</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- THE TRAJECTORY -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section class="trajectory-section">
+  <div class="eyebrow">Section 06 · The trajectory</div>
+  <h2>Two futures, on one chart.</h2>
+  <p class="lead">Where the next ninety days land if you do nothing. Where they land if you run the three plays. The shaded area is the $847K — or the realistic capture of it, net of execution friction.</p>
+
+  <div class="trajectory-chart-wrap">
+    <div class="chart-legend">
+      <div class="chart-legend-item"><div class="chart-legend-swatch" style="background: #A39C8F;"></div>Current trajectory · no action</div>
+      <div class="chart-legend-item"><div class="chart-legend-swatch" style="background: #B0532D;"></div>Recommended trajectory · with the three plays</div>
+    </div>
+    <div class="trajectory-canvas-wrap">
+      <canvas id="trajectoryChart" role="img" aria-label="Line chart comparing two 90-day GMV projections: current trajectory reaching $1.92M versus recommended trajectory reaching $2.34M" width="1173" height="425" style="display: block; box-sizing: border-box; height: 340px; width: 938px;"></canvas>
+    </div>
+  </div>
+
+  <div class="trajectory-meta">
+    <div class="trajectory-meta-block">
+      <div class="trajectory-meta-label">Revenue · next 90 days</div>
+      <div class="trajectory-meta-value"><span class="plus">+</span>$420K <span class="pct">/ +22%</span></div>
+      <div class="trajectory-meta-sub">$1.92M → $2.34M projected</div>
+    </div>
+    <div class="trajectory-meta-block">
+      <div class="trajectory-meta-label">Gross margin · period</div>
+      <div class="trajectory-meta-value"><span class="plus">+</span>600 <span class="pct">bps</span></div>
+      <div class="trajectory-meta-sub">38% → 44% — driven by markdown avoidance</div>
+    </div>
+    <div class="trajectory-meta-block">
+      <div class="trajectory-meta-label">Markdown spend</div>
+      <div class="trajectory-meta-value"><span class="plus">−</span>$58K <span class="pct">/ −40%</span></div>
+      <div class="trajectory-meta-sub">$145K → $87K — earlier, shallower walks</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- CLOSING -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section class="closing-section">
+  <div class="eyebrow">Section 07 · How this was built · what's next</div>
+  <h2>This audit was not a guess.</h2>
+
+  <div class="closing-grid">
+    <div class="closing-left">
+      <h3>It was your data, read by a tool built for fashion.</h3>
+      <p>KiKi connects to your Shopify Admin in 90 seconds, reads variant-level sales, inventory by location, returns by SKU, back-in-stock waitlist counts, and ad-feed performance — then applies fashion-aware models that account for pack ratios, broken size, stockout-corrected demand, and category-specific seasonality.</p>
+      <p>What you saw above is the static, one-time read. Connect KiKi and the same intelligence runs every Monday morning, alongside trade-meeting-ready actions, until your size curve is no longer a leak.</p>
+      <a href="file:///C:/Users/E%20LAPTOP/Downloads/sales-curve-audit%20(1).html#" class="cta-btn" onclick="openLink(&#39;https://KiKi.app/book&#39;); return false;">Book a 30-minute walkthrough <span class="arrow">→</span></a>
+    </div>
+
+    <div class="method-block">
+      <h4>Methodology · how this was computed</h4>
+      <ul class="method-list">
+        <li><span class="method-icon">01</span><span><strong>Variant-level reading.</strong> 1,247 size × colour × location combinations, not aggregated to product.</span></li>
+        <li><span class="method-icon">02</span><span><strong>Stockout correction.</strong> 312 variant-days of OOS removed from the denominator before computing demand-side STR.</span></li>
+        <li><span class="method-icon">03</span><span><strong>Returns-adjusted.</strong> Net of size-specific return rates pulled from Loop. Avg net-of-returns: −14% gross.</span></li>
+        <li><span class="method-icon">04</span><span><strong>Waitlist as signal.</strong> 1,840 Klaviyo back-in-stock signups read at variant level as forward-demand evidence.</span></li>
+        <li><span class="method-icon">05</span><span><strong>Ad-data overlay.</strong> 90 days of Meta and Google spend joined to variant-level OOS timeline.</span></li>
+        <li><span class="method-icon">06</span><span><strong>Confidence intervals.</strong> Every projected number carries a ±range; only ranges with &lt;15% spread shown as "High" confidence.</span></li>
+        <li><span class="method-icon">07</span><span><strong>Human review.</strong> Reviewed by a senior fashion category planner before delivery.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- FOOTER -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="doc-footer">
+  <div class="doc-footer-left">KiKi · Sales Curve Audit · Document №.&nbsp;SCA-2025-1187</div>
+  <div class="doc-footer-right">Confidential · for Marigold Studio</div>
+</div>
+
+</div>
+
+<!-- Chart.js -->
+<script src="./Sales Curve Audit · Marigold Studio · KiKi_files/chart.umd.min.js.download"></script>
+<script>
+const fontStack = "'Geist', -apple-system, sans-serif";
+
+// Global defaults
+Chart.defaults.font.family = fontStack;
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#6F6960';
+Chart.defaults.borderColor = '#E5DFD0';
+
+// ─── Size Curve Chart ───
+const sizeCurveCtx = document.getElementById('sizeCurveChart');
+if (sizeCurveCtx) {
+  new Chart(sizeCurveCtx, {
+    type: 'bar',
+    data: {
+      labels: ['XS', 'S', 'M', 'L', 'XL'],
+      datasets: [
+        {
+          label: 'Planned pack ratio',
+          data: [20, 20, 20, 20, 20],
+          backgroundColor: '#D9D2C2',
+          borderRadius: 1,
+          barPercentage: 0.85,
+          categoryPercentage: 0.7
+        },
+        {
+          label: 'Actual sell-through',
+          data: [14, 28, 32, 18, 8],
+          backgroundColor: '#B0532D',
+          borderRadius: 1,
+          barPercentage: 0.85,
+          categoryPercentage: 0.7
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#16140F',
+          titleFont: { family: fontStack, size: 12, weight: '500' },
+          bodyFont: { family: fontStack, size: 12 },
+          padding: 12,
+          cornerRadius: 2,
+          displayColors: true,
+          callbacks: {
+            label: function(ctx) {
+              return ctx.dataset.label + ': ' + ctx.parsed.y + '%';
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 40,
+          ticks: {
+            callback: (v) => v + '%',
+            font: { family: fontStack, size: 11 },
+            color: '#A39C8F',
+            stepSize: 10
+          },
+          grid: {
+            color: 'rgba(217, 210, 194, 0.5)',
+            drawTicks: false
+          },
+          border: { display: false }
+        },
+        x: {
+          grid: { display: false },
+          border: { color: '#D9D2C2' },
+          ticks: {
+            font: { family: fontStack, size: 12, weight: '500' },
+            color: '#38332C'
+          }
+        }
+      }
+    }
+  });
+}
+
+// ─── Trajectory Chart ───
+const trajectoryCtx = document.getElementById('trajectoryChart');
+if (trajectoryCtx) {
+  const weeks = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8', 'W9', 'W10', 'W11', 'W12', 'W13'];
+
+  // Cumulative GMV ($K) - current trajectory
+  const current = [125, 268, 412, 553, 698, 842, 985, 1128, 1276, 1422, 1568, 1721, 1920];
+  // Cumulative GMV ($K) - recommended trajectory (steeper from week 3 once plays land)
+  const recommended = [125, 268, 425, 595, 762, 932, 1106, 1284, 1462, 1648, 1832, 2088, 2340];
+
+  new Chart(trajectoryCtx, {
+    type: 'line',
+    data: {
+      labels: weeks,
+      datasets: [
+        {
+          label: 'Current trajectory',
+          data: current,
+          borderColor: '#A39C8F',
+          backgroundColor: 'rgba(163, 156, 143, 0.04)',
+          borderWidth: 1.5,
+          borderDash: [4, 4],
+          tension: 0.3,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#A39C8F',
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2,
+          fill: false
+        },
+        {
+          label: 'Recommended trajectory',
+          data: recommended,
+          borderColor: '#B0532D',
+          backgroundColor: 'rgba(176, 83, 45, 0.08)',
+          borderWidth: 2.5,
+          tension: 0.3,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#B0532D',
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2,
+          fill: '-1'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#16140F',
+          titleFont: { family: fontStack, size: 12, weight: '500' },
+          bodyFont: { family: fontStack, size: 12 },
+          padding: 12,
+          cornerRadius: 2,
+          callbacks: {
+            label: function(ctx) {
+              return ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString() + 'K';
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 2500,
+          ticks: {
+            callback: (v) => '$' + (v / 1000).toFixed(1) + 'M',
+            font: { family: fontStack, size: 11 },
+            color: '#A39C8F',
+            stepSize: 500
+          },
+          grid: {
+            color: 'rgba(217, 210, 194, 0.5)',
+            drawTicks: false
+          },
+          border: { display: false }
+        },
+        x: {
+          grid: { display: false },
+          border: { color: '#D9D2C2' },
+          ticks: {
+            font: { family: fontStack, size: 11 },
+            color: '#A39C8F',
+            maxRotation: 0
+          }
+        }
+      }
+    }
+  });
+}
+</script>
+
+
+
+</body></html>

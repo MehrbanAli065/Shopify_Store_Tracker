@@ -50,6 +50,9 @@ a{color:inherit;text-decoration:none}
 .genbar-in input:focus{outline:none;border-color:var(--blue)}
 .genbar-in input::placeholder{color:var(--muted)}
 #gen[aria-expanded="true"]{border-color:var(--blue);color:var(--blue)}
+#gen.busy{color:var(--muted);cursor:progress}
+.genbar-note{max-width:1240px;margin:0 auto;padding:0 24px 10px;font-size:11.5px;
+  color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
 @media(max-width:600px){
   .genbar-in{padding-left:14px;padding-right:14px}
   .genbar-in input{flex:1 1 100%}

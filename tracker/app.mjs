@@ -8,6 +8,7 @@ import express from 'express'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { q, one } from './lib/db.mjs'
+import { generateAudit } from './lib/generate-audit.mjs'
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -356,6 +357,51 @@ app.get('/api/stores/:id/timeline', wrap(async (req, res) => {
                              last_seen_at: d(r.last_seen_at) })),
     runs: runs.map(r => ({ date: d(r.run_date), status: r.status }))
   })
+}))
+
+// ── generate an audit report ──────────────────────────────────────
+//  POST because it costs money and writes a row; a GET here would be
+//  re-fired by every crawler and refresh.
+app.post('/api/stores/:id/audit', wrap(async (req, res) => {
+  const { from, to } = await bounds(req, req.params.id)
+  const out = await generateAudit({ storeId: Number(req.params.id), from, to })
+  res.json(out)
+}))
+
+// ── a generated report, by its link ───────────────────────────────
+app.get('/reports/:id', wrap(async (req, res) => {
+  const r = await one(
+    `SELECT html FROM audit_reports WHERE id = $1`, [req.params.id])
+  if (!r) return res.status(404).type('html').send(
+    '<p style="font:15px system-ui;padding:40px">That report link is not valid.</p>')
+  res.type('html').send(r.html)
+}))
+
+// ── the same report as a download rather than a page ──────────────
+app.get('/reports/:id/download', wrap(async (req, res) => {
+  const r = await one(
+    `SELECT html, doc_no, store_id FROM audit_reports WHERE id = $1`, [req.params.id])
+  if (!r) return res.status(404).json({ error: 'no such report' })
+  const st = await one(`SELECT domain FROM stores WHERE id = $1`, [r.store_id])
+  const name = `${(st?.domain || 'store').replace(/\W+/g, '_')}_${r.doc_no}`
+  // The browser prints this to PDF; the page carries its own print stylesheet,
+  // and auto-print fires only on this route so opening the link stays quiet.
+  res.type('html').send(r.html.replace('</body>',
+    `<script>
+       document.title = ${JSON.stringify(name)}
+       addEventListener('load', () => setTimeout(() => window.print(), 350))
+     </script></body>`))
+}))
+
+// ── reports already generated for a store ─────────────────────────
+app.get('/api/stores/:id/audits', wrap(async (req, res) => {
+  const rows = await q(`
+    SELECT id, doc_no, from_date, to_date, model, generated_at, generated_ms,
+           length(html) AS bytes
+      FROM audit_reports WHERE store_id = $1
+     ORDER BY generated_at DESC LIMIT 25`, [req.params.id])
+  res.json(rows.map(r => ({ ...r, from_date: d(r.from_date), to_date: d(r.to_date),
+                            url: `/reports/${r.id}` })))
 }))
 
 // ── store state on any past date (the as-of query) ────────────────

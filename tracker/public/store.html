@@ -40,6 +40,7 @@
       <button class="btn" id="genopen" disabled>Open ↗</button>
       <button class="btn pri" id="gendl" disabled>Download</button>
     </div>
+    <div class="genbar-note" id="genNote" hidden></div>
   </div>
 </header>
 
@@ -493,33 +494,65 @@ tg.onclick = () => {
   document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark')
 }
 
-// ═══ generate: the bar and its two actions ═══
-// What fills the box is still to be decided, so nothing is generated yet —
-// Open and Download act on whatever link the box is holding.
-gen.onclick = () => {
-  const open = genbar.hidden
-  genbar.hidden = !open
-  gen.setAttribute('aria-expanded', String(open))
-  if (open) genurl.focus()
-}
+// ═══ generate: build the audit, then hand back its link ═══
 const syncGenActions = () => {
-  const has = !!genurl.value.trim()
+  const has = /^https?:\/\/|^\//.test(genurl.value.trim())
   genopen.disabled = gendl.disabled = !has
 }
 genurl.addEventListener('input', syncGenActions)
 syncGenActions()
 
+let generating = false
+gen.onclick = async () => {
+  // First click opens the bar and starts a build; while one is running the
+  // button is the only way to see progress, so it must not fire twice.
+  if (generating) return
+  if (genbar.hidden) { genbar.hidden = false; gen.setAttribute('aria-expanded', 'true') }
+  else if (genurl.value.trim()) { // already has a link — just fold the bar away
+    genbar.hidden = true; gen.setAttribute('aria-expanded', 'false'); return
+  }
+
+  generating = true
+  const label = gen.textContent
+  gen.textContent = '⚙ Generating…'
+  gen.classList.add('busy')
+  genurl.value = ''
+  genurl.placeholder = 'Reading the feed and writing the audit — this takes a few seconds…'
+  syncGenActions()
+
+  try {
+    const r = await fetch(`/api/stores/${ID}/audit?${qsDates()}`, { method: 'POST' })
+    const j = await r.json()
+    if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`)
+    genurl.value = location.origin + j.url
+    genurl.placeholder = ''
+    genNote.hidden = false
+    genNote.textContent =
+      `${j.doc_no} · ${(j.generated_ms / 1000).toFixed(1)}s · ${j.model}` +
+      (j.verified ? '' : ' · figures failed the check, deterministic text used')
+    genurl.select()
+  } catch (e) {
+    genurl.placeholder = ''
+    genNote.hidden = false
+    genNote.textContent = 'Could not generate: ' + e.message
+  } finally {
+    generating = false
+    gen.textContent = label
+    gen.classList.remove('busy')
+    syncGenActions()
+  }
+}
+
 genopen.onclick = () => {
   const u = genurl.value.trim()
   if (u) window.open(u, '_blank', 'noopener')
 }
+// The report is a full HTML document, so the PDF comes from the browser's own
+// print engine against the page's print stylesheet — the /download route opens
+// it and fires print, which keeps the layout identical to the screen.
 gendl.onclick = () => {
   const u = genurl.value.trim()
-  if (!u) return
-  const a = document.createElement('a')
-  a.href = u
-  a.download = ''            // let the server's filename win when it sends one
-  document.body.appendChild(a); a.click(); a.remove()
+  if (u) window.open(u.replace(/\/+$/, '') + '/download', '_blank', 'noopener')
 }
 
 boot()
