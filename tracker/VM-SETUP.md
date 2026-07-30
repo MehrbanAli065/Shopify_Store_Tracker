@@ -26,14 +26,33 @@ node --version      # v20 or newer
 
 ### 2 · Get the code onto the VM
 
-With git:
+The VM has no git, and it does not need one. Paste this into PowerShell **on the
+VM** — it downloads, unzips and puts everything in place:
 
-```bash
-cd C:\
-git clone https://github.com/techbugs86/Shopify_Stores_Scraper.git shopify-tracker
+```powershell
+Invoke-WebRequest -Uri "https://github.com/techbugs86/Shopify_Stores_Scraper/archive/refs/heads/main.zip" -OutFile "$env:TEMP\tracker.zip"
+Expand-Archive -Path "$env:TEMP\tracker.zip" -DestinationPath "C:\" -Force
+Rename-Item "C:\Shopify_Stores_Scraper-main" "C:\shopify-tracker"
 ```
 
-Without git: download the repo as a ZIP from GitHub and unzip to `C:\shopify-tracker`.
+Or do it by hand: open that URL in the VM's browser, unzip it, and rename the
+extracted `Shopify_Stores_Scraper-main` folder to `C:\shopify-tracker`.
+
+Either way the layout should end up as:
+
+```
+C:\shopify-tracker\tracker\package.json
+C:\shopify-tracker\tracker\scripts\ingest-folder.mjs
+```
+
+Check it:
+
+```powershell
+Test-Path C:\shopify-tracker\tracker\scripts\ingest-folder.mjs    # True
+```
+
+> To update later, re-run the same three lines — delete `C:\shopify-tracker`
+> first, and keep a copy of `tracker\.env`, which is not in the ZIP.
 
 ### 3 · Install dependencies
 
@@ -100,10 +119,34 @@ the next run retries them.
 
 ---
 
-## Schedule it
+## Wiring it into the existing UiPath workflow
 
-`scripts/nightly-local.bat` wraps the command. Edit the three paths at the top,
-then:
+This is the tidiest option, because the workflow already loops over the local
+files before uploading them.
+
+After the `For Each File in Folder` loop — still inside `Try` — add one activity:
+
+| Activity | **Start Process** |
+|---|---|
+| FileName | `C:\shopify-tracker\tracker\scripts\nightly-local.bat` |
+
+That is the whole change. Scrape → upload to Drive → ingest, in one run.
+
+The paths inside `nightly-local.bat` are already set for this project, and it
+checks them before doing anything — a wrong path, a missing drop folder or Node
+absent from PATH each exit with code 2 and an explicit message, rather than
+failing quietly inside a scheduled run.
+
+> The workflow's Drive connection is not involved at all. It uses UiPath's own
+> OAuth client, whose token lives inside UiPath's connection store and cannot be
+> handed to an external script. That connection stays exactly as it is, for the
+> upload; ingest reads the local folder instead.
+
+---
+
+## Or schedule it separately
+
+`scripts/nightly-local.bat` also works as a standalone task:
 
 1. **Task Scheduler** → **Create Task**
 2. **General** → tick *Run whether user is logged on or not* and *Run with highest privileges*
