@@ -93,18 +93,23 @@ app.get('/api/stores/:id/summary', wrap(async (req, res) => {
       FROM variants v JOIN products p ON p.id = v.product_id
      WHERE p.store_id = $1 AND v.is_active AND v.current_discount_pct > 0`, [id])
 
+  // Driven by scrape_runs, not by the change rows. Grouping the history alone
+  // dropped any day the scrape ran and found nothing — the row vanished
+  // instead of reading zero, which looks the same as a day that never ran.
   const daily = await q(`
-    SELECT observed_date,
-           COUNT(*) FILTER (WHERE change_type = 'new' AND NOT is_baseline)::int AS new_items,
-           COUNT(*) FILTER (WHERE change_type = 'new' AND is_baseline)::int     AS baseline_items,
-           COUNT(*) FILTER (WHERE change_type LIKE 'price%')::int AS price,
-           COUNT(*) FILTER (WHERE change_type = 'stock_out')::int AS stock_out,
-           COUNT(*) FILTER (WHERE change_type = 'stock_in')::int  AS stock_in,
-           COUNT(*) FILTER (WHERE change_type = 'removed')::int   AS removed,
-           COUNT(*) FILTER (WHERE NOT is_baseline)::int AS total
-      FROM v_change_report
-     WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3
-     GROUP BY observed_date ORDER BY observed_date`, [id, from, to])
+    SELECT r.run_date AS observed_date, r.status,
+           COUNT(h.change_type) FILTER (WHERE h.change_type = 'new' AND NOT h.is_baseline)::int AS new_items,
+           COUNT(h.change_type) FILTER (WHERE h.change_type = 'new' AND h.is_baseline)::int     AS baseline_items,
+           COUNT(h.change_type) FILTER (WHERE h.change_type LIKE 'price%')::int AS price,
+           COUNT(h.change_type) FILTER (WHERE h.change_type = 'stock_out')::int AS stock_out,
+           COUNT(h.change_type) FILTER (WHERE h.change_type = 'stock_in')::int  AS stock_in,
+           COUNT(h.change_type) FILTER (WHERE h.change_type = 'removed')::int   AS removed,
+           COUNT(h.change_type) FILTER (WHERE NOT h.is_baseline)::int AS total
+      FROM scrape_runs r
+      LEFT JOIN v_change_report h
+             ON h.store_id = r.store_id AND h.observed_date = r.run_date
+     WHERE r.store_id = $1 AND r.run_date BETWEEN $2 AND $3
+     GROUP BY r.run_date, r.status ORDER BY r.run_date`, [id, from, to])
 
   res.json({ from, to, ...k, avg_discount: disc?.avg_discount ?? 0,
              daily: daily.map(r => ({ ...r, observed_date: d(r.observed_date) })) })
@@ -337,9 +342,20 @@ app.get('/api/stores/:id/timeline', wrap(async (req, res) => {
       FROM v_change_report
      WHERE store_id = $1 AND handle = $2
      ORDER BY sku, observed_date`, [req.params.id, req.query.handle])
-  res.json(rows.map(r => ({ ...r, observed_date: d(r.observed_date),
-                            variant_first_seen: d(r.variant_first_seen),
-                            last_seen_at: d(r.last_seen_at) })))
+
+  // Every run for this store, so the drawer can walk the calendar day by day.
+  // A day the scrape ran and found nothing is "no change"; a day with no run
+  // at all is a gap in coverage. The events alone cannot tell them apart.
+  const runs = await q(
+    `SELECT run_date, status FROM scrape_runs WHERE store_id = $1 ORDER BY run_date`,
+    [req.params.id])
+
+  res.json({
+    events: rows.map(r => ({ ...r, observed_date: d(r.observed_date),
+                             variant_first_seen: d(r.variant_first_seen),
+                             last_seen_at: d(r.last_seen_at) })),
+    runs: runs.map(r => ({ date: d(r.run_date), status: r.status }))
+  })
 }))
 
 // ── store state on any past date (the as-of query) ────────────────

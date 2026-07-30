@@ -360,6 +360,39 @@ const EV = {
   stock_out:['Sold out', 'var(--s2)'],  stock_in:['Back in stock','var(--good)'],
   removed:['Removed',    'var(--muted)']
 }
+/**
+ * Turn one variant's events into a row per calendar day, from the day it first
+ * appeared to the day it left (or to the latest run if it is still listed).
+ *
+ * Three outcomes per day, and they are not the same fact:
+ *   event  — something changed
+ *   quiet  — the scrape ran and this variant was unchanged
+ *   gap    — no scrape ran, so nothing is known about that day
+ */
+function walkDays (list, runs) {
+  const ranOn = new Set(runs.map(r => r.date))
+  const byDate = {}
+  for (const e of list) (byDate[e.observed_date] ||= []).push(e)
+
+  const gone = list.find(e => e.change_type === 'removed')
+  const start = list[0].observed_date
+  const end = gone ? gone.observed_date
+            : (runs.length ? runs[runs.length-1].date : list[list.length-1].observed_date)
+
+  // Parse, add and format all in UTC. Reading a local-midnight Date back through
+  // toISOString() lands on the previous day east of UTC, so the string never
+  // advances and the loop below never ends.
+  const step = s => { const t = new Date(s + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate()+1)
+                      return t.toISOString().slice(0,10) }
+
+  const out = []
+  for (let day = start; day <= end; day = step(day)) {
+    if (byDate[day]) out.push(...byDate[day].map(e => ({ kind:'event', date:day, e })))
+    else out.push({ kind: ranOn.has(day) ? 'quiet' : 'gap', date: day })
+  }
+  return out
+}
+
 async function openDrawer (handle, title) {
   scrim.hidden = false; drawer.hidden = false
   requestAnimationFrame(() => drawer.classList.add('open'))
@@ -367,7 +400,8 @@ async function openDrawer (handle, title) {
   dHandle.textContent = handle
   dBody.innerHTML = `<div class="spin">loading timeline…</div>`
 
-  const ev = await (await fetch(`/api/stores/${ID}/timeline?handle=${encodeURIComponent(handle)}`)).json()
+  const data = await (await fetch(`/api/stores/${ID}/timeline?handle=${encodeURIComponent(handle)}`)).json()
+  const ev = data.events || [], runs = data.runs || []
   if (!ev.length) { dBody.innerHTML = `<div class="empty">No history recorded</div>`; return }
 
   const bySku = {}
@@ -386,10 +420,17 @@ async function openDrawer (handle, title) {
       <div class="vgroup">
         <div class="vgh"><span class="vp">${esc(list[0].variant_label||'—')}</span>
           <span class="sk">SKU · ${esc(sku)}</span></div>
-        ${list.map((e,i) => {
+        ${(days => days.map((r,i) => {
+          const last = i === days.length - 1
+          if (r.kind !== 'event') return `<div class="ev ${r.kind} ${last?'last':''}">
+            <div class="evd">${dt(r.date)}</div>
+            <div class="evr"><span class="pin"></span><span class="bar"></span></div>
+            <div class="evb"><div class="evt">${r.kind==='quiet'?'No change':'No scrape that day'}</div></div>
+          </div>`
+          const e = r.e
           const [lbl, col] = EV[e.change_type] || [e.change_type,'var(--muted)']
           const moved = e.prev_price != null && Number(e.prev_price) !== Number(e.price)
-          return `<div class="ev ${i===list.length-1?'last':''}">
+          return `<div class="ev ${last?'last':''}">
             <div class="evd">${dt(e.observed_date)}</div>
             <div class="evr"><span class="pin" style="background:${col}"></span><span class="bar"></span></div>
             <div class="evb">
@@ -403,7 +444,7 @@ async function openDrawer (handle, title) {
                 ${e.change_type==='stock_out' ? ' · left the feed' : ''}
               </div>
             </div></div>`
-        }).join('')}
+        }).join(''))(walkDays(list, runs))}
       </div>`).join('')}`
 }
 const closeDrawer = () => {
