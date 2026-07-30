@@ -14,7 +14,8 @@
     "dev": "node server.mjs",
     "views": "node scripts/apply-views.mjs",
     "ingest:folder": "node scripts/ingest-folder.mjs",
-    "ingest:drive": "node scripts/ingest-drive.mjs"
+    "ingest:drive": "node scripts/ingest-drive.mjs",
+    "seed": "node scripts/apply-seed.mjs"
   },
   "dependencies": {
     "csv-parse": "^5.6.0",
