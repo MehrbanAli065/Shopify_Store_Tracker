@@ -133,6 +133,12 @@ async function call (url, { writable = false, raw = false, ...init } = {}) {
   return raw ? res : res.json()
 }
 
+/** The folder's own metadata — 404 here means the credential cannot see it at all,
+ *  which is a different problem from the folder being empty. */
+export async function getFolder (folder) {
+  return call(`${API}/files/${folder}?fields=id,name,mimeType&supportsAllDrives=true`)
+}
+
 /** Every CSV directly inside the folder, newest first. */
 export async function listCsvFiles (folder) {
   const out = []

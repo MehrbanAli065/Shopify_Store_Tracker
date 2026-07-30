@@ -15,7 +15,43 @@ because it never involves a browser.
 
 ---
 
-## Option A · Service account (recommended)
+## Option A · API key — the smallest setup
+
+Two minutes, nothing expires, no service account and nothing to share with a robot.
+
+### 1 · Make the folder link-readable
+
+Drive → open the folder → **Share** → **Anyone with the link** → **Viewer**
+
+> This does mean anyone holding the link can read the CSVs. They are scraped
+> public product data, so that is usually fine — but it is your call.
+
+### 2 · Create the key
+
+1. <https://console.cloud.google.com> → **Select a project** → **New project** → `shopify-tracker`
+2. Search **Google Drive API** → open it → **Enable**
+3. **APIs & Services → Credentials** → **Create credentials** → **API key** → copy it
+
+### 3 · Put it in `.env`
+
+```
+DRIVE_FOLDER_ID=https://drive.google.com/drive/folders/18pys1Pn4EHeycwWWvtj5StiqqFQTYTEs
+GOOGLE_API_KEY=AIza...
+```
+
+### 4 · Check, then run
+
+```bash
+npm run drive:check          # names the exact problem if there is one
+npm run ingest:drive         # the whole folder, into the database
+```
+
+An API key can only read, so `--archive` and `--trash` are unavailable. That is
+fine — files can stay in Drive, because finished store + date pairs are skipped.
+
+---
+
+## Option B · Service account (better for an unattended job)
 
 One-time, about five minutes.
 
@@ -88,7 +124,7 @@ Then drop `--dry-run` to do it for real.
 
 ---
 
-## Option B · OAuth refresh token
+## Option C · OAuth refresh token
 
 Use this if you would rather reuse the same Google app the Python uploader
 already uses (`For Python/settings.yaml`). It is equally headless once the
