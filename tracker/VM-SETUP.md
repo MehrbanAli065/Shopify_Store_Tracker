@@ -26,33 +26,40 @@ node --version      # v20 or newer
 
 ### 2 · Get the code onto the VM
 
-The VM has no git, and it does not need one. Paste this into PowerShell **on the
-VM** — it downloads, unzips and puts everything in place:
+The VM has no git — and `git clone` would not help anyway, because **this repo is
+private**, so neither cloning nor GitHub's ZIP link works without signing in.
 
-```powershell
-Invoke-WebRequest -Uri "https://github.com/techbugs86/Shopify_Stores_Scraper/archive/refs/heads/main.zip" -OutFile "$env:TEMP\tracker.zip"
-Expand-Archive -Path "$env:TEMP\tracker.zip" -DestinationPath "C:\" -Force
-Rename-Item "C:\Shopify_Stores_Scraper-main" "C:\shopify-tracker"
+Copy the ready-made archive across instead. It sits in the project root:
+
+```
+shopify-tracker-vm.zip        (52 KB)
 ```
 
-Or do it by hand: open that URL in the VM's browser, unzip it, and rename the
-extracted `Shopify_Stores_Scraper-main` folder to `C:\shopify-tracker`.
+Rebuild it any time with `npm run pack:vm`. It deliberately excludes
+`node_modules`, `data/`, `logs/`, `secure/`, `.env` and every `.csv` — so nothing
+secret and nothing large travels with it.
 
-Either way the layout should end up as:
+**Transfer it** by dragging the file into the RDP window, or via any shared
+folder. Then on the VM:
+
+```powershell
+Expand-Archive -Path "$env:USERPROFILE\Downloads\shopify-tracker-vm.zip" -DestinationPath "C:\" -Force
+Test-Path C:\shopify-tracker\tracker\scripts\ingest-folder.mjs      # True
+```
+
+The layout should end up as:
 
 ```
 C:\shopify-tracker\tracker\package.json
 C:\shopify-tracker\tracker\scripts\ingest-folder.mjs
 ```
 
-Check it:
-
-```powershell
-Test-Path C:\shopify-tracker\tracker\scripts\ingest-folder.mjs    # True
-```
-
-> To update later, re-run the same three lines — delete `C:\shopify-tracker`
-> first, and keep a copy of `tracker\.env`, which is not in the ZIP.
+> **Updating later:** re-run `npm run pack:vm`, copy the new zip over and expand
+> it with `-Force`. Keep `tracker\.env` — it is not in the archive, so it survives
+> an overwrite.
+>
+> If you would rather use git, install it on the VM and authenticate to GitHub;
+> a private repo needs credentials either way.
 
 ### 3 · Install dependencies
 

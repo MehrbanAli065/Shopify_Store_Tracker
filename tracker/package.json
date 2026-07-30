@@ -16,7 +16,8 @@
     "ingest:folder": "node scripts/ingest-folder.mjs",
     "ingest:drive": "node scripts/ingest-drive.mjs",
     "seed": "node scripts/apply-seed.mjs",
-    "drive:check": "node scripts/drive-check.mjs"
+    "drive:check": "node scripts/drive-check.mjs",
+    "pack:vm": "cd .. && python tracker/scripts/pack-vm.py"
   },
   "dependencies": {
     "csv-parse": "^5.6.0",
