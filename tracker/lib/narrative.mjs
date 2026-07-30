@@ -219,26 +219,40 @@ ${SHAPE}` }
   return { n: JSON.parse(text), usage: json.usage }
 }
 
-export async function writeNarrative (facts, { signal } = {}) {
+/**
+ * budgetMs bounds the whole thing, because this runs inside a serverless
+ * function with a hard ceiling. Two model calls at their slowest exceeded it and
+ * the request died with nothing to show; a deterministic narrative delivered on
+ * time beats a better one that never arrives.
+ */
+export async function writeNarrative (facts, { signal, budgetMs = 40000 } = {}) {
   const key = process.env.OPENAI_API_KEY
   const model = process.env.OPENAI_MODEL || 'gpt-4o'
   const base = fallback(facts)
   if (!key) return { ...base, model: 'fallback (no OPENAI_API_KEY set)', verified: true }
 
+  const started = Date.now()
+  const left = () => budgetMs - (Date.now() - started)
+  const deadline = () => {
+    const t = AbortSignal.timeout(Math.max(4000, left()))
+    return signal ? AbortSignal.any([signal, t]) : t
+  }
+
   const allowed = allowedNumbers(payload(facts))
   let tokensIn = 0, tokensOut = 0
 
   try {
-    let { n, usage } = await callOpenAI({ key, model, facts, signal })
+    let { n, usage } = await callOpenAI({ key, model, facts, signal: deadline() })
     tokensIn += usage?.prompt_tokens ?? 0
     tokensOut += usage?.completion_tokens ?? 0
     let bad = unsupportedNumbers(n, allowed)
 
     // One correction round. A model that invents a figure will usually drop it
-    // when the specific digits are quoted back at it.
-    if (bad.length) {
+    // when the specific digits are quoted back at it — but only if there is time
+    // left to ask. Out of budget, the deterministic text stands in instead.
+    if (bad.length && left() > 14000) {
       const retry = await callOpenAI({
-        key, model, facts, signal,
+        key, model, facts, signal: deadline(),
         complaint:
           `These numbers appeared in your answer but are not in the facts: ${bad.join(', ')}. ` +
           `Rewrite the whole JSON using only numbers present in the facts. If a sentence ` +

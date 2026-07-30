@@ -34,7 +34,13 @@ export async function generateAudit ({ storeId, from, to, signal }) {
   if (!f0 || !t0) throw new Error(`store ${storeId} has no successful scrape runs to audit`)
 
   const facts = await buildFacts({ storeId, from: f0, to: t0 })
-  const narrative = await writeNarrative(facts, { signal })
+
+  // Leave the model whatever is left of the request's own ceiling. vercel.json
+  // allows 60s; the facts query and the insert take a few seconds of that, and
+  // going over means the caller gets nothing at all.
+  const ceiling = Number(process.env.AUDIT_BUDGET_MS || 45000)
+  const narrative = await writeNarrative(facts, {
+    signal, budgetMs: Math.max(8000, ceiling - (Date.now() - started)) })
 
   // The link is read and pasted by people, so it says which store and which
   // window it covers. The random tail keeps two runs of the same window apart
