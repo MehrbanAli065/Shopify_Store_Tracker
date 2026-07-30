@@ -7,6 +7,7 @@
  *   node scripts/ingest-drive.mjs --dry-run
  *   node scripts/ingest-drive.mjs --archive        (move into Drive/Ingested/)
  *   node scripts/ingest-drive.mjs --trash          (send to Drive trash)
+ *   node scripts/ingest-drive.mjs --delete         (remove for good, frees quota)
  *
  * Options
  *   --folder <id|url>    override DRIVE_FOLDER_ID
@@ -14,6 +15,8 @@
  *   --concurrency N      stores at once (default 3)
  *   --archive            move each ingested file into an "Ingested" subfolder
  *   --trash              send each ingested file to the Drive trash instead
+ *   --delete             delete each ingested file outright — trashed files still
+ *                        count against Drive storage until the trash is emptied
  *   --keep               leave the downloaded copies in data/drive-cache
  *   --dry-run            list what would happen, touch nothing
  *   --force              re-ingest dates already recorded
@@ -27,7 +30,7 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { q, close, describe, MODE, ROOT } from '../lib/db.mjs'
 import { folderId, describeAuth, readOnlyAuth, listCsvFiles, downloadFile,
-         trashFile, moveFile, ensureFolder } from '../lib/drive.mjs'
+         trashFile, deleteFile, moveFile, ensureFolder } from '../lib/drive.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
@@ -41,6 +44,7 @@ const FORCEDAY = opt('date')
 const CONC     = Math.max(1, Number(opt('concurrency', 3)))
 const ARCHIVE  = flag('archive')
 const TRASH    = flag('trash')
+const DELETE   = flag('delete')
 const KEEP     = flag('keep')
 const DRY      = flag('dry-run')
 const FORCE    = flag('force')
@@ -117,10 +121,10 @@ if (!auth) {
 }
 
 // An API key can read, and that is all. Say so before any work happens.
-if ((ARCHIVE || TRASH) && readOnlyAuth()) {
+if ((ARCHIVE || TRASH || DELETE) && readOnlyAuth()) {
   console.error([
     '',
-    '  ✗ An API key can only read, so --archive and --trash cannot work.',
+    '  ✗ An API key can only read, so --archive, --trash and --delete cannot work.',
     '    Drop the flag — already-ingested days are skipped anyway — or use a',
     '    service account.',
     ''
@@ -172,7 +176,8 @@ if (DRY) {
   for (const j of jobs) {
     console.log(`  would ingest  store ${j.store.id} · ${j.date} · ${j.f.name} (${j.mb} MB)`)
   }
-  if (ARCHIVE || TRASH) console.log(`\n  then ${TRASH ? 'trash' : 'archive'} each ingested file on Drive`)
+  if (ARCHIVE || TRASH || DELETE)
+    console.log(`\n  then ${DELETE ? 'DELETE' : TRASH ? 'trash' : 'archive'} each ingested file on Drive`)
   console.log('')
   await close(); process.exit(0)
 }
@@ -218,18 +223,21 @@ console.log(`\n  ${ok.length} succeeded · ${fail.length + (jobs.length - ready.
             `${Math.round((Date.now() - started) / 1000)}s\n`)
 
 // ── tidy up, only what actually succeeded ──────────────────────────
-if (ok.length && (ARCHIVE || TRASH)) {
+if (ok.length && (ARCHIVE || TRASH || DELETE)) {
   let moved = 0
   const dest = ARCHIVE ? await ensureFolder('Ingested', FOLDER) : null
   for (const r of ok) {
     try {
-      if (TRASH) await trashFile(r.f.id)
-      else       await moveFile(r.f.id, dest, FOLDER)
+      if (DELETE)     await deleteFile(r.f.id)
+      else if (TRASH) await trashFile(r.f.id)
+      else            await moveFile(r.f.id, dest, FOLDER)
       moved++
     } catch (e) { console.log(`  ! could not tidy ${r.f.name}: ${e.message}`) }
   }
-  console.log(`  ${TRASH ? 'trashed' : 'archived'} ${moved} file(s) on Drive` +
+  const verb = DELETE ? 'deleted' : TRASH ? 'trashed' : 'archived'
+  console.log(`  ${verb} ${moved} file(s) on Drive` +
               (fail.length ? `; left ${fail.length} failed file(s) in place` : '') + '\n')
+  if (TRASH) console.log('  note: trashed files still use Drive storage until the trash is emptied\n')
 }
 
 if (!KEEP) {

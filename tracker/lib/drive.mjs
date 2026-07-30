@@ -179,6 +179,15 @@ export async function trashFile (id) {
   })
 }
 
+/**
+ * Delete a file outright. Unlike trashFile this frees Drive storage immediately —
+ * trashed files keep counting against the quota until the trash is emptied, which
+ * matters when the account is near full. There is no undo.
+ */
+export async function deleteFile (id) {
+  await call(`${API}/files/${id}?supportsAllDrives=true`, { writable: true, method: 'DELETE', raw: true })
+}
+
 /** Move a file into another folder, keeping it out of the way of the next run. */
 export async function moveFile (id, toFolder, fromFolder) {
   const p = new URLSearchParams({ addParents: toFolder, supportsAllDrives: 'true' })

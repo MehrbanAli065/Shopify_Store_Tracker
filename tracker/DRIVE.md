@@ -147,6 +147,55 @@ whatever you can see in Drive, the job can see.
 
 ---
 
+## Clearing files off Drive after they are ingested
+
+| Flag | What happens | Frees Drive storage? |
+|---|---|---|
+| *(none)* | file stays where it is | — |
+| `--archive` | moved into an `Ingested` subfolder | no |
+| `--trash` | sent to the Drive trash | **no** — see below |
+| `--delete` | removed outright | **yes** |
+
+> **Trashed files keep using your quota.** Drive counts everything in the trash
+> until the trash is emptied, so `--trash` will not recover space on an account
+> that is nearly full. Use `--delete` for that, and be aware there is no undo.
+
+Only files that **actually succeeded** are touched. Anything that failed stays in
+the folder so the next run retries it.
+
+Deleting is safe to do, because the database is the archive: the History tab
+rebuilds any past day from `variant_history`, and the rebuilt counts match the
+original files exactly.
+
+### This needs write access
+
+An API key can only read. To use `--archive`, `--trash` or `--delete` you need a
+service account — and you do **not** need a new Google Cloud project for it,
+which matters if project creation is hitting its quota. Create it inside the
+project you already have:
+
+1. Console → pick your existing project → **IAM & Admin → Service Accounts**
+2. **Create service account** → name `tracker-ingest` → Create and continue → Done
+3. The account → **Keys → Add key → Create new key → JSON** → download
+4. Open the JSON, copy `client_email`
+5. Drive → folder → **Share** → paste that address → **Editor** → Send
+6. `.env`:
+
+```
+GOOGLE_APPLICATION_CREDENTIALS=C:/secure/tracker-ingest-key.json
+```
+
+Then the API key is no longer needed, and the folder no longer has to be
+link-shareable — you can set it back to **Restricted**, which is tighter than
+leaving it open to anyone with the link.
+
+```bash
+npm run drive:check          # should now report "service account"
+npm run ingest:drive -- --delete
+```
+
+---
+
 ## What the job does
 
 | Step | Behaviour |
@@ -157,7 +206,7 @@ whatever you can see in Drive, the job can see.
 | Skip | any store + date already recorded as `success` or `partial` |
 | Download | to `data/drive-cache/`, deleted afterwards unless `--keep` |
 | Ingest | one child process per store, `--concurrency` at a time (default 3) |
-| Tidy | `--archive` moves to a `Ingested` subfolder · `--trash` sends to Drive trash |
+| Tidy | `--archive` moves to an `Ingested` subfolder · `--trash` to the Drive trash · `--delete` removes it |
 
 Safeguards, same as the local folder job:
 
