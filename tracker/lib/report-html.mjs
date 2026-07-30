@@ -389,7 +389,11 @@ svg.bandbar{width:100%;height:10px;display:block;border-radius:2px;overflow:hidd
         </div>`
       }).join('') : '<p class="none">No style lost a size while a sibling size stayed in stock.</p>'}
     </div>
-    <p class="note">${f.broken_timeline.observed_breaks.value} style(s) were seen breaking inside the window. ${esc(f.broken_timeline.observed_breaks.note)}</p>
+    <p class="note">${f.broken_timeline.observed_breaks.value} style(s) were seen breaking inside the window, of
+      ${nf(f.headline.broken_style_pct.numerator)} carrying a broken ladder in total${
+      f.broken_timeline.observed_breaks.listed < f.headline.broken_style_pct.numerator
+        ? `; the ${f.broken_timeline.observed_breaks.listed} above are the hardest hit` : ''}.
+      ${esc(f.broken_timeline.observed_breaks.note)}</p>
     ${read('Read', n.reads.broken_timeline)}
     ${gapGrid(f.broken_timeline, ['loss_per_sku'])}
   </div>

@@ -264,10 +264,17 @@ export async function buildFacts ({ storeId, from, to }) {
        GROUP BY d.product_id, d.run_date
     ),
     per_style AS (
-      SELECT product_id, bool_or(any_out AND any_in) AS ever_broken FROM per_day GROUP BY product_id
+      SELECT product_id,
+             bool_or(any_out AND any_in) AS ever_broken,
+             min(run_date) FILTER (WHERE any_out AND any_in) AS first_broken
+        FROM per_day GROUP BY product_id
     )
     SELECT count(*)::int AS sized_styles,
-           count(*) FILTER (WHERE ever_broken)::int AS broken_styles
+           count(*) FILTER (WHERE ever_broken)::int AS broken_styles,
+           -- counted over every style, not over the handful the timeline lists:
+           -- deriving it from a top-N list understates it by the size of the cap
+           count(*) FILTER (WHERE ever_broken AND first_broken >
+             (SELECT min(run_date) FROM run_dates))::int AS broke_inside_window
       FROM per_style`, A)
 
   /* Which sizes break first, across the store. */
@@ -554,7 +561,8 @@ export async function buildFacts ({ storeId, from, to }) {
       })),
       observed_breaks: computed({
         label: 'Styles seen breaking inside the window',
-        value: broken.filter(r => !r.at_baseline).length,
+        value: brokenTotals.broke_inside_window,
+        listed: broken.length,
         formula: 'styles whose first broken day is later than the first observed day',
         note: 'a style already broken on day one has no observable break date — the spec\'s ' +
               '"week each SKU broke" only exists for styles that transitioned while being watched'

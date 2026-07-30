@@ -156,10 +156,10 @@ if (prior) {
   await q(`
     UPDATE variants v
        SET current_price = h.price, current_compare_at_price = h.compare_at_price,
-           current_in_stock = h.in_stock, is_active = h.in_stock, last_seen_at = h.observed_date,
+           current_in_stock = h.in_stock, is_active = h.in_feed, last_seen_at = h.observed_date,
            current_qty = h.inventory_qty
       FROM (SELECT DISTINCT ON (variant_id) variant_id, price, compare_at_price, in_stock,
-                   inventory_qty, observed_date
+                   in_feed, inventory_qty, observed_date
               FROM variant_history ORDER BY variant_id, observed_date DESC) h
      WHERE h.variant_id = v.id
        AND v.product_id IN (SELECT id FROM products WHERE store_id = $1)`, [STORE_ID])
@@ -195,9 +195,16 @@ for (const p of await q(
 }
 const dbVariants = new Map()
 for (const v of await q(
+  // last_in_feed comes from the history, not from the cache: the cache's
+  // is_active used to be set from in_stock, so it cannot answer "has this
+  // variant already been recorded as gone".
   `SELECT v.id, v.product_id, p.handle, v.variant_key,
-          v.current_price, v.current_compare_at_price, v.current_in_stock, v.is_active
+          v.current_price, v.current_compare_at_price, v.current_in_stock, v.is_active,
+          h.in_feed AS last_in_feed
      FROM variants v JOIN products p ON p.id = v.product_id
+     LEFT JOIN LATERAL (
+       SELECT in_feed FROM variant_history
+        WHERE variant_id = v.id ORDER BY observed_date DESC LIMIT 1) h ON true
     WHERE p.store_id = $1`, [STORE_ID])) {
   dbVariants.set(v.handle + '\u0000' + v.variant_key, v)
 }
@@ -289,15 +296,20 @@ if (allowRemovals && !isFirstRun) {
 
   for (const [key, dbv] of dbVariants) {
     if (csvVariants.has(key)) continue
-    const handle = key.split('\u0000')[0]
-    const delisted = missingHandles.has(handle)
 
-    // Record a departure once, then stay quiet. Without the first check every
-    // run would re-log the same removals for as long as the product stays gone.
-    if (delisted && dbProducts.get(handle)?.is_active === false) continue
-    if (!delisted && dbv.current_in_stock === false) continue
+    // Everything reaching here is absent from today's file, so it has left the
+    // feed. That is a feed fact and has to be recorded even for a variant that
+    // was already unsellable: skipping the row leaves in_feed true forever, and
+    // carry-forward then counts a delisted variant as listed in every later
+    // report. Ten Brooklinen variants were doing exactly that.
+    //
+    // Record the departure once, then stay quiet, or every run re-logs the same
+    // removals for as long as the variant stays gone. The test is the last row's
+    // in_feed, not its stock: out of stock and off the feed are different facts,
+    // and only the second one belongs here.
+    if (dbv.last_in_feed === false) continue
 
-    const type = delisted ? 'removed' : 'stock_out'
+    const type = 'removed'
     history.push([dbv.id, RUN_ID, RUN_DATE,
                   num(dbv.current_price), num(dbv.current_compare_at_price), false, false, null,
                   num(dbv.current_price), num(dbv.current_compare_at_price), dbv.current_in_stock, type])
