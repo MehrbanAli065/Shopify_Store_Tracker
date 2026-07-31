@@ -666,7 +666,12 @@ export async function buildFacts ({ storeId, from, to }) {
       went_out:         computed({ label: 'Went out of stock', value: assortment.went_out,
         formula: "count(change_type = 'stock_out')", period: 'T₀' }),
       came_back:        computed({ label: 'Came back in stock', value: assortment.came_back,
-        formula: "count(change_type = 'stock_in')", period: 'T₀' }),
+        formula: "count(change_type = 'stock_in')", period: 'T₀',
+        note: 'still listed throughout; a variant that was off the feed entirely is counted below' }),
+      relisted:         computed({ label: 'Put back on the feed', value: assortment.relisted,
+        formula: "count(change_type = 'relisted')", period: 'T₀',
+        note: 'left the feed on an earlier day and reappeared, which is a different ' +
+              'event from a restock and arrives in bulk when a range is re-added' }),
       categories: categories.map(r => ({
         product_type: r.product_type, styles: r.styles, variants: r.variants,
         oos_rate: pct(r.oos_days, r.variant_days),

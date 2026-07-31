@@ -450,7 +450,8 @@ svg.bandbar{width:100%;height:10px;display:block;border-radius:2px;overflow:hidd
     ${stat('New variants', nf(f.assortment.new_variants.value), 'first appearance in the feed')}
     ${stat('Variants removed', nf(f.assortment.removed_variants.value), 'left the feed entirely')}
     ${stat('Went out of stock', nf(f.assortment.went_out.value), 'still listed, not sellable')}
-    ${stat('Came back in stock', nf(f.assortment.came_back.value), 'returned to sellable')}
+    ${stat('Came back in stock', nf(f.assortment.came_back.value), 'listed throughout, back to sellable')}
+    ${stat('Put back on the feed', nf(f.assortment.relisted.value), 'had left the feed, then reappeared')}
   </div>
   ${read('Read', n.reads.assortment)}
 

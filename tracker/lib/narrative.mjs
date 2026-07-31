@@ -131,7 +131,8 @@ function payload (facts) {
       new_variants: val(facts.assortment.new_variants),
       removed_variants: val(facts.assortment.removed_variants),
       went_out: val(facts.assortment.went_out),
-      came_back: val(facts.assortment.came_back),
+      came_back_while_still_listed: val(facts.assortment.came_back),
+      put_back_on_the_feed_after_being_removed: val(facts.assortment.relisted),
       categories: facts.assortment.categories.slice(0, 6)
     },
     unavailable: Object.entries({
