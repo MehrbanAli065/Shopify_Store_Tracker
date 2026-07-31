@@ -203,6 +203,9 @@ async function loadAll () {
 async function loadKpis () {
   const k = await (await fetch(`/api/stores/${ID}/summary?${qsDates()}`)).json()
   const priceTotal = k.price_down + k.price_up + k.discount_change
+  // The unfiltered table leaves relistings out, so its tab count has to as
+  // well, or the number promises rows the table will not show.
+  const reportedTotal = k.new_items + priceTotal + k.stock_out + k.stock_in + k.removed
   kpis.innerHTML = [
     ['Products',      nf(k.products),  '', 'Active products in the catalogue'],
     ['Variants',      nf(k.variants),  '', 'Size / colour combinations tracked'],
@@ -218,7 +221,7 @@ async function loadKpis () {
   baseChk.disabled = !BASE_N
 
   document.querySelectorAll('.tn').forEach(el => {
-    const n = { '':k.total, price:priceTotal, new:k.new_items,
+    const n = { '':reportedTotal, price:priceTotal, new:k.new_items,
                 stock:k.stock_out+k.stock_in, removed:k.removed,
                 relisted:k.relisted }[el.dataset.c]
     el.textContent = n ? ` ${n}` : ''

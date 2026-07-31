@@ -131,7 +131,14 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
     removed: ['removed'],
     relisted: ['relisted']
   }
-  const types = groups[req.query.type] || null
+  // What the unfiltered view means: something changed about the variant itself.
+  // A relisting is a change to the feed, not to the product, and it arrives in
+  // bulk when a store re-adds a range: Alkaram's 31 July was 592 relistings
+  // against 173 real changes. Leaving them in buries the day's actual news, so
+  // they live behind their own tab.
+  const REPORTED = ['new', 'price_up', 'price_down', 'discount_change',
+                    'stock_out', 'stock_in', 'removed']
+  const types = groups[req.query.type] || REPORTED
 
   // The first ingest of a store records every variant as 'new' — that is the
   // starting inventory, not news. Keep it out unless explicitly requested.
@@ -149,11 +156,11 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
       LEFT JOIN v_change_report h
              ON h.store_id = r.store_id AND h.observed_date = r.run_date
             ${baseFilter.replace('AND NOT is_baseline', 'AND NOT h.is_baseline')}
-            ${types ? 'AND h.change_type = ANY($4)' : ''}
+            AND h.change_type = ANY($4)
      WHERE r.store_id = $1 AND r.run_date BETWEEN $2 AND $3
        AND r.status IN ('success','partial')
      GROUP BY r.run_date ORDER BY r.run_date DESC`,
-    types ? [id, from, to, types] : [id, from, to])
+    [id, from, to, types])
 
   const total = perDate.reduce((s, r) => s + r.n, 0)
 
@@ -180,15 +187,13 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
                                 ORDER BY abs(COALESCE(price_diff_pct, 0)) DESC, handle) AS rn
         FROM v_change_report
        WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
-         ${types ? 'AND change_type = ANY($5)' : ''}
+         AND change_type = ANY($5)
     )
     SELECT r.* FROM ranked r
-      JOIN (SELECT * FROM unnest($4::date[], $${types ? 6 : 5}::int[]) AS t(d, cap)) c
+      JOIN (SELECT * FROM unnest($4::date[], $6::int[]) AS t(d, cap)) c
         ON c.d = r.observed_date AND r.rn <= c.cap
      ORDER BY r.observed_date DESC, r.rn`,
-    types
-      ? [id, from, to, [...caps.keys()], types, [...caps.values()]]
-      : [id, from, to, [...caps.keys()], [...caps.values()]]) : []
+    [id, from, to, [...caps.keys()], types, [...caps.values()]]) : []
 
   res.json({
     from, to, total, shown: rows.length,
@@ -248,7 +253,9 @@ app.get('/api/stores/:id/report.csv', wrap(async (req, res) => {
   const groups = { price: ['price_up','price_down','discount_change'], new: ['new'],
                    stock: ['stock_out','stock_in'], removed: ['removed'],
                    relisted: ['relisted'] }
-  const types = groups[req.query.type] || null
+  // Same default as the on-screen table, so an export matches what was exported.
+  const types = groups[req.query.type] ||
+    ['new', 'price_up', 'price_down', 'discount_change', 'stock_out', 'stock_in', 'removed']
   const baseFilter = req.query.baseline === '1' ? '' : 'AND NOT is_baseline'
 
   const rows = await q(`
