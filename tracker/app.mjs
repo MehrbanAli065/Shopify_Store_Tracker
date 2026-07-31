@@ -84,6 +84,7 @@ app.get('/api/stores/:id/summary', wrap(async (req, res) => {
       COUNT(*) FILTER (WHERE change_type = 'stock_out')::int       AS stock_out,
       COUNT(*) FILTER (WHERE change_type = 'stock_in')::int        AS stock_in,
       COUNT(*) FILTER (WHERE change_type = 'removed')::int         AS removed,
+      COUNT(*) FILTER (WHERE change_type = 'relisted')::int        AS relisted,
       COUNT(*) FILTER (WHERE NOT is_baseline)::int AS total,
       COUNT(*)::int AS total_with_baseline
     FROM v_change_report
@@ -105,6 +106,7 @@ app.get('/api/stores/:id/summary', wrap(async (req, res) => {
            COUNT(h.change_type) FILTER (WHERE h.change_type = 'stock_out')::int AS stock_out,
            COUNT(h.change_type) FILTER (WHERE h.change_type = 'stock_in')::int  AS stock_in,
            COUNT(h.change_type) FILTER (WHERE h.change_type = 'removed')::int   AS removed,
+           COUNT(h.change_type) FILTER (WHERE h.change_type = 'relisted')::int  AS relisted,
            COUNT(h.change_type) FILTER (WHERE NOT h.is_baseline)::int AS total
       FROM scrape_runs r
       LEFT JOIN v_change_report h
@@ -126,7 +128,8 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
     price:   ['price_up', 'price_down', 'discount_change'],
     new:     ['new'],
     stock:   ['stock_out', 'stock_in'],
-    removed: ['removed']
+    removed: ['removed'],
+    relisted: ['relisted']
   }
   const types = groups[req.query.type] || null
 
@@ -243,7 +246,8 @@ app.get('/api/stores/:id/report.csv', wrap(async (req, res) => {
   const id = req.params.id
   const { from, to } = await bounds(req, id)
   const groups = { price: ['price_up','price_down','discount_change'], new: ['new'],
-                   stock: ['stock_out','stock_in'], removed: ['removed'] }
+                   stock: ['stock_out','stock_in'], removed: ['removed'],
+                   relisted: ['relisted'] }
   const types = groups[req.query.type] || null
   const baseFilter = req.query.baseline === '1' ? '' : 'AND NOT is_baseline'
 

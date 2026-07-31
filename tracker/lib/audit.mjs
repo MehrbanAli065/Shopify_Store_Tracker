@@ -329,7 +329,8 @@ export async function buildFacts ({ storeId, from, to }) {
     SELECT count(*) FILTER (WHERE change_type = 'new' AND NOT is_baseline)::int AS new_variants,
            count(*) FILTER (WHERE change_type = 'removed')::int                AS removed_variants,
            count(*) FILTER (WHERE change_type = 'stock_out')::int              AS went_out,
-           count(*) FILTER (WHERE change_type = 'stock_in')::int               AS came_back
+           count(*) FILTER (WHERE change_type = 'stock_in')::int               AS came_back,
+           count(*) FILTER (WHERE change_type = 'relisted')::int               AS relisted
       FROM v_change_report
      WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3`, A)
 

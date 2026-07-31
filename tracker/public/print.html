@@ -90,7 +90,8 @@ const SECTIONS = [
   { key:'new',     label:'New products',     hue:'#1baf7a' },
   { key:'price',   label:'Price changes',    hue:'#c0392b' },
   { key:'stock',   label:'Stock movements',  hue:'#eb6834' },
-  { key:'removed', label:'Removed from store', hue:'#888' }
+  { key:'removed', label:'Removed from store', hue:'#888' },
+  { key:'relisted', label:'Back on the feed', hue:'#5680AC' }
 ]
 
 const qs = extra => (FROM?`from=${FROM}&`:'') + (TO?`to=${TO}&`:'') + (BASE?'baseline=1&':'') + extra
@@ -105,6 +106,7 @@ function priceCell (r) {
 function changeCell (r) {
   if (r.is_baseline)                 return 'first import'
   if (r.change_type === 'new')       return '<span class="up">NEW</span>'
+  if (r.change_type === 'relisted')  return '<span class="up">RELISTED</span>'
   if (r.change_type === 'removed')   return 'REMOVED'
   if (r.change_type === 'stock_out') return '<span class="dn">STOCK OUT</span>'
   if (r.change_type === 'stock_in')  return '<span class="up">RESTOCKED</span>'

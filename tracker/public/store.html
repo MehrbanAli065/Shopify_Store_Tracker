@@ -90,7 +90,7 @@
   <h2>Day by day</h2>
   <div class="days">
     <table class="dt">
-      <thead><tr><th>Date</th><th>New</th><th>Price Δ</th><th>Stock out</th><th>Stock in</th><th>Removed</th><th>History rows</th></tr></thead>
+      <thead><tr><th>Date</th><th>New</th><th>Price Δ</th><th>Stock out</th><th>Stock in</th><th>Removed</th><th>Relisted</th><th>History rows</th></tr></thead>
       <tbody id="daily"></tbody>
     </table>
   </div>
@@ -143,7 +143,8 @@ const TABS = [
   { key:'price',   label:'Price changes' },
   { key:'new',     label:'New' },
   { key:'stock',   label:'Stock' },
-  { key:'removed', label:'Removed' }
+  { key:'removed', label:'Removed' },
+  { key:'relisted', label:'Relisted' }
 ]
 const CHANGE_HUES = { new:'var(--s1)', price:'var(--s2)', stock:'var(--s3)', removed:'var(--s4)' }
 let tab = '', CUR = 'PKR', RANGE = {}, ROWS = [], q = '', showBase = false, BASE_N = 0
@@ -218,7 +219,8 @@ async function loadKpis () {
 
   document.querySelectorAll('.tn').forEach(el => {
     const n = { '':k.total, price:priceTotal, new:k.new_items,
-                stock:k.stock_out+k.stock_in, removed:k.removed }[el.dataset.c]
+                stock:k.stock_out+k.stock_in, removed:k.removed,
+                relisted:k.relisted }[el.dataset.c]
     el.textContent = n ? ` ${n}` : ''
   })
 
@@ -229,8 +231,9 @@ async function loadKpis () {
       <td class="num ${d.stock_out?'':'z'}">${d.stock_out}</td>
       <td class="num ${d.stock_in?'':'z'}">${d.stock_in}</td>
       <td class="num ${d.removed?'':'z'}">${d.removed}</td>
+      <td class="num ${d.relisted?'':'z'}">${d.relisted}</td>
       <td class="num"><b style="color:var(--ink)">${d.total}</b></td></tr>`).join('')
-    : `<tr><td colspan="7" class="empty">No activity in this range</td></tr>`
+    : `<tr><td colspan="8" class="empty">No activity in this range</td></tr>`
 
   // ── "what changed" stacked bar
   const parts = [
@@ -403,7 +406,7 @@ const EV = {
   new:['New',           'var(--s1)'], price_down:['Price dropped','var(--critical)'],
   price_up:['Price rose','var(--good)'], discount_change:['Discount changed','var(--warning)'],
   stock_out:['Sold out', 'var(--s2)'],  stock_in:['Back in stock','var(--good)'],
-  removed:['Removed',    'var(--muted)']
+  removed:['Removed',    'var(--muted)'], relisted:['Back on the feed','var(--s1)']
 }
 /**
  * Turn one variant's events into a row per calendar day, from the day it first

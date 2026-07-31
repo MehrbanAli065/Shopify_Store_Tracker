@@ -276,11 +276,18 @@ for (const [key, v] of csvVariants) {
   const compareChanged = !eqNum(num(dbv.current_compare_at_price), v.compare_at)
   const stockChanged   = dbv.current_in_stock !== v.available
 
-  if (!priceChanged && !compareChanged && !stockChanged) continue   // nothing to record
+  // Returning to the feed is a change in its own right. Judging only price and
+  // stock missed a variant that left and came back unchanged: no row was
+  // written, so in_feed stayed false and carry-forward kept it delisted while
+  // the file plainly listed it. 205 Alkaram variants were doing this.
+  const relisted = dbv.last_in_feed === false
+
+  if (!relisted && !priceChanged && !compareChanged && !stockChanged) continue
 
   // one row per variant per day; priority decides the label, all values are on the row
   let type
-  if (stockChanged)            type = v.available ? 'stock_in' : 'stock_out'
+  if (relisted)                type = 'relisted'
+  else if (stockChanged)       type = v.available ? 'stock_in' : 'stock_out'
   else if (priceChanged)       type = v.price > num(dbv.current_price) ? 'price_up' : 'price_down'
   else                         type = 'discount_change'
 

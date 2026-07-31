@@ -136,8 +136,13 @@ CREATE TABLE variant_history (
   prev_in_stock          BOOLEAN,
 
   change_type       TEXT NOT NULL
+                    -- 'relisted' is a variant that left the feed and came back.
+                    -- Not 'new' (it is not, and returns would swamp that count)
+                    -- and not 'stock_in' (it was absent from the file, not
+                    -- merely unsellable).
                     CHECK (change_type IN ('new','price_up','price_down',
-                                           'discount_change','stock_out','stock_in','removed')),
+                                           'discount_change','stock_out','stock_in',
+                                           'removed','relisted')),
   UNIQUE (variant_id, observed_date, change_type)
 );
 
