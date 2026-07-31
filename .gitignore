@@ -32,3 +32,6 @@ deploy.log
 
 # generated VM transfer archive
 shopify-tracker-vm.zip
+
+# handover notes — holds live credentials, hand it over directly
+mehrban.txt
