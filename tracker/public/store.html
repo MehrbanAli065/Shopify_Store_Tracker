@@ -106,13 +106,18 @@
   <label class="basetog"><input type="checkbox" id="baseChk">
     Include the first import <span id="baseHint"></span></label>
   <div class="tabs" id="tabs"></div>
-  <div class="tw"><table>
+  <div class="logbar">
+    <label for="dsel">Date</label>
+    <select id="dsel"><option value="">All dates</option></select>
+  </div>
+  <div class="tw scrolly"><table>
     <thead><tr>
       <th>Product</th><th>Variant</th><th>Price</th><th>Change</th>
       <th>Discount</th><th>Stock</th><th>Qty</th><th>Date</th><th></th>
     </tr></thead>
     <tbody id="rows"></tbody>
   </table></div>
+  <div class="pager" id="pager" hidden></div>
   <div class="foot"><span id="cnt"></span><span id="src"></span></div>
 </div>
 
@@ -148,7 +153,8 @@ const TABS = [
 ]
 const CHANGE_HUES = { new:'var(--s1)', price:'var(--s2)', stock:'var(--s3)', removed:'var(--s4)' }
 let tab = '', CUR = 'PKR', RANGE = {}, ROWS = [], q = '', showBase = false, BASE_N = 0
-let PER_DATE = []
+let PER_DATE = [], PAGE = 0, TOTAL = 0, ONE_DATE = ''
+const PAGE_SIZE = 100
 
 const STOCK = { in:'<span class="bdg in"><span class="d"></span>In</span>',
                 out:'<span class="bdg out"><span class="d"></span>Out</span>',
@@ -329,12 +335,48 @@ function discCell (r) {
   return p !== n ? `${p}% <span class="arw">→</span> <b style="color:var(--ink)">${n}%</b>` : (n ? `${n}%` : '—')
 }
 
-async function loadRows () {
+async function loadRows (keepPage) {
+  if (!keepPage) PAGE = 0
   rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="9"><div class="skl w90"></div></td></tr>`).join('')
   const r = await (await fetch(
-    `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}limit=900`)).json()
-  ROWS = r.rows; window.__total = r.total; PER_DATE = r.per_date || []
-  paint()
+    `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}` +
+    `${ONE_DATE?`date=${ONE_DATE}&`:''}limit=${PAGE_SIZE}&offset=${PAGE * PAGE_SIZE}`)).json()
+  ROWS = r.rows; TOTAL = r.total; window.__total = r.total
+  if (r.per_date) { PER_DATE = r.per_date; fillDateSelect() }
+  document.querySelector('.tw').scrollTop = 0
+  paint(); renderPager()
+}
+
+// The picker is the way back to an older day now that the table pages newest
+// first: without it, reaching 28 July would mean clicking through 80 pages.
+function fillDateSelect () {
+  const cur = dsel.value
+  dsel.innerHTML = `<option value="">All dates</option>` + PER_DATE.map(p =>
+    `<option value="${esc(p.date)}"${p.total ? '' : ' disabled'}>${dt(p.date)} · ${nf(p.total)}</option>`).join('')
+  dsel.value = cur
+}
+
+function renderPager () {
+  const pages = Math.ceil(TOTAL / PAGE_SIZE)
+  if (pages <= 1) { pager.hidden = true; return }
+  pager.hidden = false
+  const win = []
+  for (let i = Math.max(0, PAGE - 2); i < Math.min(pages, PAGE + 3); i++) win.push(i)
+  const btn = (n, label, on, dis) =>
+    `<button class="pg${on ? ' on' : ''}" ${dis ? 'disabled' : ''} data-p="${n}">${label}</button>`
+  pager.innerHTML =
+    `<span class="pg-info">${nf(PAGE * PAGE_SIZE + 1)}–${nf(PAGE * PAGE_SIZE + ROWS.length)} of ${nf(TOTAL)}</span>` +
+    btn(PAGE - 1, '‹ Prev', false, PAGE === 0) +
+    (win[0] > 0 ? btn(0, '1', false) + (win[0] > 1 ? '<span class="pg-gap">…</span>' : '') : '') +
+    win.map(i => btn(i, String(i + 1), i === PAGE)).join('') +
+    (win[win.length-1] < pages-1
+      ? (win[win.length-1] < pages-2 ? '<span class="pg-gap">…</span>' : '') + btn(pages-1, String(pages))
+      : '') +
+    btn(PAGE + 1, 'Next ›', false, PAGE >= pages - 1)
+
+  pager.querySelectorAll('.pg').forEach(b => b.onclick = () => {
+    PAGE = Number(b.dataset.p); loadRows(true)
+  })
 }
 
 function paint () {
@@ -345,8 +387,7 @@ function paint () {
 
   cnt.innerHTML = ROWS.length
     ? (q ? `<b>${list.length}</b> matching “${esc(q)}” · ` : '') +
-      `showing ${nf(ROWS.length)} of ${nf(window.__total)} change events` +
-      (PER_DATE.length > 1 ? ` across ${PER_DATE.length} dates` : '') : ''
+      `${nf(TOTAL)} change events${ONE_DATE ? ' on ' + dt(ONE_DATE) : ''}` : ''
 
   // Grouped under a heading per date, so the range reads as "what changed on
   // the 27th, then the 28th", not as one undated pile.
@@ -364,8 +405,7 @@ function paint () {
     return `<tr class="dgrp${p.total ? '' : ' quiet'}"><td colspan="9">
       <span class="dg-d">${dt(p.date)}</span>
       <span class="dg-n">${what}</span>
-      ${held ? `<span class="dg-h">showing ${nf(n)}</span>
-        <button class="dg-more" data-date="${esc(p.date)}">Load ${nf(Math.min(held, 300))} more</button>` : ''}
+      ${held ? `<span class="dg-h">${nf(p.total - n)} more on later pages</span>` : ''}
     </td></tr>`
   }
 
@@ -374,7 +414,9 @@ function paint () {
   // at, which is a different thing entirely. While a search is running the
   // quiet days are dropped, because "no changes" would then be answering a
   // question nobody asked.
-  const shownDates = q ? PER_DATE.filter(p => grouped.has(p.date)) : PER_DATE
+  // Only the dates present on this page get a heading. A heading for a date
+  // whose rows are three pages away would promise rows that are not there.
+  const shownDates = PER_DATE.filter(p => grouped.has(p.date) || (!q && !ONE_DATE && !p.total))
 
   rows.innerHTML = shownDates.length ? shownDates.map(p =>
     head(p, (grouped.get(p.date) || []).length) + (grouped.get(p.date) || []).map(x => `
@@ -404,22 +446,6 @@ function paint () {
   document.querySelectorAll('.crow').forEach(tr =>
     tr.onclick = () => openDrawer(tr.dataset.handle, tr.dataset.title))
 
-  // Pull the next slice of one date and fold it into what is already on screen.
-  // Paging the whole range would reshuffle the groups; paging a single date
-  // just makes that date longer.
-  document.querySelectorAll('.dg-more').forEach(b => b.onclick = async () => {
-    const date = b.dataset.date
-    const have = ROWS.filter(x => x.observed_date === date).length
-    b.disabled = true; b.textContent = 'Loading…'
-    try {
-      const r = await (await fetch(`/api/stores/${ID}/report?date=${date}` +
-        `&offset=${have}&limit=300${tab ? `&type=${tab}` : ''}${showBase ? '&baseline=1' : ''}`)).json()
-      ROWS = ROWS.concat(r.rows)
-      paint()
-    } catch (e) {
-      b.disabled = false; b.textContent = 'Failed — retry'
-    }
-  })
 }
 
 // ═══ drawer — full product timeline ═══
@@ -544,6 +570,7 @@ function syncExportLinks () {
   pdf.href = `/print.html?id=${ID}&${qsDates()}${showBase ? 'baseline=1' : ''}`
 }
 baseChk.onchange = () => { showBase = baseChk.checked; syncExportLinks(); loadRows() }
+dsel.onchange = () => { ONE_DATE = dsel.value; loadRows() }
 tg.onclick = () => {
   const cur = document.documentElement.getAttribute('data-theme')
     || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')

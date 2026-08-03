@@ -195,43 +195,24 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
     [id, from, to, types])
 
   const total = perDate.reduce((s, r) => s + r.n, 0)
+  const offset = Math.max(0, Number(req.query.offset) || 0)
 
-  // Share the budget out, then hand back what the quiet days do not need, so a
-  // four-row date does not cost the same as a four-thousand-row one.
-  const caps = new Map()
-  const busy = perDate.filter(r => r.n > 0)
-  let pool = limit, left = busy.length
-  for (const r of [...busy].sort((a, b) => a.n - b.n)) {
-    const share = Math.max(1, Math.floor(pool / left))
-    const take = Math.min(r.n, share)
-    caps.set(String(r.observed_date), take)
-    pool -= take; left--
-  }
-
-  const rows = caps.size ? await q(`
-    WITH ranked AS (
-      SELECT handle, title, sku, variant_label, product_url, image_src,
-             observed_date, change_type, is_baseline,
-             prev_price, price, price_diff, price_diff_pct,
-             prev_compare_at_price, compare_at_price, prev_discount_pct, discount_pct,
-             prev_in_stock, in_stock, inventory_qty, product_first_seen, currency,
-             ROW_NUMBER() OVER (PARTITION BY observed_date
-                                ORDER BY abs(COALESCE(price_diff_pct, 0)) DESC, handle) AS rn
-        FROM v_change_report
-       WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
-         AND change_type = ANY($5)
-    )
-    SELECT r.* FROM ranked r
-      JOIN (SELECT * FROM unnest($4::date[], $6::int[]) AS t(d, cap)) c
-        ON c.d = r.observed_date AND r.rn <= c.cap
-     ORDER BY r.observed_date DESC, r.rn`,
-    [id, from, to, [...caps.keys()], types, [...caps.values()]]) : []
+  // One page, newest first. The date headings are drawn from per_date, and the
+  // date picker beside the table reaches any day directly, so a busy day no
+  // longer buries the ones behind it the way a plain LIMIT used to.
+  const rows = await q(`
+    SELECT ${ROW_COLS} FROM v_change_report
+     WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
+       AND change_type = ANY($4)
+     ORDER BY observed_date DESC, ${ROW_ORDER}
+     LIMIT $5 OFFSET $6`,
+    [id, from, to, types, limit, offset])
 
   res.json({
-    from, to, total, shown: rows.length,
-    // Lets the table head each date and say what it is holding back.
-    per_date: perDate.map(r => ({
-      date: d(r.observed_date), total: r.n, shown: caps.get(String(r.observed_date)) || 0 })),
+    from, to, total, offset, limit, shown: rows.length,
+    more: offset + rows.length < total,
+    // Heads each group, and fills the date picker.
+    per_date: perDate.map(r => ({ date: d(r.observed_date), total: r.n })),
     rows: rows.map(r => ({ ...r, observed_date: d(r.observed_date),
                            product_first_seen: d(r.product_first_seen) }))
   })
