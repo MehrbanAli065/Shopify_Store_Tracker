@@ -122,7 +122,7 @@ app.get('/api/stores/:id/summary', wrap(async (req, res) => {
 app.get('/api/stores/:id/report', wrap(async (req, res) => {
   const id = req.params.id
   const { from, to } = await bounds(req, id)
-  const limit = Math.min(Number(req.query.limit) || 300, 2000)
+  const limit = Math.min(Number(req.query.limit) || 300, 5000)
 
   const groups = {
     price:   ['price_up', 'price_down', 'discount_change'],
@@ -143,6 +143,38 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   // The first ingest of a store records every variant as 'new' — that is the
   // starting inventory, not news. Keep it out unless explicitly requested.
   const baseFilter = req.query.baseline === '1' ? '' : 'AND NOT is_baseline'
+
+  const ROW_COLS = `handle, title, sku, variant_label, product_url, image_src,
+    observed_date, change_type, is_baseline,
+    prev_price, price, price_diff, price_diff_pct,
+    prev_compare_at_price, compare_at_price, prev_discount_pct, discount_pct,
+    prev_in_stock, in_stock, inventory_qty, product_first_seen, currency`
+
+  // Same order the grouped view uses, so paging through one date continues the
+  // list rather than reshuffling it.
+  const ROW_ORDER = 'abs(COALESCE(price_diff_pct, 0)) DESC, handle'
+
+  // ?date= drills into a single day. The grouped view can only ever show a
+  // slice of a busy date, and without this there is no way to reach the rest.
+  if (req.query.date) {
+    const off = Math.max(0, Number(req.query.offset) || 0)
+    const [rows, n] = await Promise.all([
+      q(`SELECT ${ROW_COLS} FROM v_change_report
+          WHERE store_id = $1 AND observed_date = $2::date ${baseFilter}
+            AND change_type = ANY($3)
+          ORDER BY ${ROW_ORDER} LIMIT $4 OFFSET $5`,
+        [id, req.query.date, types, limit, off]),
+      one(`SELECT count(*)::int AS n FROM v_change_report
+            WHERE store_id = $1 AND observed_date = $2::date ${baseFilter}
+              AND change_type = ANY($3)`, [id, req.query.date, types])
+    ])
+    return res.json({
+      date: req.query.date, offset: off, total: n.n, shown: rows.length,
+      more: off + rows.length < n.n,
+      rows: rows.map(r => ({ ...r, observed_date: d(r.observed_date),
+                             product_first_seen: d(r.product_first_seen) }))
+    })
+  }
 
   // How many events each date holds, before any row budget is spent. One busy
   // day can hold most of the range: Alkaram's 30 Jul carries 6,838 of 7,018, so

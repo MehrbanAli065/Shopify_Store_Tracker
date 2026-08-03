@@ -332,7 +332,7 @@ function discCell (r) {
 async function loadRows () {
   rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="9"><div class="skl w90"></div></td></tr>`).join('')
   const r = await (await fetch(
-    `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}limit=600`)).json()
+    `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}limit=900`)).json()
   ROWS = r.rows; window.__total = r.total; PER_DATE = r.per_date || []
   paint()
 }
@@ -357,14 +357,15 @@ function paint () {
   }
 
   const head = (p, n) => {
-    const held = !q && p.total > p.shown ? p.total - p.shown : 0
+    const held = !q && p.total > n ? p.total - n : 0
     const what = q ? `${nf(n)} matching`
                    : p.total ? `${nf(p.total)} change${p.total === 1 ? '' : 's'}`
                              : 'no changes · the scrape ran and every variant was checked'
     return `<tr class="dgrp${p.total ? '' : ' quiet'}"><td colspan="9">
       <span class="dg-d">${dt(p.date)}</span>
       <span class="dg-n">${what}</span>
-      ${held ? `<span class="dg-h">showing the ${nf(p.shown)} largest · ${nf(held)} more</span>` : ''}
+      ${held ? `<span class="dg-h">showing ${nf(n)}</span>
+        <button class="dg-more" data-date="${esc(p.date)}">Load ${nf(Math.min(held, 300))} more</button>` : ''}
     </td></tr>`
   }
 
@@ -402,6 +403,23 @@ function paint () {
 
   document.querySelectorAll('.crow').forEach(tr =>
     tr.onclick = () => openDrawer(tr.dataset.handle, tr.dataset.title))
+
+  // Pull the next slice of one date and fold it into what is already on screen.
+  // Paging the whole range would reshuffle the groups; paging a single date
+  // just makes that date longer.
+  document.querySelectorAll('.dg-more').forEach(b => b.onclick = async () => {
+    const date = b.dataset.date
+    const have = ROWS.filter(x => x.observed_date === date).length
+    b.disabled = true; b.textContent = 'Loading…'
+    try {
+      const r = await (await fetch(`/api/stores/${ID}/report?date=${date}` +
+        `&offset=${have}&limit=300${tab ? `&type=${tab}` : ''}${showBase ? '&baseline=1' : ''}`)).json()
+      ROWS = ROWS.concat(r.rows)
+      paint()
+    } catch (e) {
+      b.disabled = false; b.textContent = 'Failed — retry'
+    }
+  })
 }
 
 // ═══ drawer — full product timeline ═══
