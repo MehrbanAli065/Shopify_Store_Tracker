@@ -44,14 +44,23 @@ now a failed night is only visible if someone opens Task Scheduler.
 
 | | Option A · Execute Command | Option B · HTTP endpoint |
 |---|---|---|
-| n8n runs | on the same machine as `tracker/` | anywhere (n8n Cloud included) |
-| Needs a public URL | no | yes — tunnel or port forward |
+| n8n runs | on the same machine as `tracker/` | anywhere |
+| Needs a URL n8n can reach | no | yes — tunnel, unless n8n is on the same server |
 | Credentials in n8n | none | one shared token |
-| New code | none | an ingest route in `app.mjs` |
-| Setup | ~10 minutes | ~40 minutes |
+| Setup | ~10 minutes | ~30 minutes |
 
-**Option A unless n8n has to live somewhere else.** It ships today with no code
-changes and nothing new exposed to the internet.
+**Option A if n8n can run next to the tracker, Option B otherwise.** Both are
+built; pick by where n8n lives, not by preference.
+
+> The deciding question is which machine the Execute Command node runs on. It
+> runs on the **n8n server**, not on your laptop — so a hosted n8n at, say,
+> `workflows.example.com` cannot see `E:\…\tracker` and Option A is out.
+>
+> Worth knowing before you choose: the ingest needs nothing that is specific to
+> the Windows machine. Drive and Neon are both reached over the network. If the
+> n8n server has shell access and Node 20+, moving `tracker/` there is the
+> sturdiest arrangement of all — no tunnel, and it does not stop working when a
+> desktop goes to sleep.
 
 ---
 
@@ -192,59 +201,92 @@ run finds every store already done and skips it — but the logs get confusing.
 
 # Option B · HTTP endpoint
 
-Only if n8n cannot run next to the tracker.
+For n8n that lives somewhere else — a hosted instance, n8n Cloud, another server.
 
-## What has to exist
+The route is built: [`lib/ingest-route.mjs`](lib/ingest-route.mjs), mounted from
+`app.mjs`.
 
-**1 · An ingest route.** Ingest takes minutes and reads multi-megabyte CSVs, so
-it cannot run on Vercel — `vercel.json` caps functions at 60s, and the ingest is
-already documented as local-only. The route has to be served by `server.mjs` on
-the machine that has the CSVs, which means:
-
-```js
-// app.mjs — sketch, not yet implemented
-import { spawn } from 'node:child_process'
-
-let running = null                       // one at a time, always
-
-app.post('/api/ingest', (req, res) => {
-  if (req.get('X-Ingest-Token') !== process.env.INGEST_TOKEN)
-    return res.status(401).json({ error: 'bad token' })
-  if (running) return res.status(409).json({ error: 'already running' })
-
-  const child = spawn(process.execPath,
-    ['scripts/ingest-drive.mjs', '--delete', '--concurrency', '3'],
-    { cwd: process.cwd() })
-
-  let out = ''
-  child.stdout.on('data', d => { out += d })
-  child.stderr.on('data', d => { out += d })
-  running = { startedAt: new Date().toISOString(), out: () => out }
-  child.on('close', code => { running = null; last = { code, out } })
-
-  res.status(202).json({ started: true })   // return immediately, do not hold the connection
-})
-
-app.get('/api/ingest/status', (req, res) => { /* token check, then running/last */ })
+```
+POST /api/ingest          start a run, answers 202 straight away
+GET  /api/ingest/status   what the current or last run is doing
 ```
 
-It returns `202` and n8n polls `/api/ingest/status`, because holding an HTTP
-connection open for the length of a 100-store ingest is not reliable.
+Both require an `X-Ingest-Token` header.
 
-**2 · A public URL.** Cloudflare Tunnel is the sane choice — free, no inbound port,
-and it survives the machine's IP changing:
+Two things are deliberate. **It answers 202 instead of waiting**, because a
+100-store ingest runs for minutes and no proxy in between can be trusted to hold
+an idle connection that long — n8n polls the status route instead. And **the
+routes do not exist unless `INGEST_TOKEN` is set**: no token means no route,
+rather than a route that exists and refuses. They also never mount on Vercel,
+where the ingest could not work anyway.
+
+The request body is validated into a fixed set of flags, so nothing a caller
+sends reaches the command line as text:
+
+```json
+{ "cleanup": "delete", "concurrency": 3 }
+```
+
+`cleanup` is one of `delete` / `archive` / `trash` / `none`, `concurrency` is
+1–10, `date` must be `YYYY-MM-DD`, `dryRun` is a boolean. Anything else is a 400.
+
+## 1 · Set the token
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Put it in `tracker/.env` as `INGEST_TOKEN=…`. Anyone holding it can write to the
+production database, so treat it like the database password.
+
+## 2 · Run the tracker
+
+```powershell
+npm start          # http://localhost:3000
+```
+
+This has to stay running for n8n to reach it. On the UiPath VM, install it as a
+service with [nssm](https://nssm.cc) so it survives a reboot.
+
+## 3 · Give it a public URL
 
 ```powershell
 cloudflared tunnel --url http://localhost:3000
 ```
 
-**3 · `INGEST_TOKEN`** in `.env` — a long random string. This endpoint writes to
-the production database, so it is not optional.
+Free, needs no inbound port opened, and survives the machine's IP changing. It
+prints a `https://something.trycloudflare.com` URL.
 
-## The workflow
+> A quick tunnel gets a **new URL every restart**. For something that runs
+> nightly, create a named tunnel bound to your own domain instead, or the n8n
+> node will be pointing at a dead address by the second week.
 
-[`n8n/ingest-nightly-remote.json`](n8n/ingest-nightly-remote.json) is ready to
-import once the route exists:
+If n8n runs on the *same* server as the tracker, skip the tunnel entirely and
+point n8n at `http://localhost:3000` — or `http://host.docker.internal:3000` if
+n8n is in Docker.
+
+## 4 · Store the token in n8n
+
+n8n → **Credentials → Create** → **Header Auth**
+
+- Name: `X-Ingest-Token`
+- Value: the token
+
+Use the credential rather than typing the token into the node, so it does not end
+up in the workflow's JSON export.
+
+## 5 · Import a workflow
+
+**Simple** — [`n8n/ingest-simple.json`](n8n/ingest-simple.json), two nodes:
+
+```
+Schedule (03:00) → POST /api/ingest
+```
+
+Fire and forget. The ingest runs on the tracker machine; results appear in the
+tracker's own report pages.
+
+**With alerting** — [`n8n/ingest-nightly-remote.json`](n8n/ingest-nightly-remote.json):
 
 ```
 Schedule → POST /api/ingest → Wait 2m → GET /api/ingest/status
@@ -254,11 +296,25 @@ Schedule → POST /api/ingest → Wait 2m → GET /api/ingest/status
                                   Read the result → IF ok → Alert
 ```
 
-Set the `X-Ingest-Token` header in both HTTP nodes — use an n8n **Header Auth**
-credential rather than typing the token into the node, so it does not end up in
-the workflow export.
+It gives up watching after 60 minutes and reports `timedOut`, so a hung ingest
+does not leave an execution running forever.
 
-Say the word and I will write the route and the status endpoint properly.
+Set the URL in the HTTP node(s) and attach the credential to each.
+
+## 6 · Test it by hand first
+
+Before involving n8n at all:
+
+```powershell
+curl -X POST http://localhost:3000/api/ingest `
+  -H "X-Ingest-Token: YOUR_TOKEN" -H "Content-Type: application/json" `
+  -d '{\"dryRun\":true,\"cleanup\":\"none\"}'
+
+curl http://localhost:3000/api/ingest/status -H "X-Ingest-Token: YOUR_TOKEN"
+```
+
+`dryRun` lists what would happen and changes nothing — the safe way to prove the
+token, the tunnel and the Drive credentials all work before a real run.
 
 ---
 

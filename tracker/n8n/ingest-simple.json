@@ -1,0 +1,70 @@
+{
+  "name": "Shopify tracker — nightly ingest (simple)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Drive → Postgres, once a night\n\nTwo nodes. The schedule fires, the tracker\nstarts ingesting, done.\n\n**Set up once:**\n\n1. `tracker/.env` → `INGEST_TOKEN=<long random string>`\n2. Start the tracker: `npm start`\n3. Give it a public URL:\n   `cloudflared tunnel --url http://localhost:3000`\n4. Paste that URL into the **Start ingest** node\n5. n8n → Credentials → **Header Auth**\n   name `X-Ingest-Token`, value = the token\n6. Settings → Timezone → `Asia/Karachi`\n\n**This node returns straight away.** The ingest\nkeeps running on the tracker machine — it takes\nminutes, so nothing waits for it. Results show\nup in the tracker's own report pages.\n\nWant to be told when a night fails? Import\n`ingest-nightly-remote.json` instead — same\ntrigger, but it polls until the run finishes\nand hands you a summary to alert on.",
+        "height": 520,
+        "width": 400,
+        "color": 4
+      },
+      "id": "d3c2f2e4-0003-4000-9000-000000000001",
+      "name": "Read me first",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-360, -80]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * *"
+            }
+          ]
+        }
+      },
+      "id": "d3c2f2e4-0003-4000-9000-000000000002",
+      "name": "Every night at 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [100, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://CHANGE-ME.trycloudflare.com/api/ingest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"cleanup\": \"delete\",\n  \"concurrency\": 3\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "d3c2f2e4-0003-4000-9000-000000000003",
+      "name": "Start ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [340, 200]
+    }
+  ],
+  "connections": {
+    "Every night at 03:00": {
+      "main": [[{ "node": "Start ingest", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "shopify-tracker"
+  },
+  "tags": []
+}

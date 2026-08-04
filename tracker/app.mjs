@@ -9,11 +9,16 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { q, one } from './lib/db.mjs'
 import { generateAudit } from './lib/generate-audit.mjs'
+import ingestRoute from './lib/ingest-route.mjs'
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 
 app.use(express.static(path.join(ROOT, 'public')))
+
+// Remote ingest trigger for n8n. Adds nothing unless INGEST_TOKEN is set, and
+// never mounts on Vercel — see lib/ingest-route.mjs.
+app.use(ingestRoute(ROOT))
 
 const d = v => (v instanceof Date ? v.toISOString().slice(0, 10) : v)
 const wrap = fn => (req, res) =>

@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## For n8n Cloud / a separate server\n\nUse this **only** if n8n cannot run on the\nmachine that holds `tracker/`. Otherwise\nimport `ingest-nightly.json` instead — it\nneeds no new code and no public URL.\n\n**This will not work until three things exist:**\n\n1. `POST /api/ingest` and\n   `GET /api/ingest/status` in `app.mjs`\n   — not written yet, see N8N.md\n2. A public URL for the tracker machine\n   (Cloudflare Tunnel)\n3. `INGEST_TOKEN` in `tracker/.env`, and a\n   matching n8n **Header Auth** credential\n   (`X-Ingest-Token`)\n\nSet the URL in both HTTP nodes.",
+        "content": "## For n8n on another machine\n\nSame trigger as `ingest-simple.json`, but it\nwaits for the run to finish and hands you a\nsummary to alert on.\n\n**Set up once (see N8N.md):**\n\n1. `tracker/.env` → `INGEST_TOKEN=<random>`\n2. Start the tracker: `npm start`\n3. A URL n8n can reach:\n   `cloudflared tunnel --url http://localhost:3000`\n   — or plain `http://localhost:3000` if n8n\n   runs on the same server\n4. Paste it into **both** HTTP nodes\n5. n8n → Credentials → **Header Auth**,\n   name `X-Ingest-Token`, value = the token\n6. Settings → Timezone → `Asia/Karachi`\n\nGives up watching after 60 minutes and reports\n`timedOut`, so a hung run does not leave an\nexecution open forever.",
         "height": 440,
         "width": 380,
         "color": 3
