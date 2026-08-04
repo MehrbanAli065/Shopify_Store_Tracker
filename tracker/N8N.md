@@ -230,6 +230,13 @@ sends reaches the command line as text:
 `cleanup` is one of `delete` / `archive` / `trash` / `none`, `concurrency` is
 1–10, `date` must be `YYYY-MM-DD`, `dryRun` is a boolean. Anything else is a 400.
 
+> `cleanup` defaults to `none`, not `delete`. The other three need write access
+> to Drive, and an API key does not have it — `ingest-drive.mjs` refuses the
+> **entire run** rather than just skipping the tidy-up, and a fire-and-forget
+> caller would never see it. Once a service account is in place, set
+> `INGEST_CLEANUP=delete` in `.env` or send it in the body. Drive is at 98% and
+> `delete` is the only setting that frees quota.
+
 ## 1 · Set the token
 
 ```powershell

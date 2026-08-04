@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Drive → Postgres, once a night\n\nTwo nodes. The schedule fires, the tracker\nstarts ingesting, done.\n\n**Set up once:**\n\n1. `tracker/.env` → `INGEST_TOKEN=<long random string>`\n2. Start the tracker: `npm start`\n3. Give it a public URL:\n   `cloudflared tunnel --url http://localhost:3000`\n4. Paste that URL into the **Start ingest** node\n5. n8n → Credentials → **Header Auth**\n   name `X-Ingest-Token`, value = the token\n6. Settings → Timezone → `Asia/Karachi`\n\n**This node returns straight away.** The ingest\nkeeps running on the tracker machine — it takes\nminutes, so nothing waits for it. Results show\nup in the tracker's own report pages.\n\nWant to be told when a night fails? Import\n`ingest-nightly-remote.json` instead — same\ntrigger, but it polls until the run finishes\nand hands you a summary to alert on.",
+        "content": "## Drive → Postgres, once a night\n\nTwo nodes. The schedule fires, the tracker\nstarts ingesting, done.\n\n**Set up once:**\n\n1. `tracker/.env` → `INGEST_TOKEN=<long random string>`\n2. Start the tracker: `npm start`\n3. Give it a public URL:\n   `cloudflared tunnel --url http://localhost:3000`\n4. Paste that URL into the **Start ingest** node\n5. n8n → Credentials → **Header Auth**\n   name `X-Ingest-Token`, value = the token\n6. Settings → Timezone → `Asia/Karachi`\n\n**This node returns straight away.** The ingest\nkeeps running on the tracker machine — it takes\nminutes, so nothing waits for it. Results show\nup in the tracker's own report pages.\n\n`cleanup: none` leaves the CSVs on Drive, which\nis the only setting that works with an API key.\nOnce a service account is set up (DRIVE.md),\nchange it to `delete` — Drive is at 98% and\nnothing else frees quota.\n\nWant to be told when a night fails? Import\n`ingest-nightly-remote.json` instead — same\ntrigger, but it polls until the run finishes\nand hands you a summary to alert on.",
         "height": 520,
         "width": 400,
         "color": 4
@@ -39,7 +39,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"cleanup\": \"delete\",\n  \"concurrency\": 3\n}",
+        "jsonBody": "={\n  \"cleanup\": \"none\",\n  \"concurrency\": 3\n}",
         "options": {
           "timeout": 30000
         }

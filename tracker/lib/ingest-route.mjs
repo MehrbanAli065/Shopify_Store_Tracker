@@ -39,7 +39,12 @@ function tokenOk (given) {
 function argsFrom (body = {}) {
   const argv = []
 
-  const cleanup = String(body.cleanup ?? process.env.INGEST_CLEANUP ?? 'delete')
+  // Defaults to 'none' because the cleanup flags need write access to Drive,
+  // and an API key does not have it — ingest-drive.mjs refuses the whole run
+  // rather than skipping the tidy-up. A caller that fires and forgets would
+  // never notice. Set INGEST_CLEANUP=delete once a service account is in place;
+  // Drive quota is only freed by that one.
+  const cleanup = String(body.cleanup ?? process.env.INGEST_CLEANUP ?? 'none')
   if (!['delete', 'archive', 'trash', 'none'].includes(cleanup)) {
     throw new Error(`cleanup must be delete, archive, trash or none — got "${cleanup}"`)
   }
