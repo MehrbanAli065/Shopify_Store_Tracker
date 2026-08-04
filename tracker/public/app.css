@@ -87,6 +87,16 @@ a{color:inherit;text-decoration:none}
 .pg.on{background:var(--blue);border-color:var(--blue);color:#fff}
 .pg:disabled{opacity:.35;cursor:default}
 .pg-gap{color:var(--muted);padding:0 2px}
+
+/* Apply feedback: the reload can finish faster than the eye can register it,
+   so the click has to say something happened */
+#apply:disabled{cursor:progress;opacity:.75}
+.page.reloading .kpis,.page.reloading .cgrid,.page.reloading .days{
+  opacity:.45;transition:opacity .12s;pointer-events:none}
+@keyframes noteFlash{
+  0%{background:var(--blue);color:#fff}
+  100%{background:transparent;color:var(--muted)}}
+.rescount.flash{animation:noteFlash 1s ease-out;border-radius:6px;padding:2px 7px}
 @media(max-width:600px){
   .genbar-in{padding-left:14px;padding-right:14px}
   .genbar-in input{flex:1 1 100%}

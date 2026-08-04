@@ -50,8 +50,19 @@ async function pool () {
       ssl: /localhost|127\.0\.0\.1/.test(URL) ? false : { rejectUnauthorized: false },
       max: Number(process.env.PG_MAX || 3),        // serverless: keep it small
       idleTimeoutMillis: 10_000,
-      connectionTimeoutMillis: 15_000
+      // A suspended Neon compute took 13.5s to wake in testing, and the old
+      // 15s ceiling left almost nothing over it: the first visit after an idle
+      // spell failed rather than waited.
+      connectionTimeoutMillis: 30_000,
+      keepAlive: true
     })
+
+    // Neon suspends its compute when idle and the sockets die with it. Without
+    // a handler here, pg raises that as an unhandled error on the pool; with
+    // one, the dead client is simply discarded and the next call opens a fresh
+    // connection. This is the difference between a page that recovers and one
+    // that hangs until the process is restarted.
+    _pool.on('error', err => console.warn(`  pool client dropped: ${err.message}`))
   }
   return _pool
 }
@@ -72,14 +83,29 @@ async function lite () {
   return _lite
 }
 
+/**
+ * A connection that died while the compute was suspended is handed out once
+ * before the pool notices. That failure is not the query's fault and retrying
+ * it costs one round trip, so the caller never sees it. Anything that is
+ * actually wrong with the SQL throws on the first attempt and is left alone.
+ */
+const DEAD_CONNECTION = /Connection terminated|connection timeout|ECONNRESET|ETIMEDOUT|server closed the connection/i
+
 /** Run a query, return rows. */
 export async function q (sql, params = []) {
-  if (MODE === 'postgres') {
-    const res = await (await pool()).query(sql, params)
+  if (MODE !== 'postgres') {
+    const res = await (await lite()).query(sql, params)
     return res.rows
   }
-  const res = await (await lite()).query(sql, params)
-  return res.rows
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await (await pool()).query(sql, params)
+      return res.rows
+    } catch (err) {
+      if (attempt >= 1 || !DEAD_CONNECTION.test(err.message || '')) throw err
+      console.warn(`  retrying after a dropped connection: ${err.message}`)
+    }
+  }
 }
 
 /** Run a query, return the first row or null. */

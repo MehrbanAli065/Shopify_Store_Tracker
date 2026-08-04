@@ -205,6 +205,33 @@ async function loadAll () {
   await Promise.all([loadKpis(), loadRows(), loadCharts()])
 }
 
+/**
+ * Apply reloads everything, which on a cached range can finish before the eye
+ * registers it, so the click read as if nothing had happened. Hold the busy
+ * state for a moment even when the data is already back: feedback that is too
+ * fast to see is the same as no feedback.
+ */
+async function applyRange () {
+  if (apply.disabled) return
+  apply.disabled = true
+  const label = apply.textContent
+  apply.textContent = 'Applying…'
+  document.querySelector('.page').classList.add('reloading')
+  const started = Date.now()
+  try {
+    await loadAll()
+  } finally {
+    const held = 320 - (Date.now() - started)
+    if (held > 0) await new Promise(r => setTimeout(r, held))
+    apply.disabled = false
+    apply.textContent = label
+    document.querySelector('.page').classList.remove('reloading')
+    rangeNote.classList.remove('flash')
+    void rangeNote.offsetWidth          // restart the animation on a repeat click
+    rangeNote.classList.add('flash')
+  }
+}
+
 // ═══ KPIs + daily ═══
 async function loadKpis () {
   const k = await (await fetch(`/api/stores/${ID}/summary?${qsDates()}`)).json()
@@ -551,7 +578,7 @@ dClose.onclick = closeDrawer
 addEventListener('keydown', e => { if (e.key === 'Escape' && !drawer.hidden) closeDrawer() })
 
 // ═══ wiring ═══
-apply.onclick = loadAll
+apply.onclick = applyRange
 document.querySelectorAll('.preset').forEach(b => b.onclick = () => {
   if (b.dataset.p === 'all') { from.value = RANGE.from || ''; to.value = RANGE.to || '' }
   else {
@@ -559,7 +586,7 @@ document.querySelectorAll('.preset').forEach(b => b.onclick = () => {
     const start = new Date(end); start.setDate(start.getDate() - Number(b.dataset.p) + 1)
     from.value = iso(start); to.value = iso(end)
   }
-  loadAll()
+  applyRange()
 })
 const $q = document.getElementById('q')
 $q.addEventListener('input', () => { q = $q.value.trim(); qc.hidden = !q; paint() })
