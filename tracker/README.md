@@ -38,6 +38,11 @@ Ingest does not run on Vercel — it downloads multi-megabyte CSVs and takes
 minutes, while Vercel functions cap at 30–60s. It belongs on a machine you
 control: your own, or the UiPath VM.
 
+To run it on a schedule, use `scripts/nightly.bat` with Windows Task Scheduler,
+or **[N8N.md](N8N.md)** to drive it from n8n and get told when a night fails.
+Note that n8n schedules the ingest — it does not replace it; N8N.md explains why
+a Drive → Postgres node chain cannot.
+
 There is also a local-folder variant, for when the files are already on disk:
 
 ```bash

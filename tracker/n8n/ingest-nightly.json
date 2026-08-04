@@ -1,0 +1,147 @@
+{
+  "name": "Shopify tracker — nightly ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Nightly Drive → Postgres ingest\n\nRuns `scripts/n8n-ingest.bat`, which calls\n`ingest-drive.mjs --delete`.\n\n**Before activating:**\n1. `tracker/.env` needs a service account —\n   an API key cannot `--delete`. See DRIVE.md.\n2. Check `APPDIR` inside the .bat file.\n3. Settings → Timezone → `Asia/Karachi`,\n   or the 03:00 schedule is not 03:00.\n4. Replace the **Alert** node with Slack,\n   Email or Telegram.\n\nThe .bat always exits 0 on purpose — n8n\nthrows away stdout when a command exits\nnon-zero, and stdout is where the per-store\nresults are.",
+        "height": 420,
+        "width": 380,
+        "color": 4
+      },
+      "id": "b1a0f0c2-0001-4000-9000-000000000001",
+      "name": "Read me first",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-320, -40]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * *"
+            }
+          ]
+        }
+      },
+      "id": "b1a0f0c2-0001-4000-9000-000000000002",
+      "name": "Every night at 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [120, 180]
+    },
+    {
+      "parameters": {
+        "command": "\"E:\\Company_Projects\\Shopify_Stores\\tracker\\scripts\\n8n-ingest.bat\""
+      },
+      "id": "b1a0f0c2-0001-4000-9000-000000000003",
+      "name": "Run ingest",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [340, 180],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turn the ingest's stdout into fields the rest of the workflow can branch on.\n//\n// The exit code is read from the EXITCODE= line the wrapper prints, not from\n// the node's own exitCode: n8n discards stdout when a command exits non-zero,\n// which is exactly the case we most need the output for.\n\nconst r = $input.first().json;\nconst out = `${r.stdout || ''}\\n${r.stderr || ''}`.trim();\nconst lines = out.split('\\n').map(l => l.trim());\n\nconst codeLine = out.match(/EXITCODE=(\\d+)/);\nconst exitCode = codeLine ? Number(codeLine[1]) : Number(r.exitCode ?? 1);\n\nconst summary = out.match(/(\\d+) succeeded · (\\d+) failed · (\\d+)s/);\n\n// A ✓/✗ line in the summary block always carries the store id, e.g.\n//   ✗   2 Brooklinen           2026-08-04  FAILED — file not found\n// Requiring that id is what keeps preflight errors — which also start with ✗,\n// but are about credentials rather than a store — out of the failed list.\nconst storeLines = lines.filter(l => /^[✓✗]\\s+\\d+\\s/.test(l));\nconst failedStores = storeLines.filter(l => l.startsWith('✗'));\nconst blocker = lines.find(l => l.startsWith('✗') && !/^✗\\s+\\d+\\s/.test(l)) || null;\n\nconst idle = /nothing to do|0 to ingest/.test(out);\n\nlet text;\nif (summary) {\n  text = `Shopify ingest: ${summary[1]} succeeded, ${summary[2]} failed in ${summary[3]}s`;\n} else if (idle) {\n  text = 'Nothing new on Drive — every store and date is already ingested';\n} else if (blocker) {\n  text = `Shopify ingest never started — ${blocker.replace(/^✗\\s*/, '')}`;\n} else {\n  text = `Shopify ingest exited ${exitCode} without a summary — check the log`;\n}\n\nreturn [{\n  json: {\n    ok: exitCode === 0,\n    idle,\n    exitCode,\n    succeeded: summary ? Number(summary[1]) : 0,\n    failed: summary ? Number(summary[2]) : failedStores.length,\n    seconds: summary ? Number(summary[3]) : null,\n    stores: storeLines,\n    failedStores,\n    blocker,\n    text,\n    log: out.slice(-4000),\n  },\n}];"
+      },
+      "id": "b1a0f0c2-0001-4000-9000-000000000004",
+      "name": "Read the result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [560, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "every-store-succeeded",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "b1a0f0c2-0001-4000-9000-000000000005",
+      "name": "Every store OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [780, 180]
+    },
+    {
+      "parameters": {},
+      "id": "b1a0f0c2-0001-4000-9000-000000000006",
+      "name": "Night OK",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1020, 80]
+    },
+    {
+      "parameters": {},
+      "id": "b1a0f0c2-0001-4000-9000-000000000007",
+      "name": "Alert",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1020, 300]
+    },
+    {
+      "parameters": {
+        "content": "### Replace this with a notifier\n\nSlack / Email / Telegram — every one of\nthem can read:\n\n`{{ $json.text }}`\nOne-line summary.\n\n`{{ $json.failedStores }}`\nThe ✗ lines, one per store that failed.\n\n`{{ $json.log }}`\nLast 4,000 characters of output.\n\nExit code 1 means **at least one** store\nfailed, not that the night failed — the\nother stores still landed in Postgres.",
+        "height": 340,
+        "width": 300,
+        "color": 3
+      },
+      "id": "b1a0f0c2-0001-4000-9000-000000000008",
+      "name": "Notifier note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1200, 240]
+    }
+  ],
+  "connections": {
+    "Every night at 03:00": {
+      "main": [[{ "node": "Run ingest", "type": "main", "index": 0 }]]
+    },
+    "Run ingest": {
+      "main": [[{ "node": "Read the result", "type": "main", "index": 0 }]]
+    },
+    "Read the result": {
+      "main": [[{ "node": "Every store OK?", "type": "main", "index": 0 }]]
+    },
+    "Every store OK?": {
+      "main": [
+        [{ "node": "Night OK", "type": "main", "index": 0 }],
+        [{ "node": "Alert", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": -1,
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "shopify-tracker"
+  },
+  "tags": []
+}

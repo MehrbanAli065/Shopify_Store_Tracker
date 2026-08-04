@@ -1,0 +1,222 @@
+{
+  "name": "Shopify tracker — nightly ingest (remote n8n)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## For n8n Cloud / a separate server\n\nUse this **only** if n8n cannot run on the\nmachine that holds `tracker/`. Otherwise\nimport `ingest-nightly.json` instead — it\nneeds no new code and no public URL.\n\n**This will not work until three things exist:**\n\n1. `POST /api/ingest` and\n   `GET /api/ingest/status` in `app.mjs`\n   — not written yet, see N8N.md\n2. A public URL for the tracker machine\n   (Cloudflare Tunnel)\n3. `INGEST_TOKEN` in `tracker/.env`, and a\n   matching n8n **Header Auth** credential\n   (`X-Ingest-Token`)\n\nSet the URL in both HTTP nodes.",
+        "height": 440,
+        "width": 380,
+        "color": 3
+      },
+      "id": "c2b1e1d3-0002-4000-9000-000000000001",
+      "name": "Read me first",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-340, -60]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * *"
+            }
+          ]
+        }
+      },
+      "id": "c2b1e1d3-0002-4000-9000-000000000002",
+      "name": "Every night at 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [100, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://CHANGE-ME.trycloudflare.com/api/ingest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "c2b1e1d3-0002-4000-9000-000000000003",
+      "name": "Start the ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [320, 200],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "minutes"
+      },
+      "id": "c2b1e1d3-0002-4000-9000-000000000004",
+      "name": "Wait 2 minutes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [540, 200],
+      "webhookId": "c2b1e1d3-0002-4000-9000-0000000000ff"
+    },
+    {
+      "parameters": {
+        "url": "https://CHANGE-ME.trycloudflare.com/api/ingest/status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "c2b1e1d3-0002-4000-9000-000000000005",
+      "name": "Still running?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 200],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "still-running",
+              "leftValue": "={{ $json.running }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "under-the-hour",
+              "leftValue": "={{ $runIndex }}",
+              "rightValue": 30,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "c2b1e1d3-0002-4000-9000-000000000006",
+      "name": "Keep waiting?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [980, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The status endpoint answers either\n//   { running: true,  startedAt, out }\n//   { running: false, code, out, finishedAt }\n// and this flattens whichever arrived into the same shape the\n// Execute Command workflow produces, so notifiers are interchangeable.\n\nconst r = $input.first().json;\nconst out = String(r.out || '').trim();\n\nif (r.running) {\n  return [{\n    json: {\n      ok: false,\n      timedOut: true,\n      exitCode: null,\n      succeeded: 0,\n      failed: 0,\n      seconds: null,\n      stores: [],\n      failedStores: [],\n      text: 'Ingest still running after 60 minutes — stopped watching. It may yet finish; check /api/ingest/status.',\n      log: out.slice(-4000),\n    },\n  }];\n}\n\nconst lines = out.split('\\n').map(l => l.trim());\nconst summary = out.match(/(\\d+) succeeded · (\\d+) failed · (\\d+)s/);\n\n// A ✓/✗ line in the summary block always carries the store id. Requiring that\n// id keeps preflight errors — which also start with ✗, but are about\n// credentials rather than a store — out of the failed list.\nconst storeLines = lines.filter(l => /^[✓✗]\\s+\\d+\\s/.test(l));\nconst failedStores = storeLines.filter(l => l.startsWith('✗'));\nconst blocker = lines.find(l => l.startsWith('✗') && !/^✗\\s+\\d+\\s/.test(l)) || null;\n\nconst idle = /nothing to do|0 to ingest/.test(out);\nconst exitCode = Number(r.code ?? 1);\n\nlet text;\nif (summary) {\n  text = `Shopify ingest: ${summary[1]} succeeded, ${summary[2]} failed in ${summary[3]}s`;\n} else if (idle) {\n  text = 'Nothing new on Drive — every store and date is already ingested';\n} else if (blocker) {\n  text = `Shopify ingest never started — ${blocker.replace(/^✗\\s*/, '')}`;\n} else {\n  text = `Shopify ingest exited ${exitCode} without a summary — check the log`;\n}\n\nreturn [{\n  json: {\n    ok: exitCode === 0,\n    timedOut: false,\n    idle,\n    exitCode,\n    succeeded: summary ? Number(summary[1]) : 0,\n    failed: summary ? Number(summary[2]) : failedStores.length,\n    seconds: summary ? Number(summary[3]) : null,\n    stores: storeLines,\n    failedStores,\n    blocker,\n    text,\n    log: out.slice(-4000),\n  },\n}];"
+      },
+      "id": "c2b1e1d3-0002-4000-9000-000000000007",
+      "name": "Read the result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 320]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "every-store-succeeded",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "c2b1e1d3-0002-4000-9000-000000000008",
+      "name": "Every store OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1420, 320]
+    },
+    {
+      "parameters": {},
+      "id": "c2b1e1d3-0002-4000-9000-000000000009",
+      "name": "Night OK",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1640, 220]
+    },
+    {
+      "parameters": {},
+      "id": "c2b1e1d3-0002-4000-9000-00000000000a",
+      "name": "Alert",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1640, 440]
+    }
+  ],
+  "connections": {
+    "Every night at 03:00": {
+      "main": [[{ "node": "Start the ingest", "type": "main", "index": 0 }]]
+    },
+    "Start the ingest": {
+      "main": [[{ "node": "Wait 2 minutes", "type": "main", "index": 0 }]]
+    },
+    "Wait 2 minutes": {
+      "main": [[{ "node": "Still running?", "type": "main", "index": 0 }]]
+    },
+    "Still running?": {
+      "main": [[{ "node": "Keep waiting?", "type": "main", "index": 0 }]]
+    },
+    "Keep waiting?": {
+      "main": [
+        [{ "node": "Wait 2 minutes", "type": "main", "index": 0 }],
+        [{ "node": "Read the result", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read the result": {
+      "main": [[{ "node": "Every store OK?", "type": "main", "index": 0 }]]
+    },
+    "Every store OK?": {
+      "main": [
+        [{ "node": "Night OK", "type": "main", "index": 0 }],
+        [{ "node": "Alert", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": -1,
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "shopify-tracker"
+  },
+  "tags": []
+}
