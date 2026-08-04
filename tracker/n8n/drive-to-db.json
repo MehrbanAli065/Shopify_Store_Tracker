@@ -1,0 +1,208 @@
+{
+  "name": "Shopify tracker — Drive to Postgres",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Drive → Postgres, entirely inside n8n\n\nPress **Execute Workflow**. Every CSV in the\nDrive folder that has not been ingested yet is\ndownloaded, parsed, diffed and written.\n\nNothing runs on your laptop.\n\n### Two credentials, once\n\n**1 · Google Drive OAuth2**\nCredentials → Create → *Google Drive OAuth2 API*.\nClient ID and Secret are already in your repo at\n`tracker/secure/client_secrets.json`.\n\n**2 · Postgres**\nCredentials → Create → *Postgres*. Fill it from\nyour Neon connection string:\n\n| field | value |\n|---|---|\n| Host | ep-…-pooler.c-3.ap-southeast-1.aws.neon.tech |\n| Database | neondb |\n| User / Password | from the string |\n| SSL | require |\n| Port | 5432 |\n\nAttach both to the nodes that ask for them.\n\n### Before the first run\n\nThe database needs `ingest_store_day()`. It is\nalready applied to your Neon database — if you\never rebuild, run `npm run ingest:function`.\n\nThe folder id below is already yours. Re-running\nis safe: a store+date already recorded is skipped.",
+        "height": 720,
+        "width": 420,
+        "color": 4
+      },
+      "id": "e4d3a3f5-0004-4000-9000-000000000001",
+      "name": "Read me first",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-460, -140]
+    },
+    {
+      "parameters": {},
+      "id": "e4d3a3f5-0004-4000-9000-000000000002",
+      "name": "Execute workflow",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [40, 260]
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "'18pys1Pn4EHeycwWWvtj5StiqqFQTYTEs' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,modifiedTime,size)"
+            },
+            {
+              "name": "pageSize",
+              "value": "1000"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e4d3a3f5-0004-4000-9000-000000000003",
+      "name": "List Drive files",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 260]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT json_build_object(\n  'stores', (SELECT COALESCE(json_agg(json_build_object(\n                'id', id, 'name', name, 'csv_prefix', csv_prefix)), '[]'::json)\n               FROM stores WHERE active),\n  'done',   (SELECT COALESCE(json_agg(store_id || '|' || run_date), '[]'::json)\n               FROM scrape_runs WHERE status IN ('success','partial'))\n) AS meta",
+        "options": {}
+      },
+      "id": "e4d3a3f5-0004-4000-9000-000000000004",
+      "name": "Load stores and finished runs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [480, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Match each Drive file to a store, work out its date, and drop the ones\n// already recorded. Same rules as scripts/ingest-drive.mjs.\n\nconst files = $('List Drive files').all().flatMap(i => i.json.files || []);\nconst meta  = $input.first().json.meta;\nconst stores = meta.stores || [];\nconst done   = new Set((meta.done || []).map(String));\n\n/** Date from the filename if it carries one, else the file's own Drive timestamp. */\nconst dateFor = (name, modifiedTime) => {\n  let m = name.match(/(\\d{4})[-_](\\d{2})[-_](\\d{2})/);\n  if (m) return `${m[1]}-${m[2]}-${m[3]}`;\n  m = name.match(/(\\d{2})[-_](\\d{2})[-_](\\d{2,4})/);\n  if (m) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${m[2]}-${m[1]}`;\n  return new Date(modifiedTime).toISOString().slice(0, 10);\n};\n\n/** Longest matching csv_prefix wins, so similar domains cannot collide. */\nconst storeFor = name => {\n  const n = name.toLowerCase();\n  return stores\n    .filter(s => s.csv_prefix && n.startsWith(String(s.csv_prefix).toLowerCase()))\n    .sort((a, b) => String(b.csv_prefix).length - String(a.csv_prefix).length)[0] || null;\n};\n\nconst jobs = [], skipped = [], unmatched = [];\n\nfor (const f of files) {\n  if (!/\\.csv$/i.test(f.name)) continue;\n  const store = storeFor(f.name);\n  // Never guess. A file matching no store is reported and left alone.\n  if (!store) { unmatched.push(f.name); continue; }\n  const run_date = dateFor(f.name, f.modifiedTime);\n  if (done.has(`${store.id}|${run_date}`)) { skipped.push(`${f.name} → ${run_date}`); continue; }\n  jobs.push({\n    file_id: f.id, file_name: f.name,\n    store_id: store.id, store_name: store.name, run_date,\n    mb: ((Number(f.size) || 0) / 1e6).toFixed(1),\n  });\n}\n\nconsole.log(`${files.length} file(s) · ${jobs.length} to ingest · ${skipped.length} already done · ${unmatched.length} unmatched`);\nif (unmatched.length) console.log('unmatched (no store csv_prefix matches):', unmatched.join(', '));\nif (skipped.length)   console.log('already ingested:', skipped.join(', '));\n\nreturn jobs.map(j => ({ json: { ...j, _skipped: skipped, _unmatched: unmatched } }));"
+      },
+      "id": "e4d3a3f5-0004-4000-9000-000000000005",
+      "name": "Decide what to ingest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 260]
+    },
+    {
+      "parameters": {
+        "options": { "reset": false }
+      },
+      "id": "e4d3a3f5-0004-4000-9000-000000000006",
+      "name": "Loop over files",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [920, 260]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.file_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "alt", "value": "media" },
+            { "name": "supportsAllDrives", "value": "true" }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "csv"
+            }
+          },
+          "timeout": 300000
+        }
+      },
+      "id": "e4d3a3f5-0004-4000-9000-000000000007",
+      "name": "Download the CSV",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the CSV and build the one statement that does the whole ingest.\n//\n// This file is lib/csv-to-payload.mjs pasted in — the Code node cannot require\n// csv-parse, and there is a test that runs both over the same bytes and checks\n// they agree. The diff itself is NOT here: it lives in ingest_store_day(), so\n// n8n and scripts/ingest.mjs cannot drift apart.\n\n/**\n * RFC 4180. Quoted fields hold commas, newlines and doubled quotes, and\n * Shopify's Body (HTML) column holds all three. A quote only opens a field at\n * the start of one — mid-field quotes are literal, because product copy is full\n * of stray inch marks.\n */\nfunction parseCsv (text) {\n  const src = String(text).replace(/^\\uFEFF/, '');\n  const rows = [];\n  let row = [], field = '', quoted = false;\n\n  for (let i = 0; i < src.length; i++) {\n    const ch = src[i];\n    if (quoted) {\n      if (ch === '\"') {\n        if (src[i + 1] === '\"') { field += '\"'; i++; }\n        else quoted = false;\n      } else field += ch;\n      continue;\n    }\n    if (ch === '\"' && field === '') quoted = true;\n    else if (ch === ',') { row.push(field); field = ''; }\n    else if (ch === '\\n') { row.push(field); rows.push(row); row = []; field = ''; }\n    else if (ch !== '\\r') field += ch;\n  }\n  if (field !== '' || row.length) { row.push(field); rows.push(row); }\n  return rows;\n}\n\nconst s = v => (v ?? '').toString().trim();\nconst num = v => {\n  const n = parseFloat(String(v ?? '').replace(/,/g, ''));\n  return Number.isFinite(n) ? n : null;\n};\n/** Blank = sellable, explicit 0 = sold out, a real number = that many left. */\nconst available = raw => {\n  const t = s(raw);\n  if (t === '') return true;\n  const n = Number(t);\n  return Number.isFinite(n) ? n > 0 : true;\n};\n/** A 0 is a state marker, not a count — it never says how many there had been. */\nconst qty = raw => {\n  const t = s(raw);\n  if (t === '') return null;\n  const n = Number(t);\n  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;\n};\n\nfunction csvToPayload (text) {\n  const rows = parseCsv(text);\n  if (!rows.length) return { products: [], variants: [], rows: 0 };\n\n  const header = rows[0].map(h => s(h));\n  const idx = {};\n  header.forEach((h, n) => { if (!(h in idx)) idx[h] = n; });\n  const col = (row, name) => {\n    const n = idx[name];\n    return n === undefined ? '' : (row[n] ?? '');\n  };\n\n  const products = new Map();\n  const variants = new Map();\n  let dataRows = 0;\n\n  for (let r = 1; r < rows.length; r++) {\n    const row = rows[r];\n    if (row.every(c => s(c) === '')) continue;\n    dataRows++;\n\n    const handle = s(col(row, 'Handle'));\n    if (!handle) continue;\n\n    if (s(col(row, 'Title'))) {\n      const tags = s(col(row, 'Tags'));\n      products.set(handle, {\n        handle,\n        title:        s(col(row, 'Title')),\n        vendor:       s(col(row, 'Vendor')) || null,\n        product_type: s(col(row, 'Type')) || null,\n        tags:         tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],\n        published:    s(col(row, 'Published')) || null,\n        status:       s(col(row, 'Status')) || null,\n        image_src:    s(col(row, 'Image Src')) || null,\n      });\n    } else if (products.has(handle) && !products.get(handle).image_src && s(col(row, 'Image Src'))) {\n      products.get(handle).image_src = s(col(row, 'Image Src'));\n    }\n\n    const sku = s(col(row, 'Variant SKU'));\n    const price = s(col(row, 'Variant Price'));\n    if (!sku && !price) continue;\n\n    const o1 = s(col(row, 'Option1 Value'));\n    const o2 = s(col(row, 'Option2 Value'));\n    const o3 = s(col(row, 'Option3 Value'));\n    const variant_key = [sku, o1, o2, o3].join('|');   // SKUs repeat; options disambiguate\n    const key = handle + ' ' + variant_key;\n    if (variants.has(key)) continue;\n\n    variants.set(key, {\n      handle, variant_key,\n      sku: sku || null,\n      option1_name: s(col(row, 'Option1 Name')) || null, option1_value: o1 || null,\n      option2_name: s(col(row, 'Option2 Name')) || null, option2_value: o2 || null,\n      option3_name: s(col(row, 'Option3 Name')) || null, option3_value: o3 || null,\n      variant_image: s(col(row, 'Variant Image')) || null,\n      price: num(price),\n      compare_at: num(col(row, 'Variant Compare At Price')),\n      available: available(col(row, 'Inventory quantity')),\n      qty: qty(col(row, 'Inventory quantity')),\n    });\n  }\n\n  return { products: [...products.values()], variants: [...variants.values()], rows: dataRows };\n}\n\n// ── build the statement ───────────────────────────────────────────\n// batchSize is 1, so the loop node is holding exactly this file's job.\nconst job = $('Loop over files').first().json;\nconst csv = $input.first().json.csv ?? $input.first().json.data ?? '';\n\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(job.run_date))) {\n  throw new Error(`refusing to build SQL for a run_date that is not YYYY-MM-DD: ${job.run_date}`);\n}\nconst storeId = Number(job.store_id);\nif (!Number.isInteger(storeId)) throw new Error(`store_id is not a number: ${job.store_id}`);\n\nconst payload = csvToPayload(csv);\nif (!payload.variants.length) {\n  throw new Error(`${job.file_name} parsed to 0 variants — refusing to send an empty payload`);\n}\n\n// Dollar quoting carries any JSON safely; the tag cannot occur inside JSON,\n// because $ing$ is not a sequence JSON.stringify can emit.\nconst json = JSON.stringify(payload);\nconst quoted = str => \"'\" + String(str).replace(/'/g, \"''\") + \"'\";\n\nconst sql =\n  `SELECT ingest_store_day(${storeId}, ${quoted(job.run_date)}, ${quoted(job.file_name)}, ` +\n  `${payload.rows}, $ing$${json}$ing$::jsonb) AS result`;\n\nconsole.log(`${job.store_name} · ${job.run_date} · ${job.file_name} — ` +\n            `${payload.rows} rows → ${payload.products.length} products, ${payload.variants.length} variants`);\n\nreturn [{ json: { ...job, products: payload.products.length, variants: payload.variants.length, sql } }];"
+      },
+      "id": "e4d3a3f5-0004-4000-9000-000000000008",
+      "name": "Parse CSV and build the ingest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 380]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql }}",
+        "options": {}
+      },
+      "id": "e4d3a3f5-0004-4000-9000-000000000009",
+      "name": "Run ingest_store_day",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1620, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One line per store, plus whatever was skipped or unmatched.\n\nconst results = $('Run ingest_store_day').all().map(i => {\n  const r = i.json.result;\n  return typeof r === 'string' ? JSON.parse(r) : r;\n}).filter(Boolean);\n\nconst jobs = $('Decide what to ingest').all().map(i => i.json);\nconst first = jobs[0] || {};\n\nconst lines = results.map(r => {\n  const job = jobs.find(j => Number(j.store_id) === Number(r.store_id) && j.run_date === r.run_date);\n  const name = job ? job.store_name : `store ${r.store_id}`;\n  const counts = Object.entries(r.counts || {}).map(([k, v]) => `${k} ${v}`).join(', ');\n  return `${r.status === 'success' ? '✓' : '!'} ${name} · ${r.run_date} — ${r.changes} changes` +\n         (counts ? ` (${counts})` : '') +\n         (r.removals_skipped ? '  ⚠ feed collapsed, removals skipped' : '');\n});\n\nconst partial = results.filter(r => r.status !== 'success').length;\n\nconsole.log(lines.join('\\n') || 'nothing was ingested');\n\nreturn [{\n  json: {\n    ingested: results.length,\n    partial,\n    total_changes: results.reduce((n, r) => n + (r.changes || 0), 0),\n    already_done: first._skipped || [],\n    unmatched: first._unmatched || [],\n    stores: lines,\n    results,\n  },\n}];"
+      },
+      "id": "e4d3a3f5-0004-4000-9000-00000000000a",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1180, 140]
+    },
+    {
+      "parameters": {
+        "content": "### What each run does\n\n**Only new work.** A store+date already recorded\nas `success` or `partial` is skipped, so pressing\nExecute twice is harmless.\n\n**Unmatched files are named, never guessed at.**\nA CSV whose name matches no store's `csv_prefix`\nis listed in the Summary and left alone.\n\n**The diff is not in this workflow.** The Postgres\nfunction `ingest_store_day()` does it, which is\nwhy only ~2% of rows are written each night\ninstead of a full snapshot — and why n8n and\n`scripts/ingest.mjs` produce byte-identical\nhistory.\n\n### Files stay on Drive\n\nThis workflow does not delete them. Drive is at\n98%, so add a Google Drive → Delete File node\nafter **Run ingest_store_day** once you trust it.\nSafe to delete: the database is the archive.",
+        "height": 480,
+        "width": 380,
+        "color": 7
+      },
+      "id": "e4d3a3f5-0004-4000-9000-00000000000b",
+      "name": "Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1840, -120]
+    }
+  ],
+  "connections": {
+    "Execute workflow": {
+      "main": [[{ "node": "List Drive files", "type": "main", "index": 0 }]]
+    },
+    "List Drive files": {
+      "main": [[{ "node": "Load stores and finished runs", "type": "main", "index": 0 }]]
+    },
+    "Load stores and finished runs": {
+      "main": [[{ "node": "Decide what to ingest", "type": "main", "index": 0 }]]
+    },
+    "Decide what to ingest": {
+      "main": [[{ "node": "Loop over files", "type": "main", "index": 0 }]]
+    },
+    "Loop over files": {
+      "main": [
+        [{ "node": "Summary", "type": "main", "index": 0 }],
+        [{ "node": "Download the CSV", "type": "main", "index": 0 }]
+      ]
+    },
+    "Download the CSV": {
+      "main": [[{ "node": "Parse CSV and build the ingest", "type": "main", "index": 0 }]]
+    },
+    "Parse CSV and build the ingest": {
+      "main": [[{ "node": "Run ingest_store_day", "type": "main", "index": 0 }]]
+    },
+    "Run ingest_store_day": {
+      "main": [[{ "node": "Loop over files", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": -1,
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {},
+  "meta": { "instanceId": "shopify-tracker" },
+  "tags": []
+}

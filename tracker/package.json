@@ -13,6 +13,7 @@
     "start": "node server.mjs",
     "dev": "node server.mjs",
     "views": "node scripts/apply-views.mjs",
+    "ingest:function": "node scripts/apply-ingest-function.mjs",
     "ingest:folder": "node scripts/ingest-folder.mjs",
     "ingest:drive": "node scripts/ingest-drive.mjs",
     "seed": "node scripts/apply-seed.mjs",
