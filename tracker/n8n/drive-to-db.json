@@ -12,7 +12,10 @@
       "name": "Read me first",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-460, -140]
+      "position": [
+        -460,
+        -140
+      ]
     },
     {
       "parameters": {},
@@ -20,7 +23,10 @@
       "name": "Execute workflow",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [40, 260]
+      "position": [
+        40,
+        260
+      ]
     },
     {
       "parameters": {
@@ -58,7 +64,10 @@
       "name": "List Drive files",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [260, 260]
+      "position": [
+        260,
+        260
+      ]
     },
     {
       "parameters": {
@@ -70,7 +79,10 @@
       "name": "Load stores and finished runs",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [480, 260]
+      "position": [
+        480,
+        260
+      ]
     },
     {
       "parameters": {
@@ -80,17 +92,25 @@
       "name": "Decide what to ingest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [700, 260]
+      "position": [
+        700,
+        260
+      ]
     },
     {
       "parameters": {
-        "options": { "reset": false }
+        "options": {
+          "reset": false
+        }
       },
       "id": "e4d3a3f5-0004-4000-9000-000000000006",
       "name": "Loop over files",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [920, 260]
+      "position": [
+        920,
+        260
+      ]
     },
     {
       "parameters": {
@@ -100,8 +120,14 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "alt", "value": "media" },
-            { "name": "supportsAllDrives", "value": "true" }
+            {
+              "name": "alt",
+              "value": "media"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
           ]
         },
         "options": {
@@ -118,17 +144,23 @@
       "name": "Download the CSV",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1180, 380]
+      "position": [
+        1180,
+        380
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Parse the CSV and build the one statement that does the whole ingest.\n//\n// This file is lib/csv-to-payload.mjs pasted in — the Code node cannot require\n// csv-parse, and there is a test that runs both over the same bytes and checks\n// they agree. The diff itself is NOT here: it lives in ingest_store_day(), so\n// n8n and scripts/ingest.mjs cannot drift apart.\n\n/**\n * RFC 4180. Quoted fields hold commas, newlines and doubled quotes, and\n * Shopify's Body (HTML) column holds all three. A quote only opens a field at\n * the start of one — mid-field quotes are literal, because product copy is full\n * of stray inch marks.\n */\nfunction parseCsv (text) {\n  const src = String(text).replace(/^\\uFEFF/, '');\n  const rows = [];\n  let row = [], field = '', quoted = false;\n\n  for (let i = 0; i < src.length; i++) {\n    const ch = src[i];\n    if (quoted) {\n      if (ch === '\"') {\n        if (src[i + 1] === '\"') { field += '\"'; i++; }\n        else quoted = false;\n      } else field += ch;\n      continue;\n    }\n    if (ch === '\"' && field === '') quoted = true;\n    else if (ch === ',') { row.push(field); field = ''; }\n    else if (ch === '\\n') { row.push(field); rows.push(row); row = []; field = ''; }\n    else if (ch !== '\\r') field += ch;\n  }\n  if (field !== '' || row.length) { row.push(field); rows.push(row); }\n  return rows;\n}\n\nconst s = v => (v ?? '').toString().trim();\nconst num = v => {\n  const n = parseFloat(String(v ?? '').replace(/,/g, ''));\n  return Number.isFinite(n) ? n : null;\n};\n/** Blank = sellable, explicit 0 = sold out, a real number = that many left. */\nconst available = raw => {\n  const t = s(raw);\n  if (t === '') return true;\n  const n = Number(t);\n  return Number.isFinite(n) ? n > 0 : true;\n};\n/** A 0 is a state marker, not a count — it never says how many there had been. */\nconst qty = raw => {\n  const t = s(raw);\n  if (t === '') return null;\n  const n = Number(t);\n  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;\n};\n\nfunction csvToPayload (text) {\n  const rows = parseCsv(text);\n  if (!rows.length) return { products: [], variants: [], rows: 0 };\n\n  const header = rows[0].map(h => s(h));\n  const idx = {};\n  header.forEach((h, n) => { if (!(h in idx)) idx[h] = n; });\n  const col = (row, name) => {\n    const n = idx[name];\n    return n === undefined ? '' : (row[n] ?? '');\n  };\n\n  const products = new Map();\n  const variants = new Map();\n  let dataRows = 0;\n\n  for (let r = 1; r < rows.length; r++) {\n    const row = rows[r];\n    if (row.every(c => s(c) === '')) continue;\n    dataRows++;\n\n    const handle = s(col(row, 'Handle'));\n    if (!handle) continue;\n\n    if (s(col(row, 'Title'))) {\n      const tags = s(col(row, 'Tags'));\n      products.set(handle, {\n        handle,\n        title:        s(col(row, 'Title')),\n        vendor:       s(col(row, 'Vendor')) || null,\n        product_type: s(col(row, 'Type')) || null,\n        tags:         tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],\n        published:    s(col(row, 'Published')) || null,\n        status:       s(col(row, 'Status')) || null,\n        image_src:    s(col(row, 'Image Src')) || null,\n      });\n    } else if (products.has(handle) && !products.get(handle).image_src && s(col(row, 'Image Src'))) {\n      products.get(handle).image_src = s(col(row, 'Image Src'));\n    }\n\n    const sku = s(col(row, 'Variant SKU'));\n    const price = s(col(row, 'Variant Price'));\n    if (!sku && !price) continue;\n\n    const o1 = s(col(row, 'Option1 Value'));\n    const o2 = s(col(row, 'Option2 Value'));\n    const o3 = s(col(row, 'Option3 Value'));\n    const variant_key = [sku, o1, o2, o3].join('|');   // SKUs repeat; options disambiguate\n    const key = handle + ' ' + variant_key;\n    if (variants.has(key)) continue;\n\n    variants.set(key, {\n      handle, variant_key,\n      sku: sku || null,\n      option1_name: s(col(row, 'Option1 Name')) || null, option1_value: o1 || null,\n      option2_name: s(col(row, 'Option2 Name')) || null, option2_value: o2 || null,\n      option3_name: s(col(row, 'Option3 Name')) || null, option3_value: o3 || null,\n      variant_image: s(col(row, 'Variant Image')) || null,\n      price: num(price),\n      compare_at: num(col(row, 'Variant Compare At Price')),\n      available: available(col(row, 'Inventory quantity')),\n      qty: qty(col(row, 'Inventory quantity')),\n    });\n  }\n\n  return { products: [...products.values()], variants: [...variants.values()], rows: dataRows };\n}\n\n// ── build the statement ───────────────────────────────────────────\n// batchSize is 1, so the loop node is holding exactly this file's job.\nconst job = $('Loop over files').first().json;\nconst csv = $input.first().json.csv ?? $input.first().json.data ?? '';\n\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(job.run_date))) {\n  throw new Error(`refusing to build SQL for a run_date that is not YYYY-MM-DD: ${job.run_date}`);\n}\nconst storeId = Number(job.store_id);\nif (!Number.isInteger(storeId)) throw new Error(`store_id is not a number: ${job.store_id}`);\n\nconst payload = csvToPayload(csv);\nif (!payload.variants.length) {\n  throw new Error(`${job.file_name} parsed to 0 variants — refusing to send an empty payload`);\n}\n\n// Dollar quoting carries any JSON safely; the tag cannot occur inside JSON,\n// because $ing$ is not a sequence JSON.stringify can emit.\nconst json = JSON.stringify(payload);\nconst quoted = str => \"'\" + String(str).replace(/'/g, \"''\") + \"'\";\n\nconst sql =\n  `SELECT ingest_store_day(${storeId}, ${quoted(job.run_date)}, ${quoted(job.file_name)}, ` +\n  `${payload.rows}, $ing$${json}$ing$::jsonb) AS result`;\n\nconsole.log(`${job.store_name} · ${job.run_date} · ${job.file_name} — ` +\n            `${payload.rows} rows → ${payload.products.length} products, ${payload.variants.length} variants`);\n\nreturn [{ json: { ...job, products: payload.products.length, variants: payload.variants.length, sql } }];"
+        "jsCode": "// Parse the CSV and build the one statement that does the whole ingest.\n//\n// Everything above the divider is lib/csv-to-payload.mjs verbatim — the Code\n// node cannot require csv-parse, and a test runs both over the same bytes and\n// checks they agree. The diff itself is NOT here: it lives in\n// ingest_store_day(), so n8n and scripts/ingest.mjs cannot drift apart.\n\n/**\n * RFC 4180. Quoted fields may hold commas, newlines and doubled quotes, and\n * Shopify's Body (HTML) column holds all three.\n *\n * A quote only opens a quoted field at the start of one. Mid-field quotes are\n * literal — csv-parse behaves this way under relax_quotes, and product\n * descriptions contain plenty of stray inch marks.\n *\n * Written around indexOf/slice rather than a character loop. The character\n * version was clear but did ~8 million iterations on a 7.9 MB export, and the\n * n8n Code node runs inside a sandboxed VM where that took minutes. indexOf and\n * slice are native, so the sandbox barely slows them down.\n */\nfunction parseCsv (text) {\n  const src = String(text).replace(/^﻿/, '')\n  const n = src.length\n  const rows = []\n  let row = []\n  let i = 0\n\n  while (i < n) {\n    let field\n\n    if (src[i] === '\"') {\n      // Quoted: hop from quote to quote. A doubled quote is an escaped one and\n      // the field continues; a lone quote ends it.\n      let j = i + 1\n      let buf = null                      // stays null while there is no escape\n      let start = j\n      for (;;) {\n        const k = src.indexOf('\"', j)\n        if (k < 0) { field = (buf ?? '') + src.slice(start); i = n; break }\n        if (src[k + 1] === '\"') {\n          buf = (buf ?? '') + src.slice(start, k + 1)\n          j = k + 2\n          start = j\n          continue\n        }\n        field = buf === null ? src.slice(start, k) : buf + src.slice(start, k)\n        i = k + 1\n        break\n      }\n    } else {\n      // Unquoted: run to whichever delimiter comes first.\n      let c = src.indexOf(',', i); if (c < 0) c = n\n      let l = src.indexOf('\\n', i); if (l < 0) l = n\n      const end = c < l ? c : l\n      field = src.slice(i, end)\n      if (field.charCodeAt(field.length - 1) === 13) field = field.slice(0, -1)  // trailing \\r\n      i = end\n    }\n\n    row.push(field)\n\n    if (i >= n) break\n    if (src[i] === ',') { i++; continue }\n    if (src[i] === '\\r') i++\n    if (src[i] === '\\n') { rows.push(row); row = []; i++; continue }\n    // A stray character after a closing quote: skip to the next delimiter\n    // rather than losing the rest of the file to it.\n    let c = src.indexOf(',', i); if (c < 0) c = n\n    let l = src.indexOf('\\n', i); if (l < 0) l = n\n    if (c < l) { i = c + 1 } else { rows.push(row); row = []; i = l + 1 }\n  }\n\n  if (row.length) rows.push(row)\n  return rows\n}\n\nconst s = v => (v ?? '').toString().trim()\n\nconst num = v => {\n  const n = parseFloat(String(v ?? '').replace(/,/g, ''))\n  return Number.isFinite(n) ? n : null\n}\n\n/** Blank = sellable, explicit 0 = sold out, a real number = that many left. */\nconst available = raw => {\n  const t = s(raw)\n  if (t === '') return true\n  const n = Number(t)\n  return Number.isFinite(n) ? n > 0 : true\n}\n\n/**\n * The raw Inventory quantity, or null when the store gave nothing usable. A 0\n * is a state marker, not a count — it says the variant sold out, never how many\n * there had been, so it is not reported as a quantity.\n */\nconst qty = raw => {\n  const t = s(raw)\n  if (t === '') return null\n  const n = Number(t)\n  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null\n}\n\nfunction csvToPayload (text) {\n  const rows = parseCsv(text)\n  if (!rows.length) return { products: [], variants: [], rows: 0 }\n\n  // Column positions are resolved once. Looking each cell up by name meant a\n  // string lookup and a closure call ~20 times per row across tens of thousands\n  // of rows — cheap natively, and not cheap inside the sandbox the n8n Code\n  // node runs in.\n  const idx = {}\n  rows[0].forEach((h, n) => { const k = s(h); if (!(k in idx)) idx[k] = n })\n  const at = name => (name in idx ? idx[name] : -1)\n\n  const iHandle  = at('Handle')\n  const iTitle   = at('Title')\n  const iVendor  = at('Vendor')\n  const iType    = at('Type')\n  const iTags    = at('Tags')\n  const iPub     = at('Published')\n  const iStatus  = at('Status')\n  const iImage   = at('Image Src')\n  const iSku     = at('Variant SKU')\n  const iPrice   = at('Variant Price')\n  const iCompare = at('Variant Compare At Price')\n  const iVImage  = at('Variant Image')\n  const iInv     = at('Inventory quantity')\n  const iO1n = at('Option1 Name'), iO1v = at('Option1 Value')\n  const iO2n = at('Option2 Name'), iO2v = at('Option2 Value')\n  const iO3n = at('Option3 Name'), iO3v = at('Option3 Value')\n\n  const g = (row, i) => (i < 0 ? '' : s(row[i]))\n\n  const products = new Map()   // handle          -> product\n  const variants = new Map()   // handle\\0key     -> variant\n  let dataRows = 0\n\n  for (let r = 1; r < rows.length; r++) {\n    const row = rows[r]\n    // csv-parse's skip_empty_lines drops a blank line, which this parser\n    // returns as a single empty field. A row of genuinely empty columns is a\n    // real row and stays counted, exactly as csv-parse counts it.\n    if (row.length === 1 && row[0] === '') continue\n    dataRows++\n\n    const handle = g(row, iHandle)\n    if (!handle) continue\n\n    // The parent row carries the product-level fields; image-only rows that\n    // follow it may still be the first to name an image.\n    const title = g(row, iTitle)\n    if (title) {\n      const tags = g(row, iTags)\n      products.set(handle, {\n        handle,\n        title,\n        vendor:       g(row, iVendor) || null,\n        product_type: g(row, iType) || null,\n        tags:         tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],\n        published:    g(row, iPub) || null,\n        status:       g(row, iStatus) || null,\n        image_src:    g(row, iImage) || null,\n      })\n    } else {\n      const p = products.get(handle)\n      if (p && !p.image_src) {\n        const img = g(row, iImage)\n        if (img) p.image_src = img\n      }\n    }\n\n    // a variant row has a SKU or a price\n    const sku   = g(row, iSku)\n    const price = g(row, iPrice)\n    if (!sku && !price) continue\n\n    const o1 = g(row, iO1v), o2 = g(row, iO2v), o3 = g(row, iO3v)\n    const variant_key = [sku, o1, o2, o3].join('|')   // SKUs repeat; options disambiguate\n    const key = handle + '\u0000' + variant_key\n    if (variants.has(key)) continue\n\n    const inv = iInv < 0 ? '' : row[iInv]\n    variants.set(key, {\n      handle, variant_key,\n      sku: sku || null,\n      option1_name: g(row, iO1n) || null, option1_value: o1 || null,\n      option2_name: g(row, iO2n) || null, option2_value: o2 || null,\n      option3_name: g(row, iO3n) || null, option3_value: o3 || null,\n      variant_image: g(row, iVImage) || null,\n      price: num(price),\n      compare_at: num(iCompare < 0 ? '' : row[iCompare]),\n      // Inventory quantity does carry the stock signal: blank means sellable,\n      // an explicit 0 means sold out. Checked against the store's live\n      // /products.json feed — 99.2% agreement over 3,406 variants.\n      available: available(inv),\n      qty: qty(inv),\n    })\n  }\n\n  return {\n    products: [...products.values()],\n    variants: [...variants.values()],\n    rows: dataRows,\n  }\n}\n\n// ── build the statement ───────────────────────────────────────────\n// batchSize is 1, so the loop node is holding exactly this file's job.\nconst job = $('Loop over files').first().json;\nconst csv = $input.first().json.csv ?? $input.first().json.data ?? '';\n\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(job.run_date))) {\n  throw new Error(`refusing to build SQL for a run_date that is not YYYY-MM-DD: ${job.run_date}`);\n}\nconst storeId = Number(job.store_id);\nif (!Number.isInteger(storeId)) throw new Error(`store_id is not a number: ${job.store_id}`);\n\nconst payload = csvToPayload(csv);\nif (!payload.variants.length) {\n  throw new Error(`${job.file_name} parsed to 0 variants — refusing to send an empty payload`);\n}\n\n// Dollar quoting carries any JSON safely; the tag cannot occur inside JSON,\n// because $ing$ is not a sequence JSON.stringify can emit.\nconst json = JSON.stringify(payload);\nconst quoted = str => \"'\" + String(str).replace(/'/g, \"''\") + \"'\";\n\nconst sql =\n  `SELECT ingest_store_day(${storeId}, ${quoted(job.run_date)}, ${quoted(job.file_name)}, ` +\n  `${payload.rows}, $ing$${json}$ing$::jsonb) AS result`;\n\nconsole.log(`${job.store_name} · ${job.run_date} · ${job.file_name} — ` +\n            `${payload.rows} rows → ${payload.products.length} products, ${payload.variants.length} variants`);\n\nreturn [{ json: { ...job, products: payload.products.length, variants: payload.variants.length, sql } }];"
       },
       "id": "e4d3a3f5-0004-4000-9000-000000000008",
       "name": "Parse CSV and build the ingest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1400, 380]
+      "position": [
+        1400,
+        380
+      ]
     },
     {
       "parameters": {
@@ -140,7 +172,10 @@
       "name": "Run ingest_store_day",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1620, 380]
+      "position": [
+        1620,
+        380
+      ]
     },
     {
       "parameters": {
@@ -150,7 +185,10 @@
       "name": "Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1180, 140]
+      "position": [
+        1180,
+        140
+      ]
     },
     {
       "parameters": {
@@ -163,36 +201,107 @@
       "name": "Notes",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [1840, -120]
+      "position": [
+        1840,
+        -120
+      ]
     }
   ],
   "connections": {
     "Execute workflow": {
-      "main": [[{ "node": "List Drive files", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "List Drive files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "List Drive files": {
-      "main": [[{ "node": "Load stores and finished runs", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Load stores and finished runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Load stores and finished runs": {
-      "main": [[{ "node": "Decide what to ingest", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Decide what to ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Decide what to ingest": {
-      "main": [[{ "node": "Loop over files", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop over files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Loop over files": {
       "main": [
-        [{ "node": "Summary", "type": "main", "index": 0 }],
-        [{ "node": "Download the CSV", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download the CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Download the CSV": {
-      "main": [[{ "node": "Parse CSV and build the ingest", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Parse CSV and build the ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parse CSV and build the ingest": {
-      "main": [[{ "node": "Run ingest_store_day", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Run ingest_store_day",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Run ingest_store_day": {
-      "main": [[{ "node": "Loop over files", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop over files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -203,6 +312,8 @@
     "saveManualExecutions": true
   },
   "pinData": {},
-  "meta": { "instanceId": "shopify-tracker" },
+  "meta": {
+    "instanceId": "shopify-tracker"
+  },
   "tags": []
 }
