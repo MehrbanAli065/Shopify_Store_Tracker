@@ -57,7 +57,8 @@ built; pick by where n8n lives, not by preference.
 > `workflows.example.com` cannot see `E:\…\tracker` and Option A is out.
 >
 > Worth knowing before you choose: the ingest needs nothing that is specific to
-> the Windows machine. Drive and Neon are both reached over the network. If the
+> the Windows machine. Drive and a hosted database are both reached over the
+> network. If the
 > n8n server has shell access and Node 20+, moving `tracker/` there is the
 > sturdiest arrangement of all — no tunnel, and it does not stop working when a
 > desktop goes to sleep.

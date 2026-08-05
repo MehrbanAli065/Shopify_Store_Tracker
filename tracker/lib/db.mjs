@@ -1,8 +1,8 @@
 /**
  * Dual-mode database layer.
  *
- *   DATABASE_URL set   →  hosted PostgreSQL (Neon / Supabase / any Postgres)  ← production
- *   DATABASE_URL unset →  PGlite, an embedded Postgres file under data/       ← local dev
+ *   DATABASE_URL set   →  PostgreSQL, local or hosted                    ← normal
+ *   DATABASE_URL unset →  PGlite, an embedded Postgres file under data/  ← no install
  *
  * Both expose the same q / one / exec API and the same $1-style parameters,
  * so nothing above this file has to know which one is running.
@@ -21,8 +21,8 @@ if (fs.existsSync(path.join(root, '.env'))) {
   config({ path: path.join(root, '.env') })
 }
 
-// Vercel's Postgres/Neon integration injects one of these depending on how the
-// store was created, so accept any of them rather than failing confusingly.
+// Vercel's Postgres integrations inject one of these depending on how the store
+// was created, so accept any of them rather than failing confusingly.
 const URL =
   process.env.DATABASE_URL ||
   process.env.POSTGRES_URL ||
@@ -50,14 +50,16 @@ async function pool () {
       ssl: /localhost|127\.0\.0\.1/.test(URL) ? false : { rejectUnauthorized: false },
       max: Number(process.env.PG_MAX || 3),        // serverless: keep it small
       idleTimeoutMillis: 10_000,
-      // A suspended Neon compute took 13.5s to wake in testing, and the old
+      // A suspended serverless compute took 13.5s to wake in testing, and the old
       // 15s ceiling left almost nothing over it: the first visit after an idle
       // spell failed rather than waited.
       connectionTimeoutMillis: 30_000,
       keepAlive: true
     })
 
-    // Neon suspends its compute when idle and the sockets die with it. Without
+    // Serverless Postgres suspends its compute when idle and the sockets die
+    // with it — a local server never does this, but the handler costs nothing.
+    // Without
     // a handler here, pg raises that as an unhandled error on the pool; with
     // one, the dead client is simply discarded and the next call opens a fresh
     // connection. This is the difference between a page that recovers and one

@@ -11,8 +11,13 @@ So deployment is two things, not one:
 | Piece | Where it goes |
 |---|---|
 | Frontend + API | **Vercel** |
-| Database | **Hosted Postgres** (Neon or Supabase — both have a free tier) |
+| Database | **Hosted Postgres** — any provider, or your own server |
 | Ingest (CSV → DB) | **Stays off Vercel.** Run it from your machine or the UiPath VM |
+
+> **A local PostgreSQL cannot serve the deployed site.** Vercel runs in a data
+> centre; `localhost` there is Vercel's own container, not your machine. If the
+> database is on your laptop, the site can only be used locally with `npm start`.
+> This is the one decision deployment actually rests on.
 
 > **Why ingest cannot run on Vercel:** it reads multi-megabyte CSVs from disk and takes
 > minutes for 100 stores. Vercel functions cap at 30–60s and have no file access. Ingest
@@ -33,31 +38,34 @@ If the project is already on Vercel, you do not need a separate account:
 2. Pick a region near your users → **Create**
 3. Connect it to the project when prompted
 
-Vercel provisions Neon underneath and injects the connection string into the project
+Vercel provisions the database and injects the connection string into the project
 automatically (`DATABASE_URL` / `POSTGRES_URL` — the app accepts either). **Redeploy**
 once so the running build picks the variable up.
 
 To run migrations and ingest from your machine, copy the string from
 **Storage → your database → `.env.local` tab** into `tracker/.env`.
 
-### Or create it directly on Neon
+### Or bring your own
 
-**Neon** is the easiest for this (recommended):
-
-1. Go to <https://neon.tech> → sign up → **Create project**
-2. Name it `shopify-tracker`, pick the region nearest your users
-3. On the dashboard open **Connection Details**
-4. Select **Pooled connection** and copy the string. It looks like:
+Any PostgreSQL 14+ works. Nothing in this project uses a provider-specific feature —
+the same schema and the same `ingest_store_day()` run on PGlite locally, on a managed
+service, and on `apt install postgresql`.
 
 ```
-postgresql://user:PASSWORD@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require
+postgresql://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require
 ```
 
-> Use the **pooled** (`-pooler`) endpoint. Serverless functions open many short
-> connections and a direct endpoint will run out.
+Two things to get right whoever hosts it:
 
-**Supabase** works identically — *Project Settings → Database → Connection string →
-**Transaction pooler***. Take that one, not the direct connection.
+- **Take the pooled endpoint** if the provider offers one (often marked `-pooler`, or
+  "Transaction pooler"). Serverless functions open many short connections and a direct
+  endpoint runs out of them.
+- **It has to be reachable from Vercel.** Own-server setups need port 5432 open to the
+  internet and TLS on, which is why a managed service is usually less work.
+
+> Storage is the thing to size in advance. Measured on real data: about 1 GB of
+> `products` + `variants` for 100 stores, plus roughly 2–6 GB of history per year.
+> Most free tiers are 0.5 GB.
 
 ---
 
@@ -72,7 +80,7 @@ cp .env.example .env
 Open `.env` and paste your connection string:
 
 ```
-DATABASE_URL=postgresql://user:PASSWORD@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require
 ```
 
 Check the connection:
@@ -81,7 +89,7 @@ Check the connection:
 npm run migrate:check
 ```
 
-You should see `target: PostgreSQL · ep-xxx… [postgres]` and `database is empty`.
+You should see `target: PostgreSQL · your-host/your-db  [postgres]` and `database is empty`.
 
 Now create the schema and the store registry:
 
@@ -120,7 +128,7 @@ Verify:
 npm run dev
 ```
 
-The banner should now read `db PostgreSQL · ep-xxx… [postgres]`. Open
+The banner should now read `db PostgreSQL · your-host/your-db  [postgres]`. Open
 <http://localhost:3000> — you are looking at the cloud database through the local server.
 If the stores and reports appear, deployment will work.
 
@@ -182,7 +190,7 @@ UiPath drops CSVs on Drive
 you (or a scheduled job) run:
         node scripts/ingest.mjs --store N --date YYYY-MM-DD --file <path>
         ↓
-Neon / Supabase
+Your database provider
         ↓
 Vercel site shows it immediately — no redeploy needed
 ```
@@ -199,7 +207,7 @@ Project Settings → Environment Variables, then **Redeploy** — Vercel only pi
 env vars at build time.
 
 **`too many connections`**
-You are on the direct endpoint. Switch to the pooled one (`-pooler` on Neon,
+You are on the direct endpoint. Switch to the pooled one (often marked `-pooler`,
 Transaction pooler on Supabase) and keep `PG_MAX=3`.
 
 **`self-signed certificate` / TLS errors**
@@ -228,6 +236,6 @@ Lower the `limit` query parameter, or narrow the date range. `maxDuration` is se
 REVOKE UPDATE, DELETE ON variant_history FROM PUBLIC;
 ```
 
-4. **Watch the free tiers.** Neon free is 0.5 GB; Vercel Hobby is non-commercial.
+4. **Watch the free tiers.** Most managed Postgres free tiers are 0.5 GB, which 100 stores exceed on the base tables alone; Vercel Hobby is non-commercial.
    At 100 stores × ~15k change rows/day you will outgrow the free database in a few
    months — budget for the paid tier.

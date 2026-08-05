@@ -4,7 +4,7 @@ The CSVs land on the UiPath VM **before** they are uploaded to Drive. Ingesting
 them there needs no Google credentials at all — the files are already on disk.
 
 ```
-UiPath scrapes  ─→  C:\...\Scrapped_Csv_Files\   ─→  ingest  ─→  Neon (cloud)
+UiPath scrapes  ─→  C:\...\Scrapped_Csv_Files\   ─→  ingest  ─→  PostgreSQL
                             │
                             └─────────────────────→  Drive (backup copy)
 ```
@@ -73,13 +73,16 @@ the cloud database, so it is not needed.
 
 ### 4 · Point it at the database
 
-Create `C:\shopify-tracker\tracker\.env` with the **same** connection string this
-machine uses — Vercel → Storage → your database → `.env.local` tab:
+Create `C:\shopify-tracker\tracker\.env` with the **same** connection string the
+rest of the setup uses:
 
 ```
-DATABASE_URL=postgresql://neondb_owner:PASSWORD@ep-xxx-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require
 PG_MAX=3
 ```
+
+> This has to be a database the VM can actually reach. A PostgreSQL running on
+> someone's laptop is not one — `localhost` on the VM means the VM.
 
 No `DRIVE_FOLDER_ID`, no Google keys — this route does not touch Drive.
 
@@ -101,7 +104,7 @@ npm run migrate:check
 Expected — note it reports the existing tables rather than "empty":
 
 ```
-  target: PostgreSQL · ep-xxx-pooler.ap-southeast-1.aws.neon.tech/neondb  [postgres]
+  target: PostgreSQL · your-host/your-db  [postgres]
   existing tables: products, scrape_runs, stores, variant_history, variants
   rows: {"products":2481,"variants":13499,...}
 ```

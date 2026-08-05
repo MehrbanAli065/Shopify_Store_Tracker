@@ -106,7 +106,7 @@ const psql   = tool('psql')
 
 const dump = spawn(pgDump, [
   SOURCE,
-  '--no-owner',            // local role names differ from Neon's
+  '--no-owner',            // the local role names differ from the source's
   '--no-privileges',
   '--clean', '--if-exists', // replace whatever is already there
   '--quote-all-identifiers',
