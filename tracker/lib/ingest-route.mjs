@@ -76,13 +76,17 @@ export default function ingestRoute (ROOT) {
   if (process.env.VERCEL) return router
   if (!process.env.INGEST_TOKEN) return router
 
-  router.use(express.json({ limit: '8kb' }))
-  router.use((req, res, next) =>
+  // Attached per route, never with a bare router.use(). This router is mounted
+  // at the app root, so an unpathed middleware runs on EVERY request — which is
+  // how setting INGEST_TOKEN once made the whole site answer 401.
+  const guard = (req, res, next) =>
     tokenOk(req.get('X-Ingest-Token'))
       ? next()
-      : res.status(401).json({ error: 'bad or missing X-Ingest-Token' }))
+      : res.status(401).json({ error: 'bad or missing X-Ingest-Token' })
 
-  router.post('/api/ingest', (req, res) => {
+  const body = express.json({ limit: '8kb' })
+
+  router.post('/api/ingest', guard, body, (req, res) => {
     if (running) {
       return res.status(409).json({
         error: 'an ingest is already running',
@@ -125,7 +129,7 @@ export default function ingestRoute (ROOT) {
     res.status(202).json({ started: true, startedAt, args: argv })
   })
 
-  router.get('/api/ingest/status', (_req, res) => {
+  router.get('/api/ingest/status', guard, (_req, res) => {
     if (running) {
       return res.json({
         running: true,
