@@ -21,7 +21,8 @@
     "reports:init": "node scripts/apply-reports.mjs",
     "audit": "node scripts/audit.mjs",
     "audit:facts": "node scripts/audit-facts.mjs",
-    "pack:vm": "cd .. && python tracker/scripts/pack-vm.py"
+    "pack:vm": "cd .. && python tracker/scripts/pack-vm.py",
+    "ingest:server": "node scripts/ingest-server.mjs"
   },
   "dependencies": {
     "csv-parse": "^5.6.0",
