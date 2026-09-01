@@ -1,556 +1,583 @@
 /**
- * Renders the audit into a standalone HTML document.
+ * The sales report, as HTML.
  *
- * Charts are server-drawn SVG rather than a charting library: the document has
- * to survive being saved, mailed and printed, and a canvas that needs a CDN
- * script is blank in all three. It also means the PDF matches the screen.
+ * Rewritten to answer the question a reader actually opens it with — how is this
+ * store trading — rather than to walk the specification top to bottom.
  *
- * Every figure comes from the facts object. Where a spec variable could not be
- * computed the section still appears, stating which source is missing — an
- * absent number is a finding, and quietly dropping the section would leave the
- * reader thinking the audit had covered it.
+ * The old version was built from a sample template that assumed order lines, ad
+ * spend and supplier terms. None of that exists in a public product feed, so
+ * whole sections were a heading followed by an explanation of what was missing:
+ * the opportunity stack, the three plays, the GMV trajectory, the ad-waste
+ * block, the confidence interval, and an appendix restating every formula. They
+ * are gone. One short paragraph at the end says what the report is built on,
+ * which is all a reader needs to judge it.
+ *
+ * The rule everywhere below: a measure is rendered only when it was actually
+ * computed. Anything the feed could not answer is silently absent rather than
+ * present as an apology.
  */
 
-const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
-const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ESC[c])
-const nf = v => (v == null ? '—' : Number(v).toLocaleString('en-US'))
-const pc = v => (v == null ? '—' : `${v}%`)
-const dt = d => {
-  if (!d) return '—'
-  const [y, m, day] = String(d).slice(0, 10).split('-')
-  return `${Number(day)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m - 1]} ${y}`
-}
+const esc = s => String(s ?? '').replace(/[&<>"]/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 
-/* ── SVG charts ───────────────────────────────────────────────────── */
+const nf = n => n == null ? '—' : new Intl.NumberFormat('en-US').format(
+  typeof n === 'number' && !Number.isInteger(n) ? Math.round(n * 100) / 100 : n)
 
-/** Grouped bars: assortment share against out-of-stock rate, per size. */
-function sizeCurveSvg (rows) {
-  if (!rows?.length) return '<p class="none">No size option on this feed, so no size curve.</p>'
-  const r = rows.slice(0, 12)
-  const W = 1000, H = 300, PAD_L = 44, PAD_B = 46, PAD_T = 14
-  const max = Math.max(50, ...r.map(x => Math.max(x.share ?? 0, x.oos_rate ?? 0)))
-  const step = Math.ceil(max / 5 / 10) * 10 || 10
-  const top = Math.ceil(max / step) * step
-  const plotH = H - PAD_B - PAD_T
-  const bandW = (W - PAD_L) / r.length
-  const barW = Math.min(26, bandW * 0.3)
-  const y = v => PAD_T + plotH - (v / top) * plotH
+/** A measure is worth showing when the data behind it existed. */
+const has = m => m && (m.status === 'computed' || m.status === 'adapted')
+const val = m => has(m) ? m.value : null
 
-  const grid = []
-  for (let v = 0; v <= top; v += step) {
-    grid.push(`<line x1="${PAD_L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" class="g"/>`,
-              `<text x="${PAD_L - 8}" y="${y(v) + 4}" class="ax" text-anchor="end">${v}%</text>`)
-  }
-  const bars = r.map((x, i) => {
-    const cx = PAD_L + bandW * i + bandW / 2
-    const a = x.share ?? 0, b = x.oos_rate ?? 0
-    return `
-      <rect x="${cx - barW - 2}" y="${y(a)}" width="${barW}" height="${plotH - (y(a) - PAD_T)}" class="b1"/>
-      <rect x="${cx + 2}"        y="${y(b)}" width="${barW}" height="${plotH - (y(b) - PAD_T)}" class="b2"/>
-      <text x="${cx}" y="${H - PAD_B + 18}" class="ax" text-anchor="middle">${esc(String(x.size).slice(0, 10))}</text>`
-  }).join('')
+const dt = s => s
+  ? new Date(String(s).slice(0, 10) + 'T00:00:00Z')
+      .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  : '—'
 
-  return `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img"
-    aria-label="Share of the range against out-of-stock rate, by size">
-    ${grid.join('')}<line x1="${PAD_L}" x2="${W}" y1="${y(0)}" y2="${y(0)}" class="axis"/>${bars}</svg>`
-}
+/* ── pieces ───────────────────────────────────────────────────────── */
 
-/** Horizontal band bar: how the range sits across discount depth. */
-function bandSvg (bands) {
-  const total = bands.reduce((s, b) => s + b.variants, 0)
-  if (!total) return ''
-  const cols = ['#16140F', '#6F5746', '#B0532D', '#8A3F22', '#A39C8F']
-  let x = 0
-  const segs = bands.map((b, i) => {
-    const w = (b.variants / total) * 100
-    const s = `<rect x="${x}" y="0" width="${w}" height="10" fill="${cols[i % cols.length]}"/>`
-    x += w
-    return s
-  }).join('')
-  return `<svg viewBox="0 0 100 10" preserveAspectRatio="none" class="bandbar">${segs}</svg>
-    <div class="bandkey">${bands.map((b, i) =>
-      `<span><i style="background:${cols[i % cols.length]}"></i>${esc(b.band)} · ${nf(b.variants)}</span>`).join('')}</div>`
-}
-
-/* ── blocks ───────────────────────────────────────────────────────── */
-
-/** A spec variable that could not be computed, stated rather than hidden. */
-function gap (f, key) {
-  const miss = (f.missing || []).map(m => `<code>${esc(m)}</code>`).join(' ')
-  return `<div class="gap">
-    <div class="gap-h">${esc(f.label || key)}</div>
-    ${f.spec_formula ? `<div class="gap-f">${esc(f.spec_formula)}</div>` : ''}
-    <div class="gap-w">${f.why ? esc(f.why) : ''}</div>
-    ${miss ? `<div class="gap-m">needs ${miss}</div>` : ''}
-    ${f.have ? `<div class="gap-y">available: ${esc(f.have)}</div>` : ''}
+const fig = (label, value, sub, tone) => `
+  <div class="fig${tone ? ' ' + tone : ''}">
+    <div class="fig-v">${value}</div>
+    <div class="fig-l">${esc(label)}</div>
+    ${sub ? `<div class="fig-s">${esc(sub)}</div>` : ''}
   </div>`
+
+/** Horizontal bar, wherever one row should be read against the others. */
+const bar = (pct, tone) =>
+  `<span class="bar${tone ? ' ' + tone : ''}" style="width:${Math.max(1, Math.min(100, pct || 0))}%"></span>`
+
+/**
+ * One stacked column per observed day. Built from divs rather than SVG so it
+ * reflows with the page and prints, and because the shape is the point here —
+ * an exact axis would invite reading values off it that the tooltip gives
+ * properly.
+ */
+function dayChart (rows, cur) {
+  if (!rows.length) return ''
+  const max = Math.max(1, ...rows.map(r => r.total))
+  const parts = [
+    ['new_items', 'new', 'New'],
+    ['price_down', 'down', 'Price down'],
+    ['price_up', 'up', 'Price up'],
+    ['stock_out', 'out', 'Out of stock'],
+    ['stock_in', 'in', 'Back in stock'],
+    ['removed', 'gone', 'Removed'],
+    ['relisted', 'back', 'Relisted'],
+  ]
+  const step = Math.max(1, Math.ceil(rows.length / 9))
+  return `
+    <div class="chart">
+      <div class="cols">
+        ${rows.map(r => `
+          <div class="col" title="${esc(r.date)} · ${nf(r.total)} changes">
+            <div class="stack" style="height:${Math.max(2, r.total / max * 100)}%">
+              ${parts.map(([k, cls]) => r[k]
+                ? `<span class="sg ${cls}" style="flex:${r[k]}"></span>` : '').join('')}
+            </div>
+          </div>`).join('')}
+      </div>
+      <div class="axis">
+        ${rows.map((r, i) => `<span>${i % step === 0 || i === rows.length - 1
+          ? esc(r.date.slice(8) + ' ' + new Date(r.date + 'T00:00:00Z').toLocaleDateString('en-GB', { month: 'short' }))
+          : ''}</span>`).join('')}
+      </div>
+      <div class="key">
+        ${parts.map(([, cls, label]) => `<span><i class="${cls}"></i>${label}</span>`).join('')}
+      </div>
+    </div>`
 }
 
-const gapGrid = (obj, keys) =>
-  `<div class="gaps">${keys.filter(k => obj[k]?.status === 'unavailable')
-    .map(k => gap(obj[k], k)).join('')}</div>`
-
-const read = (label, text) => `<div class="diag-read">
-  <div class="diag-read-marker">${esc(label)}</div><p>${esc(text)}</p></div>`
-
-const stat = (label, value, sub) => `<div class="stat">
-  <div class="stat-label">${esc(label)}</div>
-  <div class="stat-value">${value}</div>
-  ${sub ? `<div class="stat-sub">${esc(sub)}</div>` : ''}</div>`
+const section = (num, title, lead, body) => `
+  <section>
+    <div class="s-head">
+      <span class="s-num">${num}</span>
+      <div>
+        <h2>${esc(title)}</h2>
+        ${lead ? `<p class="lead">${esc(lead)}</p>` : ''}
+      </div>
+    </div>
+    ${body}
+  </section>`
 
 /* ── the document ─────────────────────────────────────────────────── */
 
 export function renderReport ({ facts, narrative, id, docNo, coverage }) {
-  const f = facts, n = narrative
+  const f = facts
+  const n = narrative || {}
   const cur = f.store.currency
-  const sizes = f.size_curve.size_mix.rows
-  const brokenRows = f.broken_timeline.rows
+  const t = f.top_sellers || { rows: [], days_covered: 0, distinct_products: 0 }
+  const p = f.pricing || {}
+  const a = f.assortment || {}
+  const sc = f.size_curve || {}
+  const so = f.stockout || {}
+  const bt = f.broken_timeline || {}
+  const cov = (f.confidence && f.confidence.coverage) || {}
+  const days = f.window.run_dates.length
 
-  const maxDays = Math.max(1, ...brokenRows.map(r => r.days_observed))
+  /* ── the band across the top: the store in six numbers ── */
+  const figures = [
+    has(f.headline.style_count) &&
+      fig('Styles', nf(val(f.headline.style_count)), 'distinct products seen'),
+    has(f.headline.variant_count) &&
+      fig('Variants', nf(val(f.headline.variant_count)), 'size and colour combinations'),
+    has(so.oos_rate) &&
+      fig('Out of stock', val(so.oos_rate) + '%', 'of all variant-days',
+          val(so.oos_rate) > 25 ? 'warn' : ''),
+    has(f.headline.broken_style_pct) &&
+      fig('Broken on size', val(f.headline.broken_style_pct) + '%',
+          `${nf(f.headline.broken_style_pct.numerator)} of ${nf(f.headline.broken_style_pct.denominator)} sized styles`,
+          val(f.headline.broken_style_pct) > 40 ? 'warn' : ''),
+    has(p.price_drops) &&
+      fig('Price drops', nf(val(p.price_drops)), `against ${nf(val(p.price_rises))} rises`),
+    t.rows.length &&
+      fig('Best sellers', nf(t.distinct_products), `held a place over ${t.days_covered} days`),
+  ].filter(Boolean).join('')
+
+  /* ── best sellers, the store's own ranking ── */
+  const maxDaysT = Math.max(1, ...t.rows.map(r => r.days_ranked))
+  const topOut = t.rows.filter(r => r.variants && r.in_stock_variants === 0)
+  const topBody = t.rows.length ? `
+    <div class="figs small">
+      ${fig('Held a place', nf(t.distinct_products), 'distinct products')}
+      ${fig('Arrived', nf(t.entered), 'newly in the top 20', 'up')}
+      ${fig('Dropped out', nf(t.dropped), 'left before the window ended', 'down')}
+      ${fig('Held throughout', nf(t.held), `all ${t.days_covered} days`)}
+    </div>
+    ${topOut.length ? `<p class="alert"><b>${topOut.length}</b> of these best sellers
+      ${topOut.length === 1 ? 'is' : 'are'} out of stock in every variant right now —
+      the most expensive kind of gap, because demand is proven.</p>` : ''}
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>Product</th><th>Type</th><th class="r">Days ranked</th>
+          <th class="r">Price</th><th class="r">Discount</th><th class="r">In stock</th><th class="r">Seen</th>
+        </tr></thead>
+        <tbody>
+          ${t.rows.map(r => `
+          <tr>
+            <td class="prod">
+              <div class="pt">${esc(r.title)}</div>
+              <div class="ph">${esc(r.handle)}</div>
+            </td>
+            <td class="dim">${esc(r.product_type || '—')}</td>
+            <td class="r nowrap">
+              <span class="dbar">${bar(r.days_ranked / maxDaysT * 100)}</span><b>${r.days_ranked}</b>
+            </td>
+            <td class="r mono">${r.price == null ? '—' : nf(r.price)}</td>
+            <td class="r mono">${r.discount_pct ? `<span class="down">${r.discount_pct}%</span>` : '—'}</td>
+            <td class="r mono">${r.variants
+              ? `<span class="${r.in_stock_variants === 0 ? 'up' : ''}">${r.in_stock_variants}/${r.variants}</span>`
+              : '—'}</td>
+            <td class="r mono dim nowrap">${esc(r.first_day.slice(5))} – ${esc(r.last_day.slice(5))}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <p class="foot">Ranked by how many of the ${t.days_covered} covered days each product held
+    a place. The export marks a best seller but does not number it, so time held is the
+    ranking — a product marked every day is a steadier seller than one marked once.</p>`
+    : `<p class="none">This store's export does not carry the best-seller column, so there is
+       nothing to rank. That is a property of the file, not a gap in the store.</p>`
+
+  /* ── stock health ── */
+  const breakRows = (sc.first_to_break && sc.first_to_break.rows) || []
+  const sizeRows = (sc.size_mix && sc.size_mix.rows) || []
+  const maxShare = Math.max(1, ...sizeRows.map(r => r.share || 0))
+  const maxOos = Math.max(1, ...breakRows.map(r => r.out_rate || 0))
+  const stockBody = `
+    <div class="grid2">
+      <div>
+        <h3>How much of the range was sellable</h3>
+        ${has(so.oos_rate) ? `
+        <div class="split">
+          <div class="split-bar">
+            <span class="seg in" style="width:${100 - val(so.oos_rate)}%"></span>
+            <span class="seg out" style="width:${val(so.oos_rate)}%"></span>
+          </div>
+          <div class="split-key">
+            <span><i class="in"></i>In stock · ${nf(val(so.in_stock_variant_days))} variant-days</span>
+            <span><i class="out"></i>Out of stock · ${nf(val(so.oos_variant_days))}</span>
+          </div>
+        </div>` : ''}
+        ${n.reads && n.reads.stockout ? `<p>${esc(n.reads.stockout)}</p>` : ''}
+      </div>
+      <div>
+        <h3>The range by size</h3>
+        ${sizeRows.length ? `
+        <div class="rows">
+          ${sizeRows.slice(0, 8).map(r => `
+            <div class="row">
+              <span class="k mono">${esc(r.size)}</span>
+              <span class="t">${bar((r.share || 0) / maxShare * 100)}</span>
+              <span class="v mono">${r.share}% · ${nf(r.variants)}</span>
+            </div>`).join('')}
+        </div>` : ''}
+      </div>
+      <div>
+        <h3>Sizes that run out first</h3>
+        ${breakRows.length ? `
+        <div class="rows">
+          ${breakRows.slice(0, 8).map(r => `
+            <div class="row">
+              <span class="k mono">${esc(r.size)}</span>
+              <span class="t">${bar((r.out_rate || 0) / maxOos * 100, 'warn')}</span>
+              <span class="v mono">${r.out_rate}%</span>
+            </div>`).join('')}
+        </div>
+        ${has(sc.core_sizes) ? `<p class="foot">Core sizes by volume: <b>${esc(String(val(sc.core_sizes)))}</b>.</p>` : ''}`
+        : '<p class="none">This range does not carry a size option.</p>'}
+      </div>
+    </div>`
+
+  /* ── styles with a hole in the ladder ── */
+  const bRows = bt.rows || []
+  const maxBroken = Math.max(1, ...bRows.map(r => r.days_broken || 0))
+  const brokenBody = bRows.length ? `
+    <div class="tw">
+      <table>
+        <thead><tr><th>Style</th><th>Type</th><th class="r">Sizes missing</th><th class="r">Days broken</th></tr></thead>
+        <tbody>
+          ${bRows.slice(0, 10).map(r => `
+          <tr>
+            <td class="prod"><div class="pt">${esc(r.title)}</div><div class="ph">${esc(r.handle)}</div></td>
+            <td class="dim">${esc(r.product_type || '—')}</td>
+            <td class="r mono">${esc((r.sizes_missing || []).join(', ') || '—')}</td>
+            <td class="r nowrap"><span class="dbar">${bar((r.days_broken || 0) / maxBroken * 100, 'warn')}</span><b>${r.days_broken}</b></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${has(bt.observed_breaks) ? `<p class="foot">${nf(val(bt.observed_breaks))} styles were seen breaking
+      inside the window; the ten carrying it longest are shown.</p>` : ''}`
+    : ''
+
+  /* ── pricing ── */
+  const drops = p.biggest_drops || []
+  const bands = p.discount_bands || []
+  const maxBand = Math.max(1, ...bands.map(b => b.variants || 0))
+  const pricingBody = `
+    <div class="figs small">
+      ${has(p.price_drops) ? fig('Drops', nf(val(p.price_drops)), null, 'down') : ''}
+      ${has(p.price_rises) ? fig('Rises', nf(val(p.price_rises)), null, 'up') : ''}
+      ${has(p.discount_moves) ? fig('Discount only', nf(val(p.discount_moves))) : ''}
+      ${has(p.avg_move_pct) ? fig('Average move', val(p.avg_move_pct) + '%') : ''}
+      ${has(p.max_move_pct) ? fig('Largest move', val(p.max_move_pct) + '%') : ''}
+    </div>
+    <div class="grid2">
+      <div>
+        <h3>Where the range sits on discount</h3>
+        ${bands.length ? `
+        <div class="rows">
+          ${bands.map(b => `
+            <div class="row">
+              <span class="k">${esc(b.band)}</span>
+              <span class="t">${bar((b.variants || 0) / maxBand * 100)}</span>
+              <span class="v mono">${nf(b.variants)}</span>
+            </div>`).join('')}
+        </div>` : ''}
+        ${p.price_spread ? `<p class="foot">Prices run ${nf(p.price_spread.min)} to
+          ${nf(p.price_spread.max)} ${esc(cur)}, median <b>${nf(p.price_spread.median)}</b>.</p>` : ''}
+      </div>
+      <div>
+        <h3>Steepest drops</h3>
+        ${drops.length ? `
+        <div class="drops">
+          ${drops.slice(0, 6).map(d => `
+            <div class="drop">
+              <div class="d-t">${esc(d.title)}</div>
+              ${d.variant ? `<div class="d-v">${esc(d.variant)}</div>` : ''}
+              <div class="d-n mono">${nf(d.from)} → <b>${nf(d.to)}</b> ${esc(cur)}
+                <span class="down">${d.diff_pct}%</span>
+                ${d.on ? `<span class="d-on">on ${esc(d.on.slice(5))}</span>` : ''}
+                ${d.discount_pct ? `<span class="d-on">now ${d.discount_pct}% off</span>` : ''}</div>
+            </div>`).join('')}
+        </div>` : '<p class="none">No price moves in this window.</p>'}
+      </div>
+    </div>`
+
+  /* ── assortment ── */
+  const cats = a.categories || []
+  const maxCat = Math.max(1, ...cats.map(c => c.variants || c.n || 0))
+  const assortBody = `
+    <div class="figs small">
+      ${has(a.new_variants) ? fig('Added', nf(val(a.new_variants)), null, 'up') : ''}
+      ${has(a.removed_variants) ? fig('Removed', nf(val(a.removed_variants)), null, 'down') : ''}
+      ${has(a.went_out) ? fig('Went out of stock', nf(val(a.went_out))) : ''}
+      ${has(a.came_back) ? fig('Came back', nf(val(a.came_back))) : ''}
+      ${has(a.relisted) ? fig('Relisted', nf(val(a.relisted))) : ''}
+    </div>
+    ${cats.length ? `
+    <h3>By category</h3>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>Type</th><th class="r">Styles</th><th class="r">Variants</th>
+          <th class="r">Out of stock</th><th class="r">Avg price</th><th class="r">Avg discount</th>
+        </tr></thead>
+        <tbody>
+          ${cats.slice(0, 10).map(c => `
+          <tr>
+            <td><b>${esc(c.product_type || '—')}</b></td>
+            <td class="r mono">${nf(c.styles)}</td>
+            <td class="r nowrap">
+              <span class="dbar">${bar((c.variants || 0) / maxCat * 100)}</span><b>${nf(c.variants)}</b>
+            </td>
+            <td class="r mono">${c.oos_rate == null ? '—'
+              : `<span class="${c.oos_rate > 30 ? 'up' : ''}">${c.oos_rate}%</span>`}</td>
+            <td class="r mono">${nf(c.avg_price)}</td>
+            <td class="r mono">${c.avg_discount ? c.avg_discount + '%' : '—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <p class="foot">Out-of-stock share is of that category's variant-days, so a small
+    category that is always short reads as badly as a large one that is short for a week.</p>` : ''}
+    ${n.reads && n.reads.assortment ? `<p>${esc(n.reads.assortment)}</p>` : ''}`
+
+  /* ── what to do ── */
+  const actions = (n.actions || []).map((x, i) => `
+    <div class="act">
+      <span class="act-n">${i + 1}</span>
+      <div>
+        <h3>${esc(x.title)}</h3>
+        <p>${esc(x.why)}</p>
+        <p class="watch"><span class="caps">Watch</span>${esc(x.watch)}</p>
+      </div>
+    </div>`).join('')
+
+  /* Numbering follows what is actually rendered, so a store with no broken
+     ladders does not show a gap where section 04 would have been. */
+  let k = 1
+  const num = () => String(++k).padStart(2, '0')
 
   return `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sales Curve Audit · ${esc(f.store.name)}</title>
+<title>Sales Report · ${esc(f.store.name)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Spectral:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ink:#16140F; --ink-soft:#38332C; --gray:#6F6960; --gray-light:#A39C8F;
-  --cream:#F6F2E8; --cream-deep:#EDE7D8; --paper:#FBF8F0;
-  --accent:#B0532D; --accent-deep:#8A3F22; --accent-soft:#E8CFBE;
-  --line:#D9D2C2; --line-soft:#E5DFD0; --good:#5C7A4F;
-  --serif:'Fraunces','Times New Roman',serif;
-  --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
-  --mono:'JetBrains Mono','Courier New',monospace;
+  --paper:#fbfbfa; --surface:#ffffff; --panel:#f2f4f5;
+  --ink:#12161a; --ink-2:#3f4a52; --muted:#6d787f;
+  --line:#e2e6e8; --rule:#c8cfd3;
+  --accent:#1b3a6b; --accent-soft:#dde5f0;
+  --copper:#9a5b2d; --up:#9c3524; --down:#14655c;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0e1114; --surface:#151a1e; --panel:#1c2328;
+  --ink:#e9ecee; --ink-2:#b4bdc3; --muted:#8a949b;
+  --line:#242c31; --rule:#37424a;
+  --accent:#7ba4de; --accent-soft:#152538;
+  --copper:#d69a5f; --up:#e08469; --down:#59bdb0;
+}}
+:root[data-theme="dark"]{
+  --paper:#0e1114; --surface:#151a1e; --panel:#1c2328;
+  --ink:#e9ecee; --ink-2:#b4bdc3; --muted:#8a949b;
+  --line:#242c31; --rule:#37424a;
+  --accent:#7ba4de; --accent-soft:#152538;
+  --copper:#d69a5f; --up:#e08469; --down:#59bdb0;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:var(--sans);background:var(--cream);color:var(--ink);line-height:1.55;font-size:15px;-webkit-font-smoothing:antialiased}
-.doc{max-width:1180px;margin:0 auto;background:var(--paper);box-shadow:0 0 60px rgba(22,20,15,.06)}
-section{padding:clamp(48px,6vw,92px) clamp(20px,5vw,80px);position:relative}
+body{background:var(--paper);color:var(--ink);
+  font:400 16.5px/1.62 Spectral,Georgia,serif;-webkit-font-smoothing:antialiased}
+.doc{max-width:1080px;margin:0 auto;background:var(--surface);box-shadow:0 0 0 1px var(--line)}
+h1,h2,h3{font-family:Spectral,Georgia,serif;font-weight:600;letter-spacing:-.015em;line-height:1.16}
+.caps,th,.fig-l,.s-num,.eyebrow{font-family:Archivo,system-ui,sans-serif}
+.mono,.fig-v{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+.top{padding:34px clamp(20px,5vw,58px);border-bottom:1px solid var(--line);
+  display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.eyebrow{font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:9px}
+h1{font-size:clamp(27px,3.6vw,38px);text-wrap:balance}
+.sub{color:var(--muted);font-size:14px;margin-top:6px}
+.doc-meta{text-align:right;font-family:"IBM Plex Mono",monospace;font-size:11.5px;
+  color:var(--muted);line-height:1.9;font-variant-numeric:tabular-nums}
+
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:1px;
+  background:var(--line);border-bottom:1px solid var(--line)}
+.figs.small{border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  margin-bottom:22px;border-bottom:1px solid var(--line)}
+.fig{background:var(--surface);padding:17px 18px}
+.fig-v{font-size:25px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.fig-l{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);margin-top:7px}
+.fig-s{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.4}
+.fig.warn .fig-v{color:var(--up)}
+.fig.up .fig-v{color:var(--up)}
+.fig.down .fig-v{color:var(--down)}
+
+section{padding:clamp(30px,4vw,50px) clamp(20px,5vw,58px)}
 section+section{border-top:1px solid var(--line)}
-h1,h2,h3,h4{font-family:var(--serif);font-weight:400;line-height:1.06;letter-spacing:-.02em}
-h2{font-size:clamp(28px,4vw,50px);margin-bottom:14px}
-h3{font-size:clamp(20px,2.4vw,27px);line-height:1.2;font-weight:500}
-p{color:var(--ink-soft);line-height:1.65}
-.lead{font-family:var(--serif);font-size:clamp(17px,1.8vw,22px);line-height:1.45;font-weight:300;color:var(--ink-soft);max-width:760px}
-.eyebrow{font-size:11px;font-weight:500;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin-bottom:26px;display:flex;align-items:center;gap:14px}
-.eyebrow::before{content:"";width:36px;height:1px;background:var(--accent);flex:0 0 36px}
-.mono{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--gray)}
-.caps{font-size:11px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--gray)}
-.none{font-size:13px;color:var(--gray);font-style:italic}
+.s-head{display:flex;gap:16px;align-items:baseline;margin-bottom:22px}
+.s-num{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--copper);
+  padding-top:6px;font-variant-numeric:tabular-nums}
+h2{font-size:clamp(21px,2.6vw,27px);text-wrap:balance}
+h3{font-size:16px;margin-bottom:11px}
+.lead{color:var(--ink-2);font-size:16px;margin-top:5px;max-width:62ch}
+p{color:var(--ink-2);margin-top:11px;max-width:66ch}
+.foot{font-size:13.5px;color:var(--muted);margin-top:13px;max-width:70ch}
+.none{font-size:14px;color:var(--muted);font-style:italic;margin-top:8px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:34px}
 
-/* cover */
-.cover{padding:clamp(40px,5vw,72px) clamp(20px,5vw,80px);min-height:88vh;display:flex;flex-direction:column;justify-content:space-between;gap:40px}
-.cover-top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding-bottom:28px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-.wordmark{font-family:var(--serif);font-size:21px;font-weight:500}
-.wordmark sup{font-size:9px;font-weight:400;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-left:6px;vertical-align:top;position:relative;top:4px}
-.cover-meta{text-align:right}.cover-meta .mono{display:block;line-height:1.8}
-.cover-title h1{font-size:clamp(44px,9vw,112px);line-height:.96;font-weight:300;letter-spacing:-.035em}
-.cover-title h1 em{font-style:italic;font-weight:400;color:var(--accent)}
-.cover-subtitle{font-family:var(--serif);font-size:clamp(17px,2vw,23px);font-weight:300;font-style:italic;color:var(--gray);margin-top:28px;max-width:660px;line-height:1.4}
-.cover-bottom{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:28px;padding-top:28px;border-top:1px solid var(--line)}
-.cover-bottom .caps{margin-bottom:8px;display:block}
-.cover-bottom .value{font-family:var(--serif);font-size:18px}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-family:Archivo,sans-serif;font-size:13.5px}
+th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);background:var(--panel);white-space:nowrap}
+td.r,th.r{text-align:right}
+.nowrap{white-space:nowrap}
+.prod{min-width:230px}
+.pt{font-weight:600;line-height:1.3}
+.ph{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);
+  margin-top:2px;word-break:break-all}
+.dim{color:var(--muted)}
+.up{color:var(--up)}
+.down{color:var(--down)}
 
-/* headline */
-.headline-number{font-family:var(--serif);font-size:clamp(96px,17vw,210px);font-weight:300;line-height:.9;letter-spacing:-.05em;margin:14px 0 22px}
-.headline-number .denom{font-size:.4em;color:var(--gray);margin-left:6px}
-.headline-context{font-family:var(--serif);font-size:clamp(18px,2.3vw,26px);line-height:1.4;font-weight:300;color:var(--ink-soft);max-width:780px;font-style:italic}
-.headline-context strong{font-weight:500;color:var(--ink);font-style:normal}
-.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-top:56px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.stat{padding:26px 22px;border-right:1px solid var(--line-soft)}
-.stat:last-child{border-right:none}
-.stat-label{font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--gray);margin-bottom:12px;line-height:1.4}
-.stat-value{font-family:var(--serif);font-size:38px;line-height:1;letter-spacing:-.02em}
-.stat-value .small{font-size:.55em;color:var(--gray);margin-left:2px}
-.stat-sub{font-size:12px;color:var(--gray);margin-top:9px;line-height:1.4}
+.bar{display:inline-block;height:5px;border-radius:3px;background:var(--accent);vertical-align:middle}
+.bar.warn{background:var(--copper)}
+.dbar{display:inline-block;width:64px;margin-right:9px;vertical-align:middle;
+  background:var(--panel);border-radius:3px;line-height:0}
+.rows{display:flex;flex-direction:column;gap:7px}
+.row{display:grid;grid-template-columns:88px 1fr auto;gap:11px;align-items:center;
+  font-family:Archivo,sans-serif;font-size:13px}
+.row .k{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .t{background:var(--panel);border-radius:3px;line-height:0}
+.row .v{color:var(--muted);font-size:12px;white-space:nowrap}
 
-/* diagnostic */
-.diagnostic-block{margin-top:52px}
-.diagnostic-block+.diagnostic-block{margin-top:76px;padding-top:56px;border-top:1px solid var(--line-soft)}
-.diag-num{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.1em}
-.diag-title{font-family:var(--serif);font-size:clamp(22px,2.8vw,31px);font-weight:500;line-height:1.2;margin:6px 0 8px;letter-spacing:-.015em}
-.diag-sub{font-family:var(--serif);font-size:17px;font-style:italic;font-weight:300;color:var(--gray);margin-bottom:26px}
-.chart-frame{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:clamp(16px,2.5vw,30px);margin-top:20px}
-.chart-legend{display:flex;gap:24px;margin-bottom:16px;font-size:12px;color:var(--gray);flex-wrap:wrap}
-.chart-legend span{display:flex;align-items:center;gap:8px}
-.chart-legend i{width:12px;height:12px;border-radius:2px;display:inline-block}
-svg.chart{width:100%;height:auto;display:block}
-svg.chart .g{stroke:rgba(217,210,194,.6);stroke-width:1}
-svg.chart .axis{stroke:#D9D2C2;stroke-width:1}
-svg.chart .ax{font-family:var(--mono);font-size:11px;fill:var(--gray-light)}
-svg.chart .b1{fill:#D9D2C2}
-svg.chart .b2{fill:#B0532D}
-.diag-read{display:grid;grid-template-columns:auto 1fr;gap:14px;margin-top:24px;padding:18px 22px;background:var(--cream-deep);border-left:2px solid var(--accent);border-radius:0 4px 4px 0}
-.diag-read-marker{font-family:var(--serif);font-weight:500;color:var(--accent);font-size:14px;font-style:italic;white-space:nowrap}
-.diag-read p{font-size:14px;line-height:1.6}
+.split{margin:4px 0 12px}
+.split-bar{display:flex;height:11px;border-radius:6px;overflow:hidden;background:var(--panel)}
+.seg.in{background:var(--down)}
+.seg.out{background:var(--copper)}
+.split-key{display:flex;gap:18px;flex-wrap:wrap;margin-top:9px;
+  font-family:Archivo,sans-serif;font-size:12px;color:var(--muted)}
+.split-key i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+.split-key i.in{background:var(--down)}
+.split-key i.out{background:var(--copper)}
 
-/* reveal cards */
-.reveal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin-top:20px}
-.reveal-card{padding:26px;border-radius:4px;border:1px solid var(--line);background:var(--paper)}
-.reveal-card.bright{background:var(--ink);border-color:var(--ink)}
-.reveal-card.bright .reveal-label{color:var(--gray-light)}
-.reveal-card.bright .reveal-num{color:var(--paper)}
-.reveal-card.bright .reveal-foot{color:var(--accent-soft)}
-.reveal-label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gray);margin-bottom:16px;font-weight:500}
-.reveal-num{font-family:var(--serif);font-size:clamp(40px,6vw,60px);line-height:1;letter-spacing:-.02em}
-.reveal-num .pct{font-size:.45em;color:var(--gray);margin-left:3px}
-.reveal-foot{font-size:12px;color:var(--gray);margin-top:14px;line-height:1.5}
+/* daily shape */
+.chart{margin-top:4px}
+.cols{display:flex;align-items:flex-end;gap:3px;height:132px;padding:0 1px;
+  border-bottom:1px solid var(--rule)}
+.col{flex:1;height:100%;display:flex;align-items:flex-end;min-width:0}
+.stack{width:100%;display:flex;flex-direction:column-reverse;border-radius:2px 2px 0 0;
+  overflow:hidden;background:var(--panel)}
+.sg{width:100%;min-height:1px}
+.sg.new{background:var(--accent)}
+.sg.down{background:var(--down)}
+.sg.up{background:var(--up)}
+.sg.out{background:var(--copper)}
+.sg.in{background:#7aa6a0}
+.sg.gone{background:#8d939a}
+.sg.back{background:#b9c3cc}
+.axis{display:flex;gap:3px;padding-top:7px;font-family:"IBM Plex Mono",monospace;
+  font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.axis span{flex:1;min-width:0;text-align:center;white-space:nowrap;overflow:hidden}
+.key{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-family:Archivo,sans-serif;
+  font-size:11.5px;color:var(--muted)}
+.key i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+.key i.new{background:var(--accent)} .key i.down{background:var(--down)}
+.key i.up{background:var(--up)} .key i.out{background:var(--copper)}
+.key i.in{background:#7aa6a0} .key i.gone{background:#8d939a} .key i.back{background:#b9c3cc}
 
-/* timeline */
-.timeline-row{display:grid;grid-template-columns:minmax(150px,220px) 1fr minmax(96px,140px);align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--line-soft)}
-.timeline-row:last-child{border-bottom:none}
-.timeline-sku{font-family:var(--serif);font-size:14px;font-weight:500;line-height:1.3;overflow-wrap:anywhere}
-.timeline-sku .sku-meta{display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-top:2px}
-.timeline-bar{position:relative;height:18px;background:var(--cream-deep);border-radius:1px;overflow:hidden}
-.timeline-fill{position:absolute;top:0;bottom:0;left:0;background:var(--good)}
-.timeline-broken{position:absolute;top:0;bottom:0;background:var(--accent);opacity:.85}
-.timeline-right{text-align:right;font-family:var(--mono);font-size:11px;color:var(--accent)}
-.timeline-right .base{color:var(--gray);font-style:italic}
+/* a best seller with nothing left to sell is worth calling out */
+.alert{background:var(--accent-soft);border-left:3px solid var(--accent);
+  padding:11px 15px;border-radius:0 8px 8px 0;font-size:14.5px;margin:0 0 16px;max-width:none}
 
-/* tables */
-.tbl{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}
-.tbl thead th{text-align:left;font-size:10px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--gray);padding:13px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
-.tbl thead th.num{text-align:right}
-.tbl tbody tr{border-bottom:1px solid var(--line-soft)}
-.tbl tbody td{padding:14px 10px;color:var(--ink-soft);vertical-align:middle}
-.tbl tbody td.num{text-align:right;font-family:var(--mono);font-size:13px;color:var(--ink)}
-.tbl .style{font-family:var(--serif);font-weight:500;font-size:15px;color:var(--ink);line-height:1.3}
-.tbl .style .id{display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-top:2px;overflow-wrap:anywhere}
-.chip{display:inline-block;padding:3px 9px;background:var(--cream-deep);border-radius:2px;font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink)}
-.chip.out{background:var(--accent-soft);color:var(--accent-deep)}
-.down{color:var(--accent);font-family:var(--mono);font-size:13px}
-.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.d-v{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);margin-top:2px}
+.d-on{color:var(--muted);margin-left:9px;font-size:11.5px}
 
-/* gaps */
-.gaps{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1px;background:var(--line-soft);border:1px solid var(--line-soft);border-radius:4px;margin-top:22px}
-.gap{background:var(--paper);padding:20px 22px}
-.gap-h{font-family:var(--serif);font-size:17px;font-weight:500;margin-bottom:8px}
-.gap-f{font-family:var(--mono);font-size:10.5px;color:var(--gray-light);line-height:1.5;margin-bottom:10px;overflow-wrap:anywhere}
-.gap-w{font-size:13px;color:var(--gray);line-height:1.55}
-.gap-m{margin-top:10px;font-size:11px;color:var(--accent);letter-spacing:.04em}
-.gap-m code{font-family:var(--mono);background:var(--accent-soft);color:var(--accent-deep);padding:2px 6px;border-radius:2px;margin-right:4px;font-size:10.5px}
-.gap-y{margin-top:8px;font-size:11.5px;color:var(--good)}
-.note{margin-top:18px;font-size:13px;color:var(--gray);font-style:italic;max-width:760px}
+.drops{display:flex;flex-direction:column;gap:11px}
+.drop{padding-bottom:10px;border-bottom:1px solid var(--line)}
+.drop:last-child{border-bottom:0;padding-bottom:0}
+.d-t{font-family:Archivo,sans-serif;font-weight:600;font-size:13.5px;line-height:1.3}
+.d-n{font-size:12.5px;color:var(--muted);margin-top:3px}
 
-/* bands */
-svg.bandbar{width:100%;height:10px;display:block;border-radius:2px;overflow:hidden;margin-top:18px}
-.bandkey{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--gray)}
-.bandkey i{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:6px}
+.act{display:flex;gap:16px;padding:16px 0;border-bottom:1px solid var(--line)}
+.act:last-child{border-bottom:0}
+.act-n{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;
+  color:var(--copper);flex:0 0 auto;padding-top:3px}
+.act p{margin-top:5px;font-size:15px}
+.watch{font-size:13.5px;color:var(--muted)}
+.caps{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent);margin-right:7px}
 
-/* method */
-.method-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:34px;margin-top:36px;align-items:start}
-.method-block{background:var(--cream-deep);border-left:2px solid var(--accent);padding:24px 26px;border-radius:0 4px 4px 0}
-.method-block h4{font-size:16px;font-weight:500;margin-bottom:14px}
-.mlist{list-style:none}
-.mlist li{font-size:13px;color:var(--ink-soft);padding:8px 0;display:grid;grid-template-columns:26px 1fr;gap:10px;border-bottom:1px solid var(--line-soft);line-height:1.5}
-.mlist li:last-child{border-bottom:none}
-.mlist .i{font-family:var(--mono);font-size:11px;color:var(--accent)}
-.pill{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:9px;letter-spacing:.06em;text-transform:uppercase}
-.pill.ok{background:#E4EBE0;color:#3F5836}
-.pill.ad{background:var(--accent-soft);color:var(--accent-deep)}
-.pill.no{background:#E9E4D6;color:var(--gray)}
-
-.doc-footer{padding:26px clamp(20px,5vw,80px);border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--gray);letter-spacing:.12em;text-transform:uppercase;font-family:var(--mono)}
-
-@media print{
-  body{background:#fff}
-  .doc{box-shadow:none;max-width:none}
-  section{page-break-after:always;padding:44px 40px}
-  .reveal-card.bright{background:var(--paper);border-color:var(--line)}
-  .reveal-card.bright .reveal-num{color:var(--ink)}
-  .reveal-card.bright .reveal-label,.reveal-card.bright .reveal-foot{color:var(--gray)}
-  .scroll{overflow:visible}
-}
+.scope{background:var(--panel)}
+.scope p{font-size:13.5px;color:var(--muted);max-width:78ch;margin-top:0}
+@media print{body{background:#fff}.doc{box-shadow:none;max-width:none}section{break-inside:avoid}}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
-</head>
-<body>
+</head><body>
 <div class="doc">
 
-<!-- ══ cover ══ -->
-<section class="cover">
-  <div class="cover-top">
-    <div class="wordmark">${esc(f.store.name)}<sup>Feed intelligence</sup></div>
-    <div class="cover-meta">
-      <span class="mono">Generated from tracked feed data</span>
-      <span class="mono">Document №&nbsp;${esc(docNo)}</span>
-    </div>
-  </div>
-  <div class="cover-title">
-    <span class="eyebrow">An assessment of ${esc(f.store.domain)}</span>
-    <h1>The Sales<br>Curve <em>Audit.</em></h1>
-    <p class="cover-subtitle">${esc(n.cover_subtitle)}</p>
-  </div>
-  <div class="cover-bottom">
-    <div><span class="caps">Store</span><span class="value">${esc(f.store.name)} · ID ${esc(f.store.id)}</span></div>
-    <div><span class="caps">Analysis window · T₀</span><span class="value">${dt(f.window.from)} — ${dt(f.window.to)}</span></div>
-    <div><span class="caps">Observed days</span><span class="value">${f.window.run_dates.length} of ${f.periods.T0.days}</span></div>
-    <div><span class="caps">Currency</span><span class="value">${esc(cur)}</span></div>
-  </div>
-</section>
-
-<!-- ══ 01 headline ══ -->
-<section>
-  <div class="eyebrow">Section 01 · The headline</div>
-  <h2>${esc(n.headline_verdict)}</h2>
-  <p class="lead">Read from ${nf(f.headline.variant_days.value)} variant-days of tracked feed data. Every figure below is computed from the feed; nothing is estimated.</p>
-  <div class="headline-number">${pc(f.stockout.oos_rate.value).replace('%', '')}<span class="denom">%</span></div>
-  <p class="headline-context">of observed variant-days were out of stock. <strong>Not inferred.</strong> ${esc(n.headline_context)}</p>
-
-  <div class="stat-row">
-    ${stat('Styles read', nf(f.headline.style_count.value), 'distinct products present in the feed')}
-    ${stat('Variants analysed', nf(f.headline.variant_count.value), 'size × colour × fabric')}
-    ${stat('Styles broken on size', `${f.headline.broken_style_pct.value ?? '—'}<span class="small">%</span>`,
-      `${nf(f.headline.broken_style_pct.numerator)} of ${nf(f.headline.broken_style_pct.denominator)} sized styles`)}
-    ${stat('Variant-days out of stock', nf(f.stockout.oos_variant_days.value), 'the spec’s own formula, unmodified')}
-  </div>
-</section>
-
-<!-- ══ 02 opportunity stack ══ -->
-<section style="background:var(--cream-deep)">
-  <div class="eyebrow">Section 02 · The opportunity stack</div>
-  <h2>Four leaks the feed cannot price.</h2>
-  <p class="lead">The specification sizes each leak in currency. Every one of those formulas multiplies by a rate of sale, a margin or an ad spend, and a public product feed carries none of them. The leaks are named here with the exact input that is missing, rather than filled with a plausible number.</p>
-  ${gapGrid(f.opportunity_stack, ['broken_size_opportunity', 'markdown_avoidance', 'wasted_ad_spend', 'reorder_chase_lift'])}
-  <p class="note">${esc(n.limits)}</p>
-</section>
-
-<!-- ══ 03 diagnostic ══ -->
-<section>
-  <div class="eyebrow">Section 03 · The diagnostic</div>
-  <h2>What the feed does show.</h2>
-  <p class="lead">Three readings of the same window. Each isolates one mechanic and reports only what the data supports.</p>
-
-  <!-- 03a -->
-  <div class="diagnostic-block">
-    <div class="diag-num">03 / a</div>
-    <div class="diag-title">The range is flat. Availability is not.</div>
-    <div class="diag-sub">Share of the range by size, against how often each size is unavailable</div>
-    <div class="chart-frame">
-      <div class="chart-legend">
-        <span><i style="background:#D9D2C2"></i>Share of variants (%)</span>
-        <span><i style="background:#B0532D"></i>Share of days out of stock (%)</span>
-      </div>
-      ${sizeCurveSvg(sizes)}
-    </div>
-    <p class="note">Substitution: ${esc(f.size_curve.size_mix.substituted)}. Core sizes read as ${esc((f.size_curve.core_sizes.value || []).join(', ') || '—')}.</p>
-    ${read('Read', n.reads.size_curve)}
-    ${gapGrid(f.size_curve, ['planned_pack', 'actual_str_by_size', 'xl_residual_risk'])}
-  </div>
-
-  <!-- 03b -->
-  <div class="diagnostic-block">
-    <div class="diag-num">03 / b</div>
-    <div class="diag-title">Availability, counted in variant-days.</div>
-    <div class="diag-sub">The spec's stockout correction needs units sold; its denominator does not</div>
-    <div class="reveal-grid">
-      <div class="reveal-card">
-        <div class="reveal-label">Variant-days in stock</div>
-        <div class="reveal-num">${nf(f.stockout.in_stock_variant_days.value)}</div>
-        <div class="reveal-foot">Days on which a variant was present in the feed and sellable. This is the denominator of the spec's baseline velocity, computed exactly.</div>
-      </div>
-      <div class="reveal-card bright">
-        <div class="reveal-label">Variant-days out of stock</div>
-        <div class="reveal-num">${nf(f.stockout.oos_variant_days.value)}<span class="pct"> · ${pc(f.stockout.oos_rate.value)}</span></div>
-        <div class="reveal-foot">Read from the Inventory quantity column: blank means sellable, 0 means sold out. Verified at 99.2% against the live storefront.</div>
-      </div>
-    </div>
-    ${read('Read', n.reads.stockout)}
-    ${gapGrid(f.stockout, ['net_str_corrected', 'latent_demand_gap', 'bis_signups'])}
-  </div>
-
-  <!-- 03c -->
-  <div class="diagnostic-block">
-    <div class="diag-num">03 / c</div>
-    <div class="diag-title">The styles carrying a broken ladder.</div>
-    <div class="diag-sub">One size unavailable while a sibling size of the same style is in stock</div>
-    <div class="chart-frame">
-      <div class="chart-legend">
-        <span><i style="background:#5C7A4F"></i>Days with a full ladder</span>
-        <span><i style="background:#B0532D"></i>Days broken</span>
-      </div>
-      ${brokenRows.length ? brokenRows.map(r => {
-        const brokenPct = (r.days_broken / maxDays) * 100
-        const fullPct = ((r.days_observed - r.days_broken) / maxDays) * 100
-        return `<div class="timeline-row">
-          <div class="timeline-sku">${esc(r.title || r.handle)}
-            <span class="sku-meta">${esc(r.handle)}</span></div>
-          <div class="timeline-bar">
-            <div class="timeline-fill" style="width:${fullPct.toFixed(1)}%"></div>
-            <div class="timeline-broken" style="left:${fullPct.toFixed(1)}%;width:${brokenPct.toFixed(1)}%"></div>
-          </div>
-          <div class="timeline-right">${r.at_baseline
-            ? '<span class="base">already broken</span>'
-            : 'broke ' + dt(r.first_broken_on)}<br>
-            <span class="base">${esc((r.sizes_missing || []).join(', ') || '—')}</span></div>
-        </div>`
-      }).join('') : '<p class="none">No style lost a size while a sibling size stayed in stock.</p>'}
-    </div>
-    <p class="note">${f.broken_timeline.observed_breaks.value} style(s) were seen breaking inside the window, of
-      ${nf(f.headline.broken_style_pct.numerator)} carrying a broken ladder in total${
-      f.broken_timeline.observed_breaks.listed < f.headline.broken_style_pct.numerator
-        ? `; the ${f.broken_timeline.observed_breaks.listed} above are the hardest hit` : ''}.
-      ${esc(f.broken_timeline.observed_breaks.note)}</p>
-    ${read('Read', n.reads.broken_timeline)}
-    ${gapGrid(f.broken_timeline, ['loss_per_sku'])}
-  </div>
-
-  <!-- 03d -->
-  <div class="diagnostic-block">
-    <div class="diag-num">03 / d</div>
-    <div class="diag-title">The media section, for the record.</div>
-    <div class="diag-sub">Wasted ad spend on out-of-stock PDPs · not observable from outside</div>
-    ${gapGrid(f.ad_waste, ['wasted_ad_spend', 'waste_share', 'oos_sessions', 'cr_oos'])}
-    <p class="note">${esc(f.ad_waste.note)}</p>
-  </div>
-</section>
-
-<!-- ══ 04 pricing ══ -->
-<section style="background:var(--cream-deep)">
-  <div class="eyebrow">Section 04 · Price and discount</div>
-  <h2>The signal this feed carries best.</h2>
-  <p class="lead">Outside the specification, whose reader owns the store and already knows its own prices. Watching a rival, this is the movement that is fully visible.</p>
-
-  <div class="stat-row" style="border-color:var(--line)">
-    ${stat('Price drops', nf(f.pricing.price_drops.value), 'variant-level reductions')}
-    ${stat('Price rises', nf(f.pricing.price_rises.value), 'variant-level increases')}
-    ${stat('Average move', pc(f.pricing.avg_move_pct.value), 'mean absolute change')}
-    ${stat('Largest single move', pc(f.pricing.max_move_pct.value), 'steepest one variant moved')}
-  </div>
-
-  <h3 style="margin-top:48px">Where the range sits on discount</h3>
-  ${bandSvg(f.pricing.discount_bands)}
-  <p class="note">Active variants by discount band on ${dt(f.window.to)}. Price range ${nf(f.pricing.price_spread.min)} – ${nf(f.pricing.price_spread.max)} ${esc(cur)}, median ${nf(f.pricing.price_spread.median)}.</p>
-
-  ${f.pricing.biggest_drops.length ? `
-  <h3 style="margin-top:44px">Steepest drops in the window</h3>
-  <div class="scroll"><table class="tbl">
-    <thead><tr><th>Style</th><th>Variant</th><th class="num">Was</th><th class="num">Now</th>
-      <th class="num">Change</th><th class="num">Discount</th><th class="num">On</th></tr></thead>
-    <tbody>${f.pricing.biggest_drops.map(r => `<tr>
-      <td><span class="style">${esc(r.title || r.handle)}<span class="id">${esc(r.sku || r.handle)}</span></span></td>
-      <td><span class="chip">${esc(r.variant || '—')}</span></td>
-      <td class="num">${nf(r.from)}</td>
-      <td class="num">${nf(r.to)}</td>
-      <td class="num"><span class="down">${r.diff_pct == null ? '—' : r.diff_pct + '%'}</span></td>
-      <td class="num">${pc(r.discount_pct)}</td>
-      <td class="num">${dt(r.on)}</td></tr>`).join('')}</tbody>
-  </table></div>` : ''}
-  ${read('Read', n.reads.pricing)}
-</section>
-
-<!-- ══ 05 assortment ══ -->
-<section>
-  <div class="eyebrow">Section 05 · Assortment movement</div>
-  <h2>What entered and what left.</h2>
-  <div class="stat-row">
-    ${stat('New variants', nf(f.assortment.new_variants.value), 'first appearance in the feed')}
-    ${stat('Variants removed', nf(f.assortment.removed_variants.value), 'left the feed entirely')}
-    ${stat('Went out of stock', nf(f.assortment.went_out.value), 'still listed, not sellable')}
-    ${stat('Came back in stock', nf(f.assortment.came_back.value), 'listed throughout, back to sellable')}
-    ${stat('Put back on the feed', nf(f.assortment.relisted.value), 'had left the feed, then reappeared')}
-  </div>
-  ${read('Read', n.reads.assortment)}
-
-  ${f.assortment.categories.length ? `
-  <h3 style="margin-top:44px">By category</h3>
-  <div class="scroll"><table class="tbl">
-    <thead><tr><th>Category</th><th class="num">Styles</th><th class="num">Variants</th>
-      <th class="num">Days OOS</th><th class="num">Avg price</th><th class="num">Avg discount</th></tr></thead>
-    <tbody>${f.assortment.categories.map(c => `<tr>
-      <td><span class="style">${esc(c.product_type)}</span></td>
-      <td class="num">${nf(c.styles)}</td>
-      <td class="num">${nf(c.variants)}</td>
-      <td class="num">${pc(c.oos_rate)}</td>
-      <td class="num">${nf(c.avg_price)}</td>
-      <td class="num">${pc(c.avg_discount)}</td></tr>`).join('')}</tbody>
-  </table></div>` : ''}
-</section>
-
-<!-- ══ 06 what to watch ══ -->
-<section style="background:var(--ink);color:var(--paper)">
-  <div class="eyebrow" style="color:var(--accent-soft)">Section 06 · What to watch</div>
-  <h2 style="color:var(--paper)">Three things to follow next.</h2>
-  <p class="lead" style="color:var(--gray-light)">The specification's plays are actions inside your own store. Watching a rival, the equivalent is what to track in the next scrape.</p>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08);margin-top:44px">
-    ${(n.actions || []).slice(0, 3).map((a, i) => `
-    <div style="background:var(--ink);padding:30px 26px;display:flex;flex-direction:column;gap:14px">
-      <div style="font-family:var(--serif);font-size:14px;font-style:italic;color:var(--accent-soft)">— ${String(i + 1).padStart(2, '0')}</div>
-      <h3 style="color:var(--paper);font-weight:400">${esc(a.title)}</h3>
-      <p style="color:var(--gray-light);font-size:14px;flex:1">${esc(a.why)}</p>
-      <div style="border-top:1px solid rgba(255,255,255,.12);padding-top:16px">
-        <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-light);margin-bottom:6px">Watch</div>
-        <div style="font-family:var(--serif);font-size:16px;color:var(--accent-soft);line-height:1.35">${esc(a.watch)}</div>
-      </div>
-    </div>`).join('')}
-  </div>
-  ${gapGrid(f.trajectory, ['gmv_no_action', 'gmv_with_plays', 'revenue_delta', 'gm_delta'])
-    .replace('class="gaps"', 'class="gaps" style="margin-top:34px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.08)"')
-    .replace(/class="gap"/g, 'class="gap" style="background:#1E1B15"')}
-</section>
-
-<!-- ══ 07 methodology ══ -->
-<section>
-  <div class="eyebrow">Section 07 · How this was built</div>
-  <h2>Every number, and where it came from.</h2>
-  <div class="method-grid">
+  <div class="top">
     <div>
-      <h3>Time periods · specification §1</h3>
-      <div class="scroll"><table class="tbl">
-        <thead><tr><th>Symbol</th><th>Window</th><th>Resolved</th></tr></thead>
-        <tbody>${Object.entries(f.periods).map(([, p]) => `<tr>
-          <td class="mono">${esc(p.symbol)}</td>
-          <td>${esc(p.label)}<span class="id mono" style="display:block;color:var(--gray)">spec: ${esc(p.spec || '—')}</span></td>
-          <td>${p.status === 'unavailable'
-            ? `<span class="pill no">unavailable</span><div style="font-size:11.5px;color:var(--gray);margin-top:6px">${esc(p.why || '')}</div>`
-            : `<span class="mono">${esc(p.value ?? '—')}</span>${p.note ? `<div style="font-size:11.5px;color:var(--gray);margin-top:6px">${esc(p.note)}</div>` : ''}`}</td>
-        </tr>`).join('')}</tbody>
-      </table></div>
-
-      <h3 style="margin-top:40px">Data sources · specification §2</h3>
-      <div class="scroll"><table class="tbl">
-        <thead><tr><th>Source</th><th>State</th><th>What is missing</th></tr></thead>
-        <tbody>${f.data_sources.map(s => `<tr>
-          <td>${esc(s.source)}</td>
-          <td><span class="pill ${s.connected === 'partial' ? 'ad' : s.connected === 'no' ? 'no' : 'ok'}">${esc(s.connected)}</span></td>
-          <td style="font-size:12.5px;color:var(--gray)">${esc(s.missing || '—')}${s.have ? `<div style="color:var(--good);margin-top:4px">have: ${esc(s.have)}</div>` : ''}</td>
-        </tr>`).join('')}</tbody>
-      </table></div>
+      <div class="eyebrow">Sales report</div>
+      <h1>${esc(f.store.name)}</h1>
+      <div class="sub">${esc(f.store.domain)} · ${esc(cur)} · ${dt(f.window.from)} – ${dt(f.window.to)}</div>
     </div>
-
-    <div class="method-block">
-      <h4>Sanity checks · specification §6</h4>
-      <ul class="mlist">
-        ${f.sanity_checks.map(c => `<li><span class="i">${String(c.rule).padStart(2, '0')}</span>
-          <span><strong>${esc(c.name)}.</strong>${c.added
-            ? ' <span class="pill no">added</span>' : ''} ${c.skipped
-            ? `<span style="color:var(--gray)">skipped, ${esc(c.skipped)}</span>`
-            : `<span style="color:${c.pass ? 'var(--good)' : 'var(--accent)'}">${c.pass ? 'pass' : 'FAIL'}</span> · <span style="color:var(--gray)">${esc(c.detail)}</span>`}</span></li>`).join('')}
-      </ul>
-
-      <h4 style="margin-top:26px">Edge cases · specification §7</h4>
-      <ul class="mlist">
-        ${f.edge_cases.map((e, i) => `<li><span class="i">${String(i + 1).padStart(2, '0')}</span>
-          <span><strong>${esc(e.case)}.</strong> <span style="color:var(--gray)">${esc(e.finding)}</span></span></li>`).join('')}
-      </ul>
-
-      <h4 style="margin-top:26px">Coverage</h4>
-      <ul class="mlist">
-        <li><span class="i">01</span><span><strong>${coverage.observed_days} of ${coverage.window_days} days observed</strong> · ${coverage.completeness}% · grade ${esc(coverage.grade)}</span></li>
-        <li><span class="i">02</span><span style="color:var(--gray)">${esc(coverage.basis)}</span></li>
-        <li><span class="i">03</span><span><strong>Prose.</strong> <span style="color:var(--gray)">Written by ${esc(n.model)}. Numbers are rendered from the computed facts, never from the model; every figure in the prose was checked against those facts before publishing${n.verified === false ? ' and <span style="color:var(--accent)">failed</span>, so the deterministic text is shown' : ''}.</span></span></li>
-      </ul>
+    <div class="doc-meta">
+      ${docNo ? `<div>${esc(docNo)}</div>` : ''}
+      <div>${days} days observed</div>
+      ${cov.completeness != null ? `<div>${cov.completeness}% coverage</div>` : ''}
     </div>
   </div>
-</section>
 
-<div class="doc-footer">
-  <div>Sales Curve Audit · ${esc(f.store.name)} · №&nbsp;${esc(docNo)}</div>
-  <div>${esc(id)} · generated ${dt(new Date().toISOString())}</div>
-</div>
+  <div class="figs">${figures}</div>
+
+  ${n.headline_verdict ? `
+  <section>
+    <div class="s-head"><span class="s-num">01</span><div>
+      <h2>${esc(n.headline_verdict)}</h2>
+      ${n.headline_context ? `<p class="lead">${esc(n.headline_context)}</p>` : ''}
+    </div></div>
+  </section>` : ''}
+
+  ${f.daily_shape && f.daily_shape.length ? section(num(), 'How the window unfolded',
+    'Every recorded change, by day and by kind. A tall column is a day the store moved a lot.',
+    dayChart(f.daily_shape, cur) + `
+    <p class="foot">${nf(f.daily_shape.reduce((s, d) => s + d.total, 0))} changes over
+    ${f.daily_shape.length} days, an average of
+    ${nf(Math.round(f.daily_shape.reduce((s, d) => s + d.total, 0) / f.daily_shape.length))} a day.
+    A day with no column is a day the scrape ran and found nothing changed.</p>`) : ''}
+
+  ${section(num(), 'Best sellers',
+    t.rows.length
+      ? `The ${t.rows.length} products this store marked as its own top sellers, across ${t.days_covered} days.`
+      : 'What the store reports as its own top sellers.',
+    topBody)}
+
+  ${section(num(), 'Stock health',
+    'How much of the range was sellable, and which sizes ran out first.',
+    stockBody)}
+
+  ${brokenBody ? section(num(), 'Styles missing a size',
+    'Still listed, but no longer buyable in part of the ladder.',
+    brokenBody) : ''}
+
+  ${section(num(), 'Pricing',
+    'What moved, how far, and where the range sits on discount.',
+    pricingBody)}
+
+  ${section(num(), 'Assortment',
+    'What entered the range and what left it.',
+    assortBody)}
+
+  ${actions ? section(num(), 'What to follow next',
+    'Three things worth watching in the next window.', actions) : ''}
+
+  <section class="scope">
+    <p><b>What this is built on.</b> Every figure comes from this store's own public
+    product feed, read once a day for ${days} days${cov.completeness != null ? ` (${cov.completeness}% of the window)` : ''}.
+    That feed carries prices, stock and the range; it does not carry orders, returns,
+    ad spend or supplier terms, so nothing here is a revenue or margin figure.
+    ${n.verified ? esc(n.verified) : ''}</p>
+  </section>
+
 </div>
 </body></html>`
 }

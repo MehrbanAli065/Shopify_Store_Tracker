@@ -19,7 +19,7 @@
  * absent, not guessed — the whole point of the audit is that a planner can act
  * on it.
  */
-import { q, one } from './db.mjs'
+import { q, one, withClient } from './db.mjs'
 
 /* ── fact constructors ───────────────────────────────────────────── */
 
@@ -131,8 +131,11 @@ const DAILY = `
            h.in_stock, h.in_feed, h.price, h.discount_pct
       FROM variant_history h
       JOIN variants v ON v.id = h.variant_id
-      JOIN products p ON p.id = v.product_id
-     WHERE p.store_id = $1
+     -- h.store_id, not a walk out to products: this window runs over the whole
+     -- of a store's history, 2.9M rows on the largest one, and the join was
+     -- paid per row. Bounded at the top of the range too — anything recorded
+     -- after it cannot affect a span inside it.
+     WHERE h.store_id = $1 AND h.observed_date <= $3
   ),
   daily AS (
     SELECT d.run_date, s.variant_id, s.product_id,
@@ -156,13 +159,19 @@ const SIZES = `
              CASE WHEN v.option2_name ILIKE 'size' THEN NULLIF(v.option2_value,'') END,
              CASE WHEN v.option3_name ILIKE 'size' THEN NULLIF(v.option3_value,'') END
            ) AS size_label
-      FROM variants v JOIN products p ON p.id = v.product_id
-     WHERE p.store_id = $1
+      FROM variants v
+     WHERE v.store_id = $1
   )`
 
 /* ── the engine ──────────────────────────────────────────────────── */
 
-export async function buildFacts ({ storeId, from, to }) {
+export async function buildFacts (args) {
+  // One connection for the whole build: the temp tables below only exist on
+  // the connection that created them.
+  return withClient((q, one) => buildFactsOn(q, one, args))
+}
+
+async function buildFactsOn (q, one, { storeId, from, to }) {
   const t0 = Date.now()
   const store = await one(
     `SELECT id, name, domain, currency FROM stores WHERE id = $1`, [storeId])
@@ -177,31 +186,65 @@ export async function buildFacts ({ storeId, from, to }) {
   if (!runDates.length) throw new Error(`no successful scrape runs for store ${storeId} in ${from}…${to}`)
 
   const A = [storeId, from, to]
+
+  // daily is 540k variants x 19 days on the largest store, and it was inlined
+  // into ten separate fact queries — built ten times, ~6.5 minutes of SQL for
+  // one report. Materialised once here instead; the fact queries below read a
+  // temp table that dies with the connection.
+  await q('SET LOCAL statement_timeout = 0')
+  await q(`CREATE TEMP TABLE _run_dates ON COMMIT DROP AS
+             SELECT run_date FROM scrape_runs
+              WHERE store_id = $1 AND run_date BETWEEN $2 AND $3
+                AND status IN ('success','partial')`, A)
+  // Only spans is materialised. It is the LEAD window over the store's whole
+  // history — the one genuinely expensive step, and it was recomputed by each
+  // of the ten fact queries. daily stays a CTE on purpose: building it here
+  // instead cost MORE, because the planner could no longer push each query's
+  // own filter into it and had to hold all 540k variants x 19 days at once.
+  await q(`CREATE TEMP TABLE _spans ON COMMIT DROP AS WITH ${DAILY} SELECT * FROM spans`, A)
+  await q('CREATE INDEX ON _spans (variant_id)')
+  await q('CREATE INDEX ON _spans (valid_from, valid_to)')
+  await q(`CREATE TEMP TABLE _sized ON COMMIT DROP AS WITH ${SIZES} SELECT * FROM sized`, [storeId])
+  await q('CREATE INDEX ON _sized (variant_id)')
+  await q('ANALYZE _spans'); await q('ANALYZE _sized'); await q('ANALYZE _run_dates')
   const periods = resolvePeriods(runDates, from, to)
 
   /* §4.1 — counts */
   const counts = await one(`
-    WITH ${DAILY}
+    WITH daily AS (SELECT d.run_date, s.variant_id, s.product_id, s.in_stock, s.in_feed, s.price, s.discount_pct
+                 FROM _run_dates d JOIN _spans s ON d.run_date >= s.valid_from
+                                AND (s.valid_to IS NULL OR d.run_date < s.valid_to)
+                WHERE s.in_feed),
+         run_dates AS (SELECT * FROM _run_dates)
     SELECT count(DISTINCT product_id)::int AS style_count,
            count(DISTINCT variant_id)::int AS variant_count,
            count(*)::int                   AS variant_days
-      FROM daily`, A)
+      FROM daily`)
 
   /* §4.4 — OOS days. The spec's own formula, and the one number here that
      needs no substitution. */
   const oos = await one(`
-    WITH ${DAILY}
+    WITH daily AS (SELECT d.run_date, s.variant_id, s.product_id, s.in_stock, s.in_feed, s.price, s.discount_pct
+                 FROM _run_dates d JOIN _spans s ON d.run_date >= s.valid_from
+                                AND (s.valid_to IS NULL OR d.run_date < s.valid_to)
+                WHERE s.in_feed),
+         run_dates AS (SELECT * FROM _run_dates)
     SELECT count(*) FILTER (WHERE in_stock IS false)::int AS oos_variant_days,
            count(*) FILTER (WHERE in_stock IS true)::int  AS in_stock_variant_days,
            count(*) FILTER (WHERE in_stock IS NULL)::int  AS unknown_variant_days
-      FROM daily`, A)
+      FROM daily`)
 
   /* §4.3 — the size curve. Sell-through by size needs orders; what the feed
      does show is how the assortment is spread across sizes and which sizes run
      out. A size that empties while its siblings hold stock is the demand
      signal the spec reads out of sales. */
   const sizeCurve = await q(`
-    WITH ${DAILY}, ${SIZES}
+    WITH daily AS (SELECT d.run_date, s.variant_id, s.product_id, s.in_stock, s.in_feed, s.price, s.discount_pct
+                 FROM _run_dates d JOIN _spans s ON d.run_date >= s.valid_from
+                                AND (s.valid_to IS NULL OR d.run_date < s.valid_to)
+                WHERE s.in_feed),
+         sized AS (SELECT * FROM _sized),
+         run_dates AS (SELECT * FROM _run_dates)
     SELECT z.size_label,
            count(DISTINCT d.variant_id)::int                    AS variants,
            count(*)::int                                        AS variant_days,
@@ -209,7 +252,7 @@ export async function buildFacts ({ storeId, from, to }) {
       FROM daily d JOIN sized z ON z.variant_id = d.variant_id
      WHERE z.size_label IS NOT NULL
      GROUP BY z.size_label
-     ORDER BY variants DESC`, A)
+     ORDER BY variants DESC`)
 
   const sizedVariants = sizeCurve.reduce((s, r) => s + r.variants, 0)
   const coreSizes = sizeCurve.slice(0, 3).map(r => r.size_label)
@@ -217,7 +260,12 @@ export async function buildFacts ({ storeId, from, to }) {
   /* §4.1 / §4.5 — broken size. The spec's definition minus "and selling":
      one size unavailable while a sibling size of the same style is in stock. */
   const broken = await q(`
-    WITH ${DAILY}, ${SIZES},
+    WITH daily AS (SELECT d.run_date, s.variant_id, s.product_id, s.in_stock, s.in_feed, s.price, s.discount_pct
+                 FROM _run_dates d JOIN _spans s ON d.run_date >= s.valid_from
+                                AND (s.valid_to IS NULL OR d.run_date < s.valid_to)
+                WHERE s.in_feed),
+         sized AS (SELECT * FROM _sized),
+         run_dates AS (SELECT * FROM _run_dates),
     per_day AS (
       SELECT d.product_id, d.run_date,
              bool_or(d.in_stock IS false) AS any_out,
@@ -250,11 +298,20 @@ export async function buildFacts ({ storeId, from, to }) {
      -- with an observed break date, which is what the spec asks for
      ORDER BY (min(pd.run_date) FILTER (WHERE pd.any_out AND pd.any_in)
                  = (SELECT min(run_date) FROM run_dates)) ASC,
-              days_broken DESC, first_broken_on
-     LIMIT 12`, A)
+              days_broken DESC, first_broken_on,
+              -- handle last, so two styles broken on the same day for the same
+              -- number of days always come out in the same order. Without it the
+              -- same report generated twice listed different styles in the top 12.
+              handle
+     LIMIT 12`)
 
   const brokenTotals = await one(`
-    WITH ${DAILY}, ${SIZES},
+    WITH daily AS (SELECT d.run_date, s.variant_id, s.product_id, s.in_stock, s.in_feed, s.price, s.discount_pct
+                 FROM _run_dates d JOIN _spans s ON d.run_date >= s.valid_from
+                                AND (s.valid_to IS NULL OR d.run_date < s.valid_to)
+                WHERE s.in_feed),
+         sized AS (SELECT * FROM _sized),
+         run_dates AS (SELECT * FROM _run_dates),
     per_day AS (
       SELECT d.product_id, d.run_date,
              bool_or(d.in_stock IS false) AS any_out,
@@ -275,11 +332,16 @@ export async function buildFacts ({ storeId, from, to }) {
            -- deriving it from a top-N list understates it by the size of the cap
            count(*) FILTER (WHERE ever_broken AND first_broken >
              (SELECT min(run_date) FROM run_dates))::int AS broke_inside_window
-      FROM per_style`, A)
+      FROM per_style`)
 
   /* Which sizes break first, across the store. */
   const breakOrder = await q(`
-    WITH ${DAILY}, ${SIZES}
+    WITH daily AS (SELECT d.run_date, s.variant_id, s.product_id, s.in_stock, s.in_feed, s.price, s.discount_pct
+                 FROM _run_dates d JOIN _spans s ON d.run_date >= s.valid_from
+                                AND (s.valid_to IS NULL OR d.run_date < s.valid_to)
+                WHERE s.in_feed),
+         sized AS (SELECT * FROM _sized),
+         run_dates AS (SELECT * FROM _run_dates)
     SELECT z.size_label,
            count(DISTINCT d.variant_id) FILTER (WHERE d.in_stock IS false)::int AS variants_out,
            count(DISTINCT d.variant_id)::int AS variants
@@ -289,7 +351,7 @@ export async function buildFacts ({ storeId, from, to }) {
     HAVING count(DISTINCT d.variant_id) >= 5
      ORDER BY (count(DISTINCT d.variant_id) FILTER (WHERE d.in_stock IS false))::numeric
               / count(DISTINCT d.variant_id) DESC
-     LIMIT 8`, A)
+     LIMIT 8`)
 
   /* Pricing and discount — outside the spec, because the spec's reader owns the
      store and already knows its own prices. It is the strongest signal a
@@ -313,7 +375,11 @@ export async function buildFacts ({ storeId, from, to }) {
      LIMIT 10`, A)
 
   const discountBands = await q(`
-    WITH ${DAILY}
+    WITH daily AS (SELECT d.run_date, s.variant_id, s.product_id, s.in_stock, s.in_feed, s.price, s.discount_pct
+                 FROM _run_dates d JOIN _spans s ON d.run_date >= s.valid_from
+                                AND (s.valid_to IS NULL OR d.run_date < s.valid_to)
+                WHERE s.in_feed),
+         run_dates AS (SELECT * FROM _run_dates)
     SELECT CASE WHEN discount_pct IS NULL OR discount_pct = 0 THEN '0%'
                 WHEN discount_pct <= 20 THEN '1–20%'
                 WHEN discount_pct <= 40 THEN '21–40%'
@@ -323,7 +389,7 @@ export async function buildFacts ({ storeId, from, to }) {
       FROM daily
      WHERE run_date = (SELECT max(run_date) FROM run_dates)
      GROUP BY band
-     ORDER BY min(COALESCE(discount_pct, 0))`, A)
+     ORDER BY min(COALESCE(discount_pct, 0))`)
 
   const assortment = await one(`
     SELECT count(*) FILTER (WHERE change_type = 'new' AND NOT is_baseline)::int AS new_variants,
@@ -335,7 +401,11 @@ export async function buildFacts ({ storeId, from, to }) {
      WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3`, A)
 
   const categories = await q(`
-    WITH ${DAILY}
+    WITH daily AS (SELECT d.run_date, s.variant_id, s.product_id, s.in_stock, s.in_feed, s.price, s.discount_pct
+                 FROM _run_dates d JOIN _spans s ON d.run_date >= s.valid_from
+                                AND (s.valid_to IS NULL OR d.run_date < s.valid_to)
+                WHERE s.in_feed),
+         run_dates AS (SELECT * FROM _run_dates)
     SELECT COALESCE(NULLIF(p.product_type,''), 'Uncategorised') AS product_type,
            count(DISTINCT d.product_id)::int AS styles,
            count(DISTINCT d.variant_id)::int AS variants,
@@ -344,24 +414,26 @@ export async function buildFacts ({ storeId, from, to }) {
            ROUND(AVG(d.price), 0) AS avg_price,
            ROUND(AVG(NULLIF(d.discount_pct, 0)), 1) AS avg_discount
       FROM daily d JOIN products p ON p.id = d.product_id
-     GROUP BY 1 ORDER BY variants DESC LIMIT 10`, A)
+     GROUP BY 1 ORDER BY variants DESC LIMIT 10`)
 
   const priceSpread = await one(`
-    WITH ${DAILY}
+    WITH daily AS (SELECT d.run_date, s.variant_id, s.product_id, s.in_stock, s.in_feed, s.price, s.discount_pct
+                 FROM _run_dates d JOIN _spans s ON d.run_date >= s.valid_from
+                                AND (s.valid_to IS NULL OR d.run_date < s.valid_to)
+                WHERE s.in_feed),
+         run_dates AS (SELECT * FROM _run_dates)
     SELECT MIN(price) AS min_price, MAX(price) AS max_price,
            ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)::numeric, 0) AS median_price
-      FROM daily WHERE run_date = (SELECT max(run_date) FROM run_dates) AND price > 0`, A)
+      FROM daily WHERE run_date = (SELECT max(run_date) FROM run_dates) AND price > 0`)
 
   /* §7 — edge cases, reported as measured rather than assumed. */
   const edges = await one(`
     SELECT (SELECT max(c) FROM (SELECT count(*) AS c FROM variants v
-              JOIN products p ON p.id = v.product_id
-             WHERE p.store_id = $1 GROUP BY v.product_id) t)::int AS max_variants_per_style,
-           (SELECT count(*) FROM variants v JOIN products p ON p.id = v.product_id
-             WHERE p.store_id = $1 AND v.first_seen_at > $2)::int AS cold_start_variants,
-           (SELECT count(*) FROM variant_history h JOIN variants v ON v.id = h.variant_id
-              JOIN products p ON p.id = v.product_id
-             WHERE p.store_id = $1 AND h.inventory_qty IS NOT NULL)::int AS rows_with_qty`,
+             WHERE v.store_id = $1 GROUP BY v.product_id) t)::int AS max_variants_per_style,
+           (SELECT count(*) FROM variants v
+             WHERE v.store_id = $1 AND v.first_seen_at > $2)::int AS cold_start_variants,
+           (SELECT count(*) FROM variant_history h
+             WHERE h.store_id = $1 AND h.inventory_qty IS NOT NULL)::int AS rows_with_qty`,
     [storeId, from])
 
   /* Feed reconciliation — not in the spec, because the spec's reader owns the
@@ -370,7 +442,11 @@ export async function buildFacts ({ storeId, from, to }) {
      if a departure is ever missed, carry-forward keeps the variant listed on
      every later day and nothing downstream notices. */
   const recon = await q(`
-    WITH ${DAILY}
+    WITH daily AS (SELECT d.run_date, s.variant_id, s.product_id, s.in_stock, s.in_feed, s.price, s.discount_pct
+                 FROM _run_dates d JOIN _spans s ON d.run_date >= s.valid_from
+                                AND (s.valid_to IS NULL OR d.run_date < s.valid_to)
+                WHERE s.in_feed),
+         run_dates AS (SELECT * FROM _run_dates)
     SELECT r.run_date, r.variants_found::int AS csv_variants,
            count(d.variant_id)::int AS carried_forward
       FROM scrape_runs r
@@ -413,6 +489,78 @@ export async function buildFacts ({ storeId, from, to }) {
     grade: runDates.length >= 60 ? 'High' : runDates.length >= 21 ? 'Medium' : 'Low',
     basis: 'share of the window with a successful scrape; not a statistical interval'
   }
+
+  /* The store's own best sellers, as the export marks them. Ranked by how many
+   * days each product held a place: the export gives a flag, not a position, and
+   * a product marked on every day of the window is a steadier seller than one
+   * that appeared once. */
+  const topSellers = await q(`
+    SELECT p.handle, p.title, p.product_type,
+           count(DISTINCT t.observed_date)::int AS days_ranked,
+           min(t.observed_date) AS first_day,
+           max(t.observed_date) AS last_day,
+           (SELECT round(avg(v.current_price), 0) FROM variants v
+             WHERE v.product_id = p.id AND v.in_feed AND v.current_price > 0) AS price,
+           (SELECT round(avg(v.current_discount_pct), 1) FROM variants v
+             WHERE v.product_id = p.id AND v.in_feed AND v.current_discount_pct > 0) AS discount_pct,
+           (SELECT count(*) FILTER (WHERE v.current_in_stock)::int FROM variants v
+             WHERE v.product_id = p.id AND v.in_feed) AS in_stock_variants,
+           (SELECT count(*)::int FROM variants v
+             WHERE v.product_id = p.id AND v.in_feed) AS variants
+      FROM product_top_sellers t
+      JOIN products p ON p.id = t.product_id
+     WHERE p.store_id = $1 AND t.observed_date BETWEEN $2 AND $3
+     GROUP BY p.id, p.handle, p.title, p.product_type
+     ORDER BY days_ranked DESC, price DESC NULLS LAST
+     LIMIT 20`, A)
+
+  /* The shape of the window, day by day. Read from store_day_stats, which the
+   * ingest fills, so this costs a single indexed lookup rather than a scan.
+   * Driven by scrape_runs so a day that ran and changed nothing reads zero
+   * instead of vanishing - a gap and a quiet day look identical otherwise. */
+  const dailyShape = await q(`
+    SELECT r.run_date AS d, r.status,
+           COALESCE(s.new_items, 0)      AS new_items,
+           COALESCE(s.price_up, 0)       AS price_up,
+           COALESCE(s.price_down, 0)     AS price_down,
+           COALESCE(s.stock_out, 0)      AS stock_out,
+           COALESCE(s.stock_in, 0)       AS stock_in,
+           COALESCE(s.removed, 0)        AS removed,
+           COALESCE(s.relisted, 0)       AS relisted,
+           COALESCE(s.total, 0)          AS total
+      FROM scrape_runs r
+      LEFT JOIN store_day_stats s ON s.store_id = r.store_id AND s.observed_date = r.run_date
+     WHERE r.store_id = $1 AND r.run_date BETWEEN $2 AND $3
+     ORDER BY r.run_date`, A)
+
+  /* Which best sellers arrived, which fell out, which held the whole time. The
+   * first and last covered day are the boundaries: a product first marked on the
+   * opening day was already there, not newly arrived. */
+  const topMove = await q(`
+    WITH span AS (
+      SELECT min(t.observed_date) AS lo, max(t.observed_date) AS hi
+        FROM product_top_sellers t JOIN products p ON p.id = t.product_id
+       WHERE p.store_id = $1 AND t.observed_date BETWEEN $2 AND $3
+    ), per AS (
+      SELECT t.product_id, count(DISTINCT t.observed_date)::int AS days,
+             min(t.observed_date) AS first_day, max(t.observed_date) AS last_day
+        FROM product_top_sellers t JOIN products p ON p.id = t.product_id
+       WHERE p.store_id = $1 AND t.observed_date BETWEEN $2 AND $3
+       GROUP BY 1
+    )
+    SELECT count(*) FILTER (WHERE per.first_day > span.lo)::int AS entered,
+           count(*) FILTER (WHERE per.last_day  < span.hi)::int AS dropped,
+           count(*) FILTER (WHERE per.first_day = span.lo AND per.last_day = span.hi)::int AS held
+      FROM per, span`, A)
+
+
+  const topCover = await q(`
+    SELECT count(DISTINCT t.observed_date)::int AS days,
+           count(DISTINCT t.product_id)::int AS products
+      FROM product_top_sellers t
+      JOIN products p ON p.id = t.product_id
+     WHERE p.store_id = $1 AND t.observed_date BETWEEN $2 AND $3`, A)
+
 
   return {
     store: { id: store.id, name: store.name, domain: store.domain, currency: store.currency },
@@ -680,6 +828,33 @@ export async function buildFacts ({ storeId, from, to }) {
     },
 
     /* ── §5 · confidence, §6 · checks, §7 · edge cases ── */
+      /* The window's own shape, one row per observed day. */
+      daily_shape: dailyShape.map(r => ({
+        date: String(r.d).slice(0, 10), status: r.status,
+        new_items: r.new_items, price_up: r.price_up, price_down: r.price_down,
+        stock_out: r.stock_out, stock_in: r.stock_in,
+        removed: r.removed, relisted: r.relisted, total: r.total,
+      })),
+
+      /* Best sellers as the store itself reports them. Empty for a store whose
+       * export carries no Top 20 column - a real state, not an error. */
+      top_sellers: {
+        days_covered: topCover[0] ? topCover[0].days : 0,
+        distinct_products: topCover[0] ? topCover[0].products : 0,
+        entered: topMove[0] ? topMove[0].entered : 0,
+        dropped: topMove[0] ? topMove[0].dropped : 0,
+        held: topMove[0] ? topMove[0].held : 0,
+        rows: topSellers.map(r => ({
+          handle: r.handle, title: r.title, product_type: r.product_type,
+          days_ranked: r.days_ranked,
+          first_day: String(r.first_day).slice(0, 10),
+          last_day: String(r.last_day).slice(0, 10),
+          price: r.price == null ? null : Number(r.price),
+          discount_pct: r.discount_pct == null ? null : Number(r.discount_pct),
+          in_stock_variants: r.in_stock_variants, variants: r.variants,
+        })),
+      },
+
     confidence: {
       spec_interval: unavailable({
         label: 'Confidence interval',

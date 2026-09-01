@@ -35,8 +35,16 @@
     every day's file is rebuilt here from the database, exactly as it was on that date.
   </div>
 
-  <h2 style="margin-top:22px">Archived days</h2>
-  <div id="daylist" class="daylist"><div class="spin">loading…</div></div>
+  <div class="calbar" style="margin-top:22px">
+    <h2 style="margin:0">Archived days</h2>
+    <div class="mnav" id="mnav" hidden>
+      <button class="btn ico" id="pm" title="Previous month">‹</button>
+      <b id="ml"></b>
+      <button class="btn ico" id="nm2" title="Next month">›</button>
+    </div>
+  </div>
+  <div id="daylist"><div class="spin">loading…</div></div>
+  <div class="callegend" id="leg" hidden></div>
 
   <div id="detail" hidden>
     <div class="snaphead">
@@ -61,7 +69,7 @@
         <thead><tr>
           <th>Product</th><th>Vendor</th><th>Type</th><th>Variant</th>
           <th>Price</th><th>Compare at</th><th>Discount</th><th>Stock</th><th>Qty</th>
-          <th>First seen</th><th>Unchanged since</th><th>Tags</th><th></th>
+          <th class="hint" title="When this variant first appeared in the feed — not the day you are viewing. A store's first run makes every variant &quot;first seen&quot; on that date.">First seen</th><th class="hint" title="Date of this variant's last recorded change. It has stayed the same from then until the day you are viewing.">Unchanged since</th><th>Tags</th><th></th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
@@ -126,21 +134,73 @@ async function boot () {
       <div class="nd">Ingest a CSV for this store and it will appear here.</div></div>`
     return
   }
-  renderDays()
+  buildScale()
   select(SNAPS[0].run_date)
 }
 
+const MON = ['January','February','March','April','May','June','July','August',
+             'September','October','November','December']
+const BY = new Map()          // run_date -> run
+let FIRST, LAST, CUTS = [], MY, MM
+
+/** Shade by quantile. Stores routinely have one first-run day worth 500x an
+ *  ordinary one; on a linear ramp every real day collapses to the palest step. */
+function buildScale () {
+  SNAPS.forEach(s => BY.set(s.run_date, s))
+  const dates = SNAPS.map(s => s.run_date).sort()
+  FIRST = dates[0]; LAST = dates[dates.length - 1]
+  const c = SNAPS.map(s => s.changes_found ?? 0).sort((x, y) => x - y)
+  CUTS = [1, 2, 3, 4].map(k => c[Math.floor(c.length * k / 5)])
+  const [y, m] = LAST.split('-').map(Number)
+  MY = y; MM = m - 1
+}
+const heat = c => !c ? 0 : c < CUTS[0] ? 1 : c < CUTS[1] ? 2 : c < CUTS[2] ? 3 : 4
+
 function renderDays () {
-  daylist.className = 'daylist'
-  daylist.innerHTML = SNAPS.map(s => {
-    const cls = { success:'ok', partial:'wrn', failed:'err', pending:'non' }[s.status] || 'non'
-    return `<button class="day ${s.run_date===DATE?'on':''}" data-d="${s.run_date}">
-      <div class="dd1">${dt(s.run_date)}</div>
-      <div class="dd2">${nf(s.products_found)} products · ${nf(s.variants_found)} variants</div>
-      <div class="st ${cls}" style="margin:9px 0 0;padding-top:8px"><span class="d"></span>${s.status}</div>
-    </button>`
-  }).join('')
-  document.querySelectorAll('.day').forEach(b => b.onclick = () => select(b.dataset.d))
+  const iso = (y, m, d) => `${y}-${String(m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+  ml.textContent = MON[MM] + ' ' + MY
+  mnav.hidden = false
+
+  const lead = (new Date(Date.UTC(MY, MM, 1)).getUTCDay() + 6) % 7      // Monday-first
+  const days = new Date(Date.UTC(MY, MM + 1, 0)).getUTCDate()
+  let h = ['Mo','Tu','We','Th','Fr','Sa','Su'].map(d => `<div class="dow">${d}</div>`).join('')
+  h += '<div></div>'.repeat(lead)
+
+  for (let n = 1; n <= days; n++) {
+    const d = iso(MY, MM, n), s = BY.get(d)
+    if (s) {
+      const mk = { partial:'wrn', failed:'err', pending:'err' }[s.status]
+      h += `<button class="cell has h${heat(s.changes_found)}${d===DATE?' on':''}" data-d="${d}"
+        title="${dtL(d)} · ${nf(s.changes_found)} changes · ${s.status}">${n}` +
+        (mk ? `<span class="mk ${mk}"></span>` : '') + `</button>`
+    } else {
+      // A date inside the tracked window with no run means the scrape never
+      // landed. The old card grid simply showed nothing and said nothing.
+      const inside = d >= FIRST && d <= LAST
+      h += `<div class="cell ${inside ? 'gap' : 'out'}"${inside ? ' title="No scrape run on this day"' : ''}>${n}</div>`
+    }
+  }
+  daylist.className = 'cal'
+  daylist.innerHTML = h
+  daylist.querySelectorAll('.cell.has').forEach(b => b.onclick = () => select(b.dataset.d))
+
+  leg.hidden = false
+  leg.innerHTML = '<span>fewer changes</span>' +
+    [0,1,2,3,4].map(i => `<span class="sw cell h${i}" style="aspect-ratio:auto"></span>`).join('') +
+    '<span>more</span><span class="sep"></span>' +
+    '<span class="sw" style="border:1px dashed var(--critical)"></span><span>no run</span>' +
+    '<span class="sep"></span><span class="sw" style="border:0;background:var(--warning);' +
+    'width:7px;height:7px;border-radius:50%"></span><span>partial</span>'
+
+  pm.disabled = iso(MY, MM, 1) <= FIRST
+  nm2.disabled = iso(MY, MM, days) >= LAST
+}
+
+function shift (n) {
+  MM += n
+  if (MM < 0) { MM = 11; MY-- }
+  if (MM > 11) { MM = 0; MY++ }
+  renderDays()
 }
 
 function select (date) {
@@ -212,6 +272,8 @@ qc.onclick = () => { q.value=''; Q=''; qc.hidden=true; OFF=0; load(); q.focus() 
 prev.onclick = () => { OFF = Math.max(0, OFF - LIMIT); load(); scrollTo({top:detail.offsetTop-20,behavior:'smooth'}) }
 next.onclick = () => { OFF += LIMIT; load(); scrollTo({top:detail.offsetTop-20,behavior:'smooth'}) }
 dl.onclick = () => location.href = `/api/stores/${ID}/snapshot.csv?date=${DATE}`
+pm.onclick = () => shift(-1)
+nm2.onclick = () => shift(1)
 tg.onclick = () => {
   const cur = document.documentElement.getAttribute('data-theme')
     || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')

@@ -88,7 +88,12 @@
 
   <!-- ── daily activity ── -->
   <h2>Day by day</h2>
-  <div class="days">
+  <div class="stripwrap">
+    <div class="strip" id="strip"></div>
+    <div class="striplab" id="striplab"></div>
+  </div>
+  <div class="lgnd" id="striplgnd" style="margin:8px 0 10px"></div>
+  <div class="days capped">
     <table class="dt">
       <thead><tr><th>Date</th><th>New</th><th>Price Δ</th><th>Stock out</th><th>Stock in</th><th>Removed</th><th>Relisted</th><th>History rows</th></tr></thead>
       <tbody id="daily"></tbody>
@@ -118,7 +123,7 @@
     <tbody id="rows"></tbody>
   </table></div>
   <div class="pager" id="pager" hidden></div>
-  <div class="foot"><span id="cnt"></span><span id="src"></span></div>
+  <div class="foot"><span id="cnt"></span></div>
 </div>
 
 <!-- ── product drawer ── -->
@@ -152,6 +157,55 @@ const TABS = [
   { key:'relisted', label:'Relisted' }
 ]
 const CHANGE_HUES = { new:'var(--s1)', price:'var(--s2)', stock:'var(--s3)', removed:'var(--s4)' }
+
+  // ── one bar per day ─────────────────────────────────────────────
+/** Same four hues as the period chart below, so a colour means the same thing
+ *  in both. Relisted gets the light ordinal blue: it is rare, and pairing it
+ *  with the removed amber would read as one category. */
+const DAY_PARTS = [
+  ['New',      d => d.new_items,  'var(--s1)'],
+  ['Price',    d => d.price,      'var(--s2)'],
+  ['Stock',    d => d.stock_out + d.stock_in, 'var(--s3)'],
+  ['Relisted', d => d.relisted,   'var(--o1)'],
+  ['Removed',  d => d.removed,    'var(--s4)'],
+]
+
+function renderStrip (daily) {
+  if (!daily.length) { strip.innerHTML = ''; striplab.innerHTML = ''; striplgnd.innerHTML = ''; return }
+
+  // Square-root heights. One first-run day is routinely hundreds of times an
+  // ordinary one, and on a linear scale it flattens every other day to nothing.
+  const max = Math.max(...daily.map(d => d.total), 1)
+  const h = v => Math.max(2, Math.sqrt(v / max) * 62)
+
+  strip.innerHTML = daily.map(d => {
+    const segs = DAY_PARTS.map(([l, get, hue]) => [l, get(d), hue]).filter(p => p[1] > 0)
+    const tip = segs.length
+      ? `${dt(d.observed_date)} — ` + segs.map(([l, v]) => `${l} ${nf(v)}`).join(' · ')
+      : `${dt(d.observed_date)} — nothing changed`
+    const cls = segs.length ? '' : ' quiet'
+    // The bar's height comes from the day's total; each segment takes its share
+    // of that bar, so the stack always adds up to the height the scale asked for.
+    const H = h(d.total)
+    return `<div class="stk${cls}" data-tip="${tip}">` + segs.map(([, v, hue]) =>
+      `<div class="sg" style="height:${(H * v / d.total).toFixed(2)}px;background:${hue}"></div>`
+      ).join('') + `</div>`
+  }).join('')
+
+  // Labels would collide at a day apart, so only every nth date is written.
+  const step = Math.max(1, Math.ceil(daily.length / 12))
+  striplab.innerHTML = daily.map((d, i) =>
+    `<span>${i % step === 0 || i === daily.length - 1 ? dt(d.observed_date) : ''}</span>`).join('')
+
+  const totals = DAY_PARTS.map(([l, get, hue]) =>
+    [l, daily.reduce((a, d) => a + get(d), 0), hue]).filter(p => p[1] > 0)
+  striplgnd.innerHTML = totals.map(([l, v, hue]) =>
+    `<span><i style="background:${hue}"></i>${l} <b>${nf(v)}</b></span>`).join('') +
+    `<span style="color:var(--muted)"><i style="background:var(--line)"></i>no change</span>`
+
+  bindTips(strip)
+}
+
 let tab = '', CUR = 'PKR', RANGE = {}, ROWS = [], q = '', showBase = false, BASE_N = 0
 let PER_DATE = [], PAGE = 0, TOTAL = 0, ONE_DATE = ''
 const PAGE_SIZE = 100
@@ -189,7 +243,6 @@ async function boot () {
   meta.textContent = `${s.domain} · ID ${s.id} · ${s.currency}`
   from.value = s.range.from || ''; to.value = s.range.to || ''
   rangeNote.innerHTML = s.range.from ? `data available <b>${dt(s.range.from)} – ${dt(s.range.to)}</b>` : ''
-  src.textContent = s.runs.map(r => `${dt(r.run_date)} ${r.status}`).join('   ·   ')
   renderTabs(); loadAll()
 }
 
@@ -270,6 +323,8 @@ async function loadKpis () {
       <td class="num ${d.relisted?'':'z'}">${d.relisted}</td>
       <td class="num"><b style="color:var(--ink)">${d.total}</b></td></tr>`).join('')
     : `<tr><td colspan="8" class="empty">No activity in this range</td></tr>`
+
+  renderStrip(k.daily)
 
   // ── "what changed" stacked bar
   const parts = [

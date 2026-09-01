@@ -39,6 +39,7 @@
     <button class="chip"    data-f="today">Updated today</button>
     <button class="chip"    data-f="changes">Has changes</button>
     <button class="chip"    data-f="issue">Needs attention</button>
+    <button class="chip" id="showMuted" title="Warnings you have dismissed">Show dismissed</button>
     <span class="grow"></span>
     <label class="sortl">Sort
       <select id="sort" class="sel">
@@ -51,7 +52,8 @@
   </div>
 
   <div id="hint" class="rescount"></div>
-  <div id="grid" class="grid"></div>
+  <div id="gridwrap" class="gridwrap"><div id="grid" class="grid"></div></div>
+  <div id="more" class="morebar" hidden></div>
 
 </div>
 
@@ -64,13 +66,81 @@ const initials = n => n.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCas
 let STORES = [], filter = 'all', sort = 'id', term = ''
 
 const isToday = s => s.last_run && s.last_run === STORES.map(x=>x.last_run).sort().at(-1)
-const health  = s => !s.last_run ? 'non' : s.last_status === 'success' ? 'ok'
-                   : s.last_status === 'partial' ? 'wrn' : 'err'
+/** Newest run date across every store. Staleness is measured against the fleet,
+ *  not against today: if the whole pipeline pauses for a weekend, no store is
+ *  individually at fault, but one store falling behind the rest always is. */
+let LATEST = null
+let showMuted = false
+const DAY = 86400000
+const daysBehind = s => (LATEST && s.last_run)
+  ? Math.round((Date.parse(LATEST) - Date.parse(s.last_run)) / DAY) : 0
+
+/** A run that succeeded three days ago is not a healthy store — it is a store
+ *  that stopped reporting. That reads as 'ok' if only last_status is checked. */
+/** Dismissed warnings are still true, they are just no longer news. Showing
+ *  them keeps the list permanently non-empty, and a counter that never reaches
+ *  zero stops being read at all. `showMuted` brings them back. */
+const muted = (s, kind) => !showMuted && (s.muted || []).includes(kind)
+
+const health = s => !s.last_run ? 'non'
+                  : (daysBehind(s) >= 2 && !muted(s, 'stale')) ? 'stale'
+                  : s.last_status === 'success' ? 'ok'
+                  : s.last_status === 'partial' ? (muted(s, 'partial') ? 'ok' : 'wrn')
+                  : muted(s, 'failed') ? 'ok' : 'err'
+
+/** Why a run came back partial. The ingest suppresses removals when a file
+ *  holds less than half of what is stored — that is a scrape that fell short,
+ *  not a store that lost its catalogue overnight, and the card said neither.
+ *  Clothesmentor lands here every day: Shopify stops paging at 25,000, so a
+ *  122,000-product store can never send more than a fifth of itself. */
+function shortfall (s) {
+  const f = s.last_file_products
+  if (f == null || !s.products) return ''
+  return ` · file had ${nf(f)} of ${nf(s.products)} products, removals skipped`
+}
+
+/** Which warning a card is showing, so it can be muted by kind. */
+const alertKind = s => ({ stale:'stale', wrn:'partial', err:'failed' })[health(s)] || null
+
+/**
+ * What to actually do about the warning. Written per cause, because the causes
+ * need opposite responses: one is a Shopify limit nobody can lift, another is a
+ * store that genuinely shrank, a third is a scraper that stopped getting in.
+ */
+function alertHint (s) {
+  const k = alertKind(s)
+  if (k === 'stale') {
+    return `Check the scraper's log for this store — a store answering HTTP 403 is
+            blocked at its firewall, not broken here. If it has closed, remove it from the sheet.`
+  }
+  if (k === 'partial') {
+    const f = s.last_file_products
+    // Shopify refuses page x limit past 25,000, so a bigger catalogue can never
+    // arrive whole. That is a fact about the feed, not a fault to chase.
+    if (f != null && f >= 24000 && s.products > 25000) {
+      return `Shopify stops paging at 25,000, and this catalogue is larger — the full list
+              can never arrive. Nothing to fix; dismiss this one.`
+    }
+    return `The file came back with less than half of what is stored, so removals were
+            skipped for safety. Re-run today's scrape for this store; if it stays short,
+            the store really did shrink and the next full file will settle it.`
+  }
+  if (k === 'failed') {
+    return `The scrape did not finish. Check the ingest log for this store's file — an
+            oversized or malformed CSV is the usual cause.`
+  }
+  return ''
+}
 
 function statusRow (s) {
   const h = health(s), lbl = dt(s.last_run)
-  const txt = { ok:`Updated ${lbl}`, wrn:`Partial — ${lbl}`,
-                err:`Scrape failed — ${lbl}`, non:'Never scraped' }[h]
+  const d = daysBehind(s)
+  const txt = { ok:`Updated ${lbl}`, wrn:`Partial — ${lbl}${shortfall(s)}`,
+                err:`Scrape failed — ${lbl}`, non:'Never scraped',
+                // Deliberately not "closed": outlet-shoes.ro stopped because a
+                // firewall started answering 403, and the shop is still trading.
+                stale:`No data since ${lbl} (${d} day${d===1?'':'s'}) — may be blocked or gone`
+              }[h]
   return `<div class="st ${h}"><span class="d"></span>${txt}</div>`
 }
 
@@ -91,7 +161,14 @@ function hilite (text, t) {
     : text.slice(0,i) + '<mark>' + text.slice(i, i+t.length) + '</mark>' + text.slice(i+t.length)
 }
 
-function render () {
+/** 242 cards made the page itself the scrollbar. The grid scrolls inside a
+ *  fixed box and shows exactly 50 at a time — the rest are a page away, not a
+ *  scroll away, so the box never grows and the count on screen never changes. */
+const PAGE = 50
+let page = 0, LIST = []
+
+function render (keepPage) {
+  if (!keepPage) page = 0
   let list = STORES.filter(matches)
   const by = { id:(a,b)=>a.id-b.id, name:(a,b)=>a.name.localeCompare(b.name),
                products:(a,b)=>b.products-a.products, changes:(a,b)=>b.last_changes-a.last_changes }
@@ -120,8 +197,12 @@ function render () {
     return
   }
 
+  LIST = list
+  const pages = Math.max(1, Math.ceil(list.length / PAGE))
+  if (page > pages - 1) page = pages - 1
+  const from = page * PAGE
   document.getElementById('grid').className = 'grid'
-  document.getElementById('grid').innerHTML = list.map((s,i) => {
+  document.getElementById('grid').innerHTML = list.slice(from, from + PAGE).map((s,i) => {
     const hue = HUES[(s.id - 1) % HUES.length]
     return `
     <a class="card" href="/store.html?id=${s.id}" style="animation-delay:${Math.min(i,12)*22}ms">
@@ -147,9 +228,35 @@ function render () {
       </div>
 
       ${statusRow(s)}
+      ${alertKind(s) ? `
+        <div class="fixit">
+          <div class="fixhint">${alertHint(s).replace(/\s+/g, ' ').trim()}</div>
+          <button class="btn sm dismiss${(s.muted||[]).includes(alertKind(s)) ? ' undo' : ''}"
+                  data-id="${s.id}" data-kind="${alertKind(s)}">
+            ${(s.muted||[]).includes(alertKind(s)) ? 'Restore this warning' : 'Dismiss this warning'}
+          </button>
+        </div>` : ''}
       <div class="cta">View report →</div>
     </a>`
   }).join('')
+
+  const bar = document.getElementById('more')
+  bar.hidden = list.length <= PAGE
+  bar.innerHTML = `
+    <button class="btn" id="pprev"${page === 0 ? ' disabled' : ''}>← Previous</button>
+    <span class="pgc">${nf(from + 1)}–${nf(Math.min(from + PAGE, list.length))} of ${nf(list.length)} stores
+      <i>page ${page + 1} of ${pages}</i></span>
+    <button class="btn" id="pnext"${page >= pages - 1 ? ' disabled' : ''}>Next →</button>`
+  document.getElementById('pprev').onclick = () => turn(-1)
+  document.getElementById('pnext').onclick = () => turn(1)
+}
+
+/** Back to the top of the box on every turn: landing mid-list after a page
+ *  change reads as nothing having happened. */
+function turn (d) {
+  page += d
+  render(true)
+  document.getElementById('gridwrap').scrollTop = 0
 }
 
 function overview () {
@@ -180,6 +287,34 @@ document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => {
   render()
 })
 document.getElementById('sort').onchange = e => { sort = e.target.value; render() }
+
+// The card is one big link, so the button has to stop the click reaching it.
+document.getElementById('grid').addEventListener('click', async e => {
+  const b = e.target.closest('.dismiss')
+  if (!b) return
+  e.preventDefault(); e.stopPropagation()
+  const { id, kind } = b.dataset
+  const on = b.classList.contains('undo')
+  b.disabled = true
+  b.textContent = on ? 'Restoring…' : 'Dismissing…'
+  try {
+    const r = await fetch(`/api/stores/${id}/mute?kind=${kind}`, { method: on ? 'DELETE' : 'POST' })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const s = STORES.find(x => String(x.id) === String(id))
+    s.muted = on ? (s.muted || []).filter(k => k !== kind) : [...(s.muted || []), kind]
+    overview(); render(true)
+  } catch (err) {
+    b.disabled = false
+    b.textContent = 'Could not save — try again'
+  }
+})
+
+document.getElementById('showMuted').onclick = e => {
+  showMuted = !showMuted
+  e.currentTarget.classList.toggle('on', showMuted)
+  e.currentTarget.textContent = showMuted ? 'Hide dismissed' : 'Show dismissed'
+  overview(); render()
+}
 document.getElementById('tg').onclick = () => {
   const cur = document.documentElement.getAttribute('data-theme')
     || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
@@ -191,6 +326,7 @@ document.getElementById('grid').innerHTML =
 
 fetch('/api/stores').then(r => r.json()).then(rows => {
   STORES = rows
+  LATEST = rows.map(r => r.last_run).filter(Boolean).sort().at(-1) || null
   document.getElementById('sub').textContent =
     `${rows.length} store${rows.length===1?'':'s'} · updated ${dt(rows.map(r=>r.last_run).sort().at(-1))}`
   overview(); render()
