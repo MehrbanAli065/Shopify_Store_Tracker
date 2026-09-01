@@ -1,8 +1,8 @@
 # Shopify Stores Scraper & Tracker
 
-Daily price and stock tracking across Shopify stores. A scraper drops one CSV per store
-onto Google Drive each day; those files are ingested into PostgreSQL, diffed against the
-previous day, and served as a per-store report.
+Daily price and stock tracking across 242 Shopify stores. A scraper drops one CSV per
+store onto Google Drive each day; those files are ingested into PostgreSQL, diffed
+against the previous day, and served as a per-store report.
 
 Tracking is at **variant level** — size, colour and fabric — not just product level.
 
@@ -24,25 +24,29 @@ Web app  ─ store cards → report → history → CSV / PDF
 |---|---|
 | [`tracker/`](tracker/) | The application — database, ingest, API and frontend |
 | [`For Python/`](For%20Python/) | Drive upload helper used by the scraper VM |
-| `Shopify-Price-Tracker-Plan-EN.html` | Full technical plan — architecture, schema, versioning |
-| `Shopify-Price-Tracker-Plan.html` | The same plan in Roman Urdu |
-| `Sample-Report-Alkaram-Studio.html` | A worked example of the report output |
 
 Start with [`tracker/README.md`](tracker/README.md) to run it, and
-[`tracker/DEPLOY.md`](tracker/DEPLOY.md) to deploy it.
+[`tracker/DEPLOY.md`](tracker/DEPLOY.md) for how the live deployment is put together.
 
 ## Quick start
 
 ```bash
 cd tracker
+cp .env.example .env                            # point DATABASE_URL at your Postgres
 npm install
-npm run reset                                   # build the local database
-node scripts/ingest.mjs --store 1 --date 2026-07-27 --file "path/to/store.csv"
+npm run migrate                                 # build the schema + store registry
 npm start                                       # http://localhost:3000
 ```
 
-Locally this runs on **PGlite** — PostgreSQL compiled to WASM — so there is no database
-to install. Set `DATABASE_URL` and the exact same code talks to hosted Postgres instead.
+Then ingest a day:
+
+```bash
+node scripts/ingest.mjs --store 1 --date 2026-07-27 --file "path/to/store.csv"
+```
+
+With `DATABASE_URL` unset the app falls back to **PGlite** — Postgres compiled to WASM,
+in a file under `data/` — so it will start with nothing installed. That is a convenience
+for trying it out, not how it runs: the real database is PostgreSQL.
 
 ## How the history works
 
@@ -65,5 +69,6 @@ exactly.
 
 - Scraped CSVs are gitignored. They are data, not code.
 - `Inventory quantity` arrives as all zeros in every store checked so far, so stock is
-  derived from feed presence instead — see `tracker/README.md`.
-- The app has **no authentication yet**. Add it before sharing a deployed URL.
+  derived from feed presence instead — see [`tracker/README.md`](tracker/README.md).
+- The app itself has **no login**. The deployment relies on Vercel Authentication in
+  front of it and a shared token behind it; see [`tracker/DEPLOY.md`](tracker/DEPLOY.md).

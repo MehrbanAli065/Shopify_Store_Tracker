@@ -211,21 +211,26 @@ searchable, and can be re-downloaded as a CSV.
 ## Layout
 
 ```
-db/schema.sql       5 tables, indexes, v_change_report view, store_state_on()
-db/seed.sql         the store registry
-lib/db.mjs          PGlite connection
-scripts/init-db.mjs build / reset the database
-scripts/ingest.mjs  parse CSV → diff → write history
-server.mjs          API + static frontend
-public/             store cards + report page
-data/pgdata/        the database itself (git-ignore this)
+db/schema.sql            tables, constraints, base indexes
+db/*.sql                 derived tables and the indexes added since
+db/migrations/           one-time steps, kept as a record — not run on a build
+lib/schema-files.mjs     the order those files must run in. The single list
+lib/db.mjs               connection — PostgreSQL, or PGlite when unconfigured
+lib/audit.mjs            the report engine: every number comes from SQL
+scripts/migrate.mjs      build the schema against DATABASE_URL
+scripts/ingest.mjs       parse CSV → diff → write history
+app.mjs                  the Express app: API + static pages
+public/                  store cards, history, per-store page
+vercel-site/             built by scripts/build-vercel-site.mjs; do not edit
 ```
 
 ## Notes on production
 
-This runs on **PGlite** — PostgreSQL compiled to WASM — so there is nothing to
-install locally. The SQL is plain Postgres and moves to Supabase or any Postgres
-server unchanged. Two things to switch on there:
+This runs on **PostgreSQL 16** on the company server; see [DEPLOY.md](DEPLOY.md).
+With `DATABASE_URL` unset it falls back to PGlite — Postgres compiled to WASM, in
+a file under `data/` — which is only a way to try it with nothing installed.
+
+Two things worth switching on as the history grows:
 
 1. `variant_history` should be `PARTITION BY RANGE (observed_date)` with one
    partition per month. It is kept flat here so one schema file runs both places.

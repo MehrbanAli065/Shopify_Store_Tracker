@@ -6,6 +6,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { exec, q, close, ROOT, DATA_DIR } from '../lib/db.mjs'
+import { SCHEMA_FILES } from '../lib/schema-files.mjs'
 
 const force = process.argv.includes('--force')
 
@@ -14,17 +15,10 @@ if (force && fs.existsSync(DATA_DIR)) {
   console.log('· wiped existing database')
 }
 
-const schema = fs.readFileSync(path.join(ROOT, 'db', 'schema.sql'), 'utf8')
-const seed   = fs.readFileSync(path.join(ROOT, 'db', 'seed.sql'),   'utf8')
-
-console.log('· applying schema …')
-await exec(schema)
-
-console.log('· applying views …')
-await exec(fs.readFileSync(path.join(ROOT, 'db', 'views.sql'), 'utf8'))
-
-console.log('· seeding stores …')
-await exec(seed)
+for (const f of SCHEMA_FILES) {
+  console.log(`· applying ${f} …`)
+  await exec(fs.readFileSync(path.join(ROOT, 'db', f), 'utf8'))
+}
 
 const tables = await q(`
   SELECT table_name FROM information_schema.tables

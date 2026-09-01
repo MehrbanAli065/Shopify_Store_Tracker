@@ -11,6 +11,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline/promises'
 import { q, exec, close, describe, MODE, ROOT } from '../lib/db.mjs'
+import { SCHEMA_FILES } from '../lib/schema-files.mjs'
 
 const check = process.argv.includes('--check')
 const yes   = process.argv.includes('--yes')
@@ -43,14 +44,10 @@ if (existing.length && !yes) {
   if (a.trim().toLowerCase() !== 'yes') { console.log('  aborted\n'); await close(); process.exit(1) }
 }
 
-console.log('\n· applying schema …')
-await exec(fs.readFileSync(path.join(ROOT, 'db', 'schema.sql'), 'utf8'))
-
-console.log('· applying views …')
-await exec(fs.readFileSync(path.join(ROOT, 'db', 'views.sql'), 'utf8'))
-
-console.log('· seeding stores …')
-await exec(fs.readFileSync(path.join(ROOT, 'db', 'seed.sql'), 'utf8'))
+for (const f of SCHEMA_FILES) {
+  console.log(`· applying ${f} …`)
+  await exec(fs.readFileSync(path.join(ROOT, 'db', f), 'utf8'))
+}
 
 const tables = await q(`
   SELECT table_name FROM information_schema.tables
