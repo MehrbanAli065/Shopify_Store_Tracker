@@ -29,8 +29,10 @@ and the shared token stays on the server side where the browser cannot read it.
 The app itself has **no login**. Two things stand in for one, and neither is a
 substitute for the real thing:
 
-- **Vercel Authentication** on the project. Anyone opening the URL is bounced to a
-  Vercel login, so only members of the Vercel team see the dashboard.
+- **Vercel Authentication** — but read what it actually covers. It protects the
+  hashed deployment URLs (`shopify-tracker-<hash>-<team>.vercel.app`) and **not**
+  the production alias. `shopify-tracker-web.vercel.app` is open to anyone who has
+  the link. Testing a hashed URL and seeing a login proves nothing about the alias.
 - **`API_TOKEN`** on the server. Port 3200 is open to the internet — it has to be, for
   Vercel to reach it — so every `/api` and `/reports` request must carry
   `x-tracker-token`. Without it the answer is 401. Only the Vercel proxy holds it.
@@ -85,9 +87,18 @@ tar czf - --exclude=node_modules --exclude=.env --exclude=vercel-site \
 
 ## The frontend
 
+The Vercel project is **connected to this GitHub repo**, so every push to `main`
+triggers a production build. That is why `vercel-site/` is committed rather than
+gitignored: a git build only sees what is in the repo.
+
+> The project's **Root Directory** must be `tracker/vercel-site`. Without it a push
+> builds from the repo root, produces nothing usable, and the site 404s until
+> someone deploys again by hand. That has already happened once.
+
 `vercel-site/` is assembled, not edited. The pages live in `public/` because that is
 where Express serves them from; Vercel wants static files at the root and functions
-under `api/`, so the shape it expects is built:
+under `api/`, so the shape it expects is built. Rebuild it and commit the result in
+the same change as any edit to `public/`:
 
 ```bash
 node scripts/build-vercel-site.mjs

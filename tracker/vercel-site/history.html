@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>History — Shopify Tracker</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="bl">
+      <a class="btn back" href="/" title="Back to all stores"><span class="ar">←</span> All stores</a>
+      <div class="av" id="av" style="background:var(--blue)">··</div>
+      <div style="min-width:0">
+        <div class="ttl" id="nm">Loading…</div>
+        <div class="sub" id="meta"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:7px;align-items:center">
+      <div class="seg">
+        <a class="segb" id="tabReport">Report</a>
+        <a class="segb on">History</a>
+      </div>
+      <button class="btn ico" id="tg" title="Switch theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+
+  <div class="note" style="margin-top:0">
+    <b>This is the archive.</b> Once a CSV has been ingested it can be deleted from Drive —
+    every day's file is rebuilt here from the database, exactly as it was on that date.
+  </div>
+
+  <div class="calbar" style="margin-top:22px">
+    <h2 style="margin:0">Archived days</h2>
+    <div class="mnav" id="mnav" hidden>
+      <button class="btn ico" id="pm" title="Previous month">‹</button>
+      <b id="ml"></b>
+      <button class="btn ico" id="nm2" title="Next month">›</button>
+    </div>
+  </div>
+  <div id="daylist"><div class="spin">loading…</div></div>
+  <div class="callegend" id="leg" hidden></div>
+
+  <div id="detail" hidden>
+    <div class="snaphead">
+      <div>
+        <h2 style="margin:0">Catalogue on <span id="dLabel">…</span></h2>
+        <div class="sub" id="dSub"></div>
+      </div>
+      <button class="btn pri" id="dl">📥 Download this day as CSV</button>
+    </div>
+
+    <div class="runcard" id="runcard"></div>
+
+    <div class="searchbar sm" style="margin-top:16px">
+      <span class="si">🔍</span>
+      <input id="q" type="search" autocomplete="off"
+             placeholder="Search this day's catalogue — product, handle, SKU or variant…">
+      <button class="clr" id="qc" hidden>✕</button>
+    </div>
+
+    <div class="tw" style="border-top:1px solid var(--border);border-radius:12px">
+      <table>
+        <thead><tr>
+          <th>Product</th><th>Vendor</th><th>Type</th><th>Variant</th>
+          <th>Price</th><th>Compare at</th><th>Discount</th><th>Stock</th><th>Qty</th>
+          <th class="hint" title="When this variant first appeared in the feed — not the day you are viewing. A store's first run makes every variant &quot;first seen&quot; on that date.">First seen</th><th class="hint" title="Date of this variant's last recorded change. It has stayed the same from then until the day you are viewing.">Unchanged since</th><th>Tags</th><th></th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="pager">
+      <span id="cnt"></span>
+      <span class="grow"></span>
+      <button class="btn" id="prev">← Previous</button>
+      <span id="pg" class="pgn"></span>
+      <button class="btn" id="next">Next →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ID  = new URLSearchParams(location.search).get('id') || '1'
+const nf  = n => n == null ? '—' : new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n)
+const dtL = s => s ? new Date(s).toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}) : '—'
+const dt  = s => s ? new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '—'
+const esc = s => String(s ?? '').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
+
+let CUR = 'PKR', DATE = null, OFF = 0, Q = '', LIMIT = 100, SNAPS = []
+
+const STOCK = { in:'<span class="bdg in"><span class="d"></span>In</span>',
+                out:'<span class="bdg out"><span class="d"></span>Out</span>' }
+
+/** Show the option NAME with its value, so "M" reads as "Size M". */
+function optCell (x) {
+  const parts = [[x.option1_name, x.option1_value], [x.option2_name, x.option2_value],
+                 [x.option3_name, x.option3_value]].filter(([, v]) => v)
+  if (!parts.length) return '—'
+  return parts.map(([n, v]) =>
+    `<span class="vp" title="${esc(n||'')}">${n ? `<i>${esc(n)}</i> ` : ''}${esc(v)}</span>`).join('')
+}
+/** The store's own count, when it publishes one. Blank and 0 tell us nothing. */
+const qtyCell = r => r.inventory_qty > 0
+  ? `<b style="color:var(--ink)">${nf(r.inventory_qty)}</b>`
+  : `<span class="unk" title="This store does not publish a stock count">unknown</span>`
+
+function tagCell (tags) {
+  if (!tags || !tags.length) return '<span class="s2">—</span>'
+  const shown = tags.slice(0, 3).map(t => `<span class="tg2">${esc(t)}</span>`).join('')
+  return shown + (tags.length > 3 ? `<span class="s2"> +${tags.length - 3}</span>` : '')
+}
+
+tabReport.href = `/store.html?id=${ID}`
+
+async function boot () {
+  const s = await (await fetch(`/api/stores/${ID}`)).json()
+  CUR = s.currency
+  document.title = `${s.name} — History`
+  nm.textContent = s.name
+  av.textContent = s.name.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()
+  av.style.background = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948'][(s.id-1)%8]
+  meta.textContent = `${s.domain} · ID ${s.id} · ${s.currency}`
+
+  SNAPS = await (await fetch(`/api/stores/${ID}/snapshots`)).json()
+  if (!SNAPS.length) {
+    daylist.innerHTML = `<div class="nores"><div class="ne">📂</div>
+      <div class="nt">Nothing archived yet</div>
+      <div class="nd">Ingest a CSV for this store and it will appear here.</div></div>`
+    return
+  }
+  buildScale()
+  select(SNAPS[0].run_date)
+}
+
+const MON = ['January','February','March','April','May','June','July','August',
+             'September','October','November','December']
+const BY = new Map()          // run_date -> run
+let FIRST, LAST, CUTS = [], MY, MM
+
+/** Shade by quantile. Stores routinely have one first-run day worth 500x an
+ *  ordinary one; on a linear ramp every real day collapses to the palest step. */
+function buildScale () {
+  SNAPS.forEach(s => BY.set(s.run_date, s))
+  const dates = SNAPS.map(s => s.run_date).sort()
+  FIRST = dates[0]; LAST = dates[dates.length - 1]
+  const c = SNAPS.map(s => s.changes_found ?? 0).sort((x, y) => x - y)
+  CUTS = [1, 2, 3, 4].map(k => c[Math.floor(c.length * k / 5)])
+  const [y, m] = LAST.split('-').map(Number)
+  MY = y; MM = m - 1
+}
+const heat = c => !c ? 0 : c < CUTS[0] ? 1 : c < CUTS[1] ? 2 : c < CUTS[2] ? 3 : 4
+
+function renderDays () {
+  const iso = (y, m, d) => `${y}-${String(m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+  ml.textContent = MON[MM] + ' ' + MY
+  mnav.hidden = false
+
+  const lead = (new Date(Date.UTC(MY, MM, 1)).getUTCDay() + 6) % 7      // Monday-first
+  const days = new Date(Date.UTC(MY, MM + 1, 0)).getUTCDate()
+  let h = ['Mo','Tu','We','Th','Fr','Sa','Su'].map(d => `<div class="dow">${d}</div>`).join('')
+  h += '<div></div>'.repeat(lead)
+
+  for (let n = 1; n <= days; n++) {
+    const d = iso(MY, MM, n), s = BY.get(d)
+    if (s) {
+      const mk = { partial:'wrn', failed:'err', pending:'err' }[s.status]
+      h += `<button class="cell has h${heat(s.changes_found)}${d===DATE?' on':''}" data-d="${d}"
+        title="${dtL(d)} · ${nf(s.changes_found)} changes · ${s.status}">${n}` +
+        (mk ? `<span class="mk ${mk}"></span>` : '') + `</button>`
+    } else {
+      // A date inside the tracked window with no run means the scrape never
+      // landed. The old card grid simply showed nothing and said nothing.
+      const inside = d >= FIRST && d <= LAST
+      h += `<div class="cell ${inside ? 'gap' : 'out'}"${inside ? ' title="No scrape run on this day"' : ''}>${n}</div>`
+    }
+  }
+  daylist.className = 'cal'
+  daylist.innerHTML = h
+  daylist.querySelectorAll('.cell.has').forEach(b => b.onclick = () => select(b.dataset.d))
+
+  leg.hidden = false
+  leg.innerHTML = '<span>fewer changes</span>' +
+    [0,1,2,3,4].map(i => `<span class="sw cell h${i}" style="aspect-ratio:auto"></span>`).join('') +
+    '<span>more</span><span class="sep"></span>' +
+    '<span class="sw" style="border:1px dashed var(--critical)"></span><span>no run</span>' +
+    '<span class="sep"></span><span class="sw" style="border:0;background:var(--warning);' +
+    'width:7px;height:7px;border-radius:50%"></span><span>partial</span>'
+
+  pm.disabled = iso(MY, MM, 1) <= FIRST
+  nm2.disabled = iso(MY, MM, days) >= LAST
+}
+
+function shift (n) {
+  MM += n
+  if (MM < 0) { MM = 11; MY-- }
+  if (MM > 11) { MM = 0; MY++ }
+  renderDays()
+}
+
+function select (date) {
+  DATE = date; OFF = 0; Q = ''; q.value = ''; qc.hidden = true
+  renderDays(); detail.hidden = false; load()
+}
+
+async function load () {
+  rows.innerHTML = Array.from({length:8},()=>`<tr class="skr"><td colspan="13"><div class="skl w90"></div></td></tr>`).join('')
+  const r = await (await fetch(
+    `/api/stores/${ID}/snapshot?date=${DATE}&offset=${OFF}&limit=${LIMIT}${Q?`&q=${encodeURIComponent(Q)}`:''}`)).json()
+
+  dLabel.textContent = dtL(r.date)
+  dSub.innerHTML = `${nf(r.total_products)} products · ${nf(r.total_variants)} variants` +
+    (r.in_stock_count != null && r.shown
+      ? ` · <b>${nf(r.in_stock_count)}</b> of the ${nf(r.shown)} on this page in stock` : '') +
+    (Q ? '  (filtered)' : '')
+
+  const run = r.run
+  runcard.innerHTML = run ? `
+    <div class="rc"><span>Source file</span><b class="mono">${esc(run.file_name || '—')}</b></div>
+    <div class="rc"><span>Scrape status</span><b>${run.status}</b></div>
+    <div class="rc"><span>CSV rows</span><b>${nf(run.rows_ingested)}</b></div>
+    <div class="rc"><span>Products in file</span><b>${nf(run.products_found)}</b></div>
+    <div class="rc"><span>Variants in file</span><b>${nf(run.variants_found)}</b></div>
+    <div class="rc"><span>Changes recorded</span><b>${nf(run.changes_found)}</b></div>`
+    : `<div class="rc"><span>No scrape run</span><b>reconstructed from earlier data</b></div>`
+
+  cnt.innerHTML = r.total_variants
+    ? `showing <b>${r.offset+1}–${r.offset+r.shown}</b> of ${nf(r.total_variants)} variants` : ''
+  pg.textContent = r.total_variants ? `page ${Math.floor(OFF/LIMIT)+1} of ${Math.max(1,Math.ceil(r.total_variants/LIMIT))}` : ''
+  prev.disabled = OFF === 0
+  next.disabled = OFF + r.shown >= r.total_variants
+
+  rows.innerHTML = r.rows.length ? r.rows.map(x => `
+    <tr>
+      <td><div class="pcell">
+        ${x.image_src ? `<img class="thumb" src="${esc(x.image_src)}" loading="lazy" alt="">` : `<div class="thumb"></div>`}
+        <div style="min-width:0">
+          <div class="pt">${esc(x.title||'—')}</div>
+          <div class="hd">${esc(x.handle)}</div>
+          ${x.sku ? `<div class="sk">SKU · ${esc(x.sku)}</div>` : ''}
+        </div></div></td>
+      <td class="tight">${esc(x.vendor||'—')}</td>
+      <td class="tight">${esc(x.product_type||'—')}</td>
+      <td>${optCell(x)}</td>
+      <td class="num"><span class="newp">${nf(x.price)}</span><div class="s2">${CUR}</div></td>
+      <td class="num">${x.compare_at_price ? nf(x.compare_at_price) : '—'}</td>
+      <td class="num">${Number(x.discount_pct) ? `<b style="color:var(--ink)">${x.discount_pct}%</b>` : '—'}</td>
+      <td>${x.in_stock ? STOCK.in : STOCK.out}</td>
+      <td class="num">${qtyCell(x)}</td>
+      <td class="num">${dt(x.first_seen_at)}</td>
+      <td class="num">${dt(x.last_changed)}</td>
+      <td class="tagcell">${tagCell(x.tags)}</td>
+      <td><a class="lnk" href="${esc(x.product_url)}" target="_blank" rel="noopener">Open ↗</a></td>
+    </tr>`).join('')
+    : `<tr><td colspan="13"><div class="nores" style="border:0;background:none;padding:40px 10px">
+         <div class="ne">🔍</div><div class="nt">Nothing found</div>
+         <div class="nd">${Q?`No rows match “${esc(Q)}” on this date.`:'This day has no catalogue data.'}</div>
+       </div></td></tr>`
+}
+
+let t
+q.addEventListener('input', () => {
+  Q = q.value.trim(); qc.hidden = !Q; OFF = 0
+  clearTimeout(t); t = setTimeout(load, 220)
+})
+qc.onclick = () => { q.value=''; Q=''; qc.hidden=true; OFF=0; load(); q.focus() }
+prev.onclick = () => { OFF = Math.max(0, OFF - LIMIT); load(); scrollTo({top:detail.offsetTop-20,behavior:'smooth'}) }
+next.onclick = () => { OFF += LIMIT; load(); scrollTo({top:detail.offsetTop-20,behavior:'smooth'}) }
+dl.onclick = () => location.href = `/api/stores/${ID}/snapshot.csv?date=${DATE}`
+pm.onclick = () => shift(-1)
+nm2.onclick = () => shift(1)
+tg.onclick = () => {
+  const cur = document.documentElement.getAttribute('data-theme')
+    || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+  document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark')
+}
+
+boot()
+</script>
+</body>
+</html>

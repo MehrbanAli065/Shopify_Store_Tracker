@@ -1,0 +1,4 @@
+# The Vercel CLI's own state — the project link and its pulled env values.
+# Never commit these; the link is per-machine and .env.local holds secrets.
+.vercel
+.env.local

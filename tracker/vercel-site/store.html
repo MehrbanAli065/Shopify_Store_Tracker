@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Store Report — Shopify Tracker</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="bl">
+      <a class="btn back" href="/" title="Back to all stores"><span class="ar">←</span> All stores</a>
+      <div class="av" id="av" style="background:var(--blue)">··</div>
+      <div style="min-width:0">
+        <div class="ttl" id="nm">Loading…</div>
+        <div class="sub" id="meta"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:7px;align-items:center">
+      <div class="seg">
+        <a class="segb on">Report</a>
+        <a class="segb" id="tabHistory">History</a>
+      </div>
+      <a class="btn" id="csv" href="#" title="Download the full change log as CSV">📄 CSV</a>
+      <a class="btn pri" id="pdf" href="#" target="_blank" rel="noopener"
+         title="Open a clean, print-ready report">📥 PDF</a>
+      <button class="btn" id="gen" aria-expanded="false" aria-controls="genbar"
+              title="Generate a link to this report">⚙ Generate</button>
+      <button class="btn ico" id="tg" title="Switch theme">◐</button>
+    </div>
+  </div>
+
+  <!-- ── generated link, revealed by the Generate button ── -->
+  <div class="genbar" id="genbar" hidden>
+    <div class="genbar-in">
+      <input id="genurl" type="text" spellcheck="false"
+             placeholder="Link will appear here…" aria-label="Generated link">
+      <!-- Real anchors, not buttons calling window.open: a popup blocker kills
+           the scripted open silently, which is how the PDF button broke once. -->
+      <a class="btn" id="genopen" target="_blank" rel="noopener" aria-disabled="true">Open ↗</a>
+      <a class="btn pri" id="gendl" target="_blank" rel="noopener" aria-disabled="true">Download</a>
+    </div>
+    <div class="genbar-note" id="genNote" hidden></div>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- ── date range ── -->
+  <div class="frow">
+    <span class="flabel">Period</span>
+    <button class="chip preset" data-p="all">Full range</button>
+    <button class="chip preset" data-p="7">Last 7 days</button>
+    <button class="chip preset" data-p="30">Last 30 days</button>
+    <span class="divx"></span>
+    <input type="date" id="from"><span class="arrow">→</span><input type="date" id="to">
+    <button class="chip on" id="apply">Apply</button>
+    <span class="rescount" id="rangeNote" style="margin:0 0 0 4px"></span>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <!-- ── charts ── -->
+  <div class="cgrid">
+    <section class="chart">
+      <div class="ch">
+        <div><div class="ct">Discount spread</div><div class="cs">Active variants by discount band</div></div>
+      </div>
+      <div id="chDisc" class="chold">…</div>
+    </section>
+
+    <section class="chart">
+      <div class="ch">
+        <div><div class="ct">What changed</div><div class="cs" id="csChange">In the selected period</div></div>
+      </div>
+      <div id="chChange" class="chold">…</div>
+    </section>
+
+    <section class="chart wide">
+      <div class="ch">
+        <div><div class="ct">Top product categories</div><div class="cs">Active products by type</div></div>
+      </div>
+      <div id="chTypes" class="chold">…</div>
+    </section>
+  </div>
+
+  <!-- ── daily activity ── -->
+  <h2>Day by day</h2>
+  <div class="stripwrap">
+    <div class="strip" id="strip"></div>
+    <div class="striplab" id="striplab"></div>
+  </div>
+  <div class="lgnd" id="striplgnd" style="margin:8px 0 10px"></div>
+  <div class="days capped">
+    <table class="dt">
+      <thead><tr><th>Date</th><th>New</th><th>Price Δ</th><th>Stock out</th><th>Stock in</th><th>Removed</th><th>Relisted</th><th>History rows</th></tr></thead>
+      <tbody id="daily"></tbody>
+    </table>
+  </div>
+  <p class="hintline">A day with <b>0 history rows</b> means nothing changed that day — the scrape still ran and every variant was checked.</p>
+
+  <!-- ── change log ── -->
+  <h2>Change log</h2>
+  <div class="searchbar sm">
+    <span class="si">🔍</span>
+    <input id="q" type="search" autocomplete="off" placeholder="Filter by product name, handle or SKU…">
+    <button class="clr" id="qc" hidden>✕</button>
+  </div>
+  <label class="basetog"><input type="checkbox" id="baseChk">
+    Include the first import <span id="baseHint"></span></label>
+  <div class="tabs" id="tabs"></div>
+  <div class="logbar">
+    <label for="dsel">Date</label>
+    <select id="dsel"><option value="">All dates</option></select>
+  </div>
+  <div class="tw scrolly"><table>
+    <thead><tr>
+      <th>Product</th><th>Variant</th><th>Price</th><th>Change</th>
+      <th>Discount</th><th>Stock</th><th>Qty</th><th>Date</th><th></th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <div class="pager" id="pager" hidden></div>
+  <div class="foot"><span id="cnt"></span></div>
+</div>
+
+<!-- ── product drawer ── -->
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden>
+  <div class="dh">
+    <div style="min-width:0">
+      <div class="dt2" id="dTitle">…</div>
+      <div class="hd" id="dHandle"></div>
+    </div>
+    <button class="btn ico" id="dClose" title="Close">✕</button>
+  </div>
+  <div class="db" id="dBody"></div>
+</aside>
+
+<div class="tip" id="tip" hidden></div>
+
+<script>
+const ID  = new URLSearchParams(location.search).get('id') || '1'
+const nf  = n => n == null ? '—' : new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n)
+const dt  = s => s ? new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '—'
+const iso = d => d.toISOString().slice(0,10)
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
+
+const TABS = [
+  { key:'',        label:'All' },
+  { key:'price',   label:'Price changes' },
+  { key:'new',     label:'New' },
+  { key:'stock',   label:'Stock' },
+  { key:'removed', label:'Removed' },
+  { key:'relisted', label:'Relisted' }
+]
+const CHANGE_HUES = { new:'var(--s1)', price:'var(--s2)', stock:'var(--s3)', removed:'var(--s4)' }
+
+  // ── one bar per day ─────────────────────────────────────────────
+/** Same four hues as the period chart below, so a colour means the same thing
+ *  in both. Relisted gets the light ordinal blue: it is rare, and pairing it
+ *  with the removed amber would read as one category. */
+const DAY_PARTS = [
+  ['New',      d => d.new_items,  'var(--s1)'],
+  ['Price',    d => d.price,      'var(--s2)'],
+  ['Stock',    d => d.stock_out + d.stock_in, 'var(--s3)'],
+  ['Relisted', d => d.relisted,   'var(--o1)'],
+  ['Removed',  d => d.removed,    'var(--s4)'],
+]
+
+function renderStrip (daily) {
+  if (!daily.length) { strip.innerHTML = ''; striplab.innerHTML = ''; striplgnd.innerHTML = ''; return }
+
+  // Square-root heights. One first-run day is routinely hundreds of times an
+  // ordinary one, and on a linear scale it flattens every other day to nothing.
+  const max = Math.max(...daily.map(d => d.total), 1)
+  const h = v => Math.max(2, Math.sqrt(v / max) * 62)
+
+  strip.innerHTML = daily.map(d => {
+    const segs = DAY_PARTS.map(([l, get, hue]) => [l, get(d), hue]).filter(p => p[1] > 0)
+    const tip = segs.length
+      ? `${dt(d.observed_date)} — ` + segs.map(([l, v]) => `${l} ${nf(v)}`).join(' · ')
+      : `${dt(d.observed_date)} — nothing changed`
+    const cls = segs.length ? '' : ' quiet'
+    // The bar's height comes from the day's total; each segment takes its share
+    // of that bar, so the stack always adds up to the height the scale asked for.
+    const H = h(d.total)
+    return `<div class="stk${cls}" data-tip="${tip}">` + segs.map(([, v, hue]) =>
+      `<div class="sg" style="height:${(H * v / d.total).toFixed(2)}px;background:${hue}"></div>`
+      ).join('') + `</div>`
+  }).join('')
+
+  // Labels would collide at a day apart, so only every nth date is written.
+  const step = Math.max(1, Math.ceil(daily.length / 12))
+  striplab.innerHTML = daily.map((d, i) =>
+    `<span>${i % step === 0 || i === daily.length - 1 ? dt(d.observed_date) : ''}</span>`).join('')
+
+  const totals = DAY_PARTS.map(([l, get, hue]) =>
+    [l, daily.reduce((a, d) => a + get(d), 0), hue]).filter(p => p[1] > 0)
+  striplgnd.innerHTML = totals.map(([l, v, hue]) =>
+    `<span><i style="background:${hue}"></i>${l} <b>${nf(v)}</b></span>`).join('') +
+    `<span style="color:var(--muted)"><i style="background:var(--line)"></i>no change</span>`
+
+  bindTips(strip)
+}
+
+let tab = '', CUR = 'PKR', RANGE = {}, ROWS = [], q = '', showBase = false, BASE_N = 0
+let PER_DATE = [], PAGE = 0, TOTAL = 0, ONE_DATE = ''
+const PAGE_SIZE = 100
+
+const STOCK = { in:'<span class="bdg in"><span class="d"></span>In</span>',
+                out:'<span class="bdg out"><span class="d"></span>Out</span>',
+                nw:'<span class="bdg nw"><span class="d"></span>New</span>',
+                rm:'<span class="bdg rm"><span class="d"></span>Removed</span>' }
+
+const qsDates = () => {
+  const f = from.value, t = to.value
+  return (f ? `from=${f}&` : '') + (t ? `to=${t}&` : '')
+}
+
+// ═══ tooltip ═══
+const tip = document.getElementById('tip')
+function showTip (e, html) {
+  tip.innerHTML = html; tip.hidden = false
+  const r = tip.getBoundingClientRect()
+  tip.style.left = Math.min(Math.max(8, e.clientX - r.width/2), innerWidth - r.width - 8) + 'px'
+  tip.style.top  = Math.max(8, e.clientY - r.height - 12) + 'px'
+}
+const hideTip = () => { tip.hidden = true }
+
+tabHistory.href = `/history.html?id=${ID}`
+
+// ═══ boot ═══
+async function boot () {
+  const s = await (await fetch(`/api/stores/${ID}`)).json()
+  CUR = s.currency; RANGE = s.range
+  document.title = `${s.name} — Report`
+  nm.textContent = s.name
+  av.textContent = s.name.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()
+  av.style.background = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948'][(s.id-1)%8]
+  meta.textContent = `${s.domain} · ID ${s.id} · ${s.currency}`
+  from.value = s.range.from || ''; to.value = s.range.to || ''
+  rangeNote.innerHTML = s.range.from ? `data available <b>${dt(s.range.from)} – ${dt(s.range.to)}</b>` : ''
+  renderTabs(); loadAll()
+}
+
+function renderTabs () {
+  tabs.innerHTML = TABS.map(t =>
+    `<button class="tab ${t.key===tab?'on':''}" data-k="${t.key}">${t.label}<span class="tn" data-c="${t.key}"></span></button>`).join('')
+  document.querySelectorAll('.tab').forEach(b =>
+    b.onclick = () => { tab = b.dataset.k; renderTabs(); syncExportLinks(); loadRows() })
+}
+
+async function loadAll () {
+  syncExportLinks()
+  await Promise.all([loadKpis(), loadRows(), loadCharts()])
+}
+
+/**
+ * Apply reloads everything, which on a cached range can finish before the eye
+ * registers it, so the click read as if nothing had happened. Hold the busy
+ * state for a moment even when the data is already back: feedback that is too
+ * fast to see is the same as no feedback.
+ */
+async function applyRange () {
+  if (apply.disabled) return
+  apply.disabled = true
+  const label = apply.textContent
+  apply.textContent = 'Applying…'
+  document.querySelector('.page').classList.add('reloading')
+  const started = Date.now()
+  try {
+    await loadAll()
+  } finally {
+    const held = 320 - (Date.now() - started)
+    if (held > 0) await new Promise(r => setTimeout(r, held))
+    apply.disabled = false
+    apply.textContent = label
+    document.querySelector('.page').classList.remove('reloading')
+    rangeNote.classList.remove('flash')
+    void rangeNote.offsetWidth          // restart the animation on a repeat click
+    rangeNote.classList.add('flash')
+  }
+}
+
+// ═══ KPIs + daily ═══
+async function loadKpis () {
+  const k = await (await fetch(`/api/stores/${ID}/summary?${qsDates()}`)).json()
+  const priceTotal = k.price_down + k.price_up + k.discount_change
+  // The unfiltered table leaves relistings out, so its tab count has to as
+  // well, or the number promises rows the table will not show.
+  const reportedTotal = k.new_items + priceTotal + k.stock_out + k.stock_in + k.removed
+  kpis.innerHTML = [
+    ['Products',      nf(k.products),  '', 'Active products in the catalogue'],
+    ['Variants',      nf(k.variants),  '', 'Size / colour combinations tracked'],
+    ['New products',  nf(k.new_items), 'c4','Arrived after tracking started — not the first import'],
+    ['Price changes', nf(priceTotal),  'c2','Price or discount moved'],
+    ['Out of stock',  nf(k.stock_out), 'c3','Dropped out of the feed'],
+    ['Removed',       nf(k.removed),   'c5','Whole product delisted'],
+    ['Avg discount',  (k.avg_discount ?? 0)+'%','', 'Across all discounted variants']
+  ].map(([l,v,c,h]) => `<div class="kpi ${c}" title="${h}"><div class="k">${l}</div><div class="v">${v}</div></div>`).join('')
+
+  BASE_N = k.baseline_items || 0
+  baseHint.textContent = BASE_N ? `(${nf(BASE_N)} rows from the initial load)` : '(none in this range)'
+  baseChk.disabled = !BASE_N
+
+  document.querySelectorAll('.tn').forEach(el => {
+    const n = { '':reportedTotal, price:priceTotal, new:k.new_items,
+                stock:k.stock_out+k.stock_in, removed:k.removed,
+                relisted:k.relisted }[el.dataset.c]
+    el.textContent = n ? ` ${n}` : ''
+  })
+
+  daily.innerHTML = k.daily.length ? k.daily.map(d => `
+    <tr><td class="num">${dt(d.observed_date)}</td>
+      <td class="num ${d.new_items?'':'z'}">${d.new_items}${d.baseline_items?`<div class="s2">+${nf(d.baseline_items)} initial</div>`:''}</td>
+      <td class="num ${d.price?'':'z'}">${d.price}</td>
+      <td class="num ${d.stock_out?'':'z'}">${d.stock_out}</td>
+      <td class="num ${d.stock_in?'':'z'}">${d.stock_in}</td>
+      <td class="num ${d.removed?'':'z'}">${d.removed}</td>
+      <td class="num ${d.relisted?'':'z'}">${d.relisted}</td>
+      <td class="num"><b style="color:var(--ink)">${d.total}</b></td></tr>`).join('')
+    : `<tr><td colspan="8" class="empty">No activity in this range</td></tr>`
+
+  renderStrip(k.daily)
+
+  // ── "what changed" stacked bar
+  const parts = [
+    ['New',     k.new_items,  'new'],
+    ['Price',   priceTotal,   'price'],
+    ['Stock',   k.stock_out + k.stock_in, 'stock'],
+    ['Removed', k.removed,    'removed']
+  ].filter(p => p[1] > 0)
+  const tot = parts.reduce((a,p)=>a+p[1],0)
+  csChange.textContent = tot ? `${nf(tot)} events · ${dt(from.value)} – ${dt(to.value)}` : 'In the selected period'
+
+  chChange.innerHTML = !tot
+    ? `<div class="cempty">No changes recorded in this period</div>`
+    : `<div class="hbar">${parts.map(([l,n,key]) =>
+         `<div class="hseg" style="flex:${n};background:${CHANGE_HUES[key]}"
+               data-tip="${l}: ${nf(n)} (${(n/tot*100).toFixed(1)}%)"></div>`).join('')}</div>
+       <div class="lgnd">${parts.map(([l,n,key]) =>
+         `<span><i style="background:${CHANGE_HUES[key]}"></i>${l} <b>${nf(n)}</b></span>`).join('')}</div>`
+  bindTips(chChange)
+}
+
+// ═══ charts ═══
+async function loadCharts () {
+  const d = await (await fetch(`/api/stores/${ID}/distribution`)).json()
+
+  // discount buckets — ordinal one-hue ramp, counts labelled above each bar
+  const max = Math.max(...d.discount.map(b => b.n), 1)
+  chDisc.innerHTML = `
+    <div class="vbars">${d.discount.map((b,i) => `
+      <div class="vcol" data-tip="${b.bucket}: ${nf(b.n)} variants">
+        <div class="vval">${b.n ? nf(b.n) : ''}</div>
+        <div class="vtrack"><div class="vbar" style="height:${Math.max(b.n/max*100,b.n?2.5:0)}%;
+             background:var(--o${i+1})"></div></div>
+        <div class="vlbl">${b.bucket}</div>
+      </div>`).join('')}</div>
+    <div class="statline">
+      <span>Price range <b>${nf(d.price?.min)} – ${nf(d.price?.max)}</b></span>
+      <span>Median <b>${nf(d.price?.median)}</b></span>
+      <span>${CUR}</span>
+    </div>`
+  bindTips(chDisc)
+
+  // product types — single hue horizontal bars
+  const tmax = Math.max(...d.types.map(t => t.n), 1)
+  chTypes.innerHTML = d.types.length ? `<div class="hbars">${d.types.map(t => `
+      <div class="hrow" data-tip="${esc(t.label)}: ${nf(t.n)} products">
+        <div class="hlbl" title="${esc(t.label)}">${esc(t.label)}</div>
+        <div class="htrack"><div class="hfill" style="width:${t.n/tmax*100}%"></div></div>
+        <div class="hnum">${nf(t.n)}</div>
+      </div>`).join('')}</div>`
+    : `<div class="cempty">No product types recorded</div>`
+  bindTips(chTypes)
+}
+
+function bindTips (root) {
+  root.querySelectorAll('[data-tip]').forEach(el => {
+    el.onmousemove = e => showTip(e, el.dataset.tip)
+    el.onmouseleave = hideTip
+  })
+}
+
+// ═══ table ═══
+function priceCell (r) {
+  if (r.change_type === 'new')
+    return `<span class="newp">${nf(r.price)}</span>` +
+           (r.compare_at_price ? `<div class="s2">was ${nf(r.compare_at_price)}</div>` : '')
+  if (r.prev_price != null && Number(r.prev_price) !== Number(r.price))
+    return `<span class="old">${nf(r.prev_price)}</span><span class="arw">→</span><span class="newp">${nf(r.price)}</span>`
+  return `<span class="newp">${nf(r.price)}</span>`
+}
+function changeCell (r) {
+  if (r.is_baseline) return `<span class="mut">FIRST IMPORT</span>`
+  const M = { new:['up','NEW'], removed:['mut','REMOVED'], stock_out:['dn','STOCK OUT'], stock_in:['up','RESTOCKED'] }
+  if (M[r.change_type]) return `<span class="${M[r.change_type][0]}">${M[r.change_type][1]}</span>`
+  if (r.price_diff == null || Number(r.price_diff) === 0) return `<span class="mut">DISCOUNT ONLY</span>`
+  const v = Number(r.price_diff)
+  return `<span class="${v<0?'dn':'up'}">${v>0?'+':''}${nf(v)}<div class="s2" style="color:inherit">${r.price_diff_pct>0?'+':''}${r.price_diff_pct}%</div></span>`
+}
+const stockCell = r => r.change_type==='new' ? STOCK.nw
+                     : r.change_type==='removed' ? STOCK.rm
+                     : r.in_stock ? STOCK.in : STOCK.out
+/** The store's own count, when it publishes one. Blank and 0 tell us nothing. */
+const qtyCell = r => r.inventory_qty > 0
+  ? `<b style="color:var(--ink)">${nf(r.inventory_qty)}</b>`
+  : `<span class="unk" title="This store does not publish a stock count">unknown</span>`
+
+function discCell (r) {
+  const p = Number(r.prev_discount_pct||0), n = Number(r.discount_pct||0)
+  if (r.change_type === 'new') return n ? `${n}%` : '—'
+  return p !== n ? `${p}% <span class="arw">→</span> <b style="color:var(--ink)">${n}%</b>` : (n ? `${n}%` : '—')
+}
+
+async function loadRows (keepPage) {
+  if (!keepPage) PAGE = 0
+  rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="9"><div class="skl w90"></div></td></tr>`).join('')
+  const r = await (await fetch(
+    `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}` +
+    `${ONE_DATE?`date=${ONE_DATE}&`:''}limit=${PAGE_SIZE}&offset=${PAGE * PAGE_SIZE}`)).json()
+  ROWS = r.rows; TOTAL = r.total; window.__total = r.total
+  if (r.per_date) { PER_DATE = r.per_date; fillDateSelect() }
+  document.querySelector('.tw').scrollTop = 0
+  paint(); renderPager()
+}
+
+// The picker is the way back to an older day now that the table pages newest
+// first: without it, reaching 28 July would mean clicking through 80 pages.
+function fillDateSelect () {
+  const cur = dsel.value
+  dsel.innerHTML = `<option value="">All dates</option>` + PER_DATE.map(p =>
+    `<option value="${esc(p.date)}"${p.total ? '' : ' disabled'}>${dt(p.date)} · ${nf(p.total)}</option>`).join('')
+  dsel.value = cur
+}
+
+function renderPager () {
+  const pages = Math.ceil(TOTAL / PAGE_SIZE)
+  if (pages <= 1) { pager.hidden = true; return }
+  pager.hidden = false
+  const win = []
+  for (let i = Math.max(0, PAGE - 2); i < Math.min(pages, PAGE + 3); i++) win.push(i)
+  const btn = (n, label, on, dis) =>
+    `<button class="pg${on ? ' on' : ''}" ${dis ? 'disabled' : ''} data-p="${n}">${label}</button>`
+  pager.innerHTML =
+    `<span class="pg-info">${nf(PAGE * PAGE_SIZE + 1)}–${nf(PAGE * PAGE_SIZE + ROWS.length)} of ${nf(TOTAL)}</span>` +
+    btn(PAGE - 1, '‹ Prev', false, PAGE === 0) +
+    (win[0] > 0 ? btn(0, '1', false) + (win[0] > 1 ? '<span class="pg-gap">…</span>' : '') : '') +
+    win.map(i => btn(i, String(i + 1), i === PAGE)).join('') +
+    (win[win.length-1] < pages-1
+      ? (win[win.length-1] < pages-2 ? '<span class="pg-gap">…</span>' : '') + btn(pages-1, String(pages))
+      : '') +
+    btn(PAGE + 1, 'Next ›', false, PAGE >= pages - 1)
+
+  pager.querySelectorAll('.pg').forEach(b => b.onclick = () => {
+    PAGE = Number(b.dataset.p); loadRows(true)
+  })
+}
+
+function paint () {
+  const t = q.toLowerCase()
+  const list = t ? ROWS.filter(x =>
+    (x.title||'').toLowerCase().includes(t) || x.handle.toLowerCase().includes(t) ||
+    (x.sku||'').toLowerCase().includes(t) || (x.variant_label||'').toLowerCase().includes(t)) : ROWS
+
+  cnt.innerHTML = ROWS.length
+    ? (q ? `<b>${list.length}</b> matching “${esc(q)}” · ` : '') +
+      `${nf(TOTAL)} change events${ONE_DATE ? ' on ' + dt(ONE_DATE) : ''}` : ''
+
+  // Grouped under a heading per date, so the range reads as "what changed on
+  // the 27th, then the 28th", not as one undated pile.
+  const grouped = new Map()
+  for (const x of list) {
+    if (!grouped.has(x.observed_date)) grouped.set(x.observed_date, [])
+    grouped.get(x.observed_date).push(x)
+  }
+
+  const head = (p, n) => {
+    const held = !q && p.total > n ? p.total - n : 0
+    const what = q ? `${nf(n)} matching`
+                   : p.total ? `${nf(p.total)} change${p.total === 1 ? '' : 's'}`
+                             : 'no changes · the scrape ran and every variant was checked'
+    return `<tr class="dgrp${p.total ? '' : ' quiet'}"><td colspan="9">
+      <span class="dg-d">${dt(p.date)}</span>
+      <span class="dg-n">${what}</span>
+      ${held ? `<span class="dg-h">${nf(p.total - n)} more on later pages</span>` : ''}
+    </td></tr>`
+  }
+
+  // Walk the dates rather than the rows, so a day with nothing to show still
+  // appears and says so. A missing heading reads as a day that was never looked
+  // at, which is a different thing entirely. While a search is running the
+  // quiet days are dropped, because "no changes" would then be answering a
+  // question nobody asked.
+  // Only the dates present on this page get a heading. A heading for a date
+  // whose rows are three pages away would promise rows that are not there.
+  const shownDates = PER_DATE.filter(p => grouped.has(p.date) || (!q && !ONE_DATE && !p.total))
+
+  rows.innerHTML = shownDates.length ? shownDates.map(p =>
+    head(p, (grouped.get(p.date) || []).length) + (grouped.get(p.date) || []).map(x => `
+    <tr class="crow" data-handle="${esc(x.handle)}" data-title="${esc(x.title||'')}">
+      <td><div class="pcell">
+        ${x.image_src ? `<img class="thumb" src="${esc(x.image_src)}" loading="lazy" alt="">` : `<div class="thumb"></div>`}
+        <div style="min-width:0">
+          <div class="pt">${esc(x.title||'—')}</div>
+          <div class="hd">${esc(x.handle)}</div>
+          ${x.sku ? `<div class="sk">SKU · ${esc(x.sku)}</div>` : ''}
+        </div></div></td>
+      <td>${(x.variant_label||'—').split(' / ').map(v=>`<span class="vp">${esc(v)}</span>`).join('')}</td>
+      <td class="num">${priceCell(x)}<div class="s2">${CUR}</div></td>
+      <td>${changeCell(x)}</td>
+      <td class="num">${discCell(x)}</td>
+      <td>${stockCell(x)}</td>
+      <td class="num">${qtyCell(x)}</td>
+      <td class="num">${dt(x.observed_date)}</td>
+      <td><a class="lnk" href="${esc(x.product_url)}" target="_blank" rel="noopener"
+             onclick="event.stopPropagation()">Open ↗</a></td>
+    </tr>`).join('')).join('')
+    : `<tr><td colspan="9"><div class="nores" style="border:0;background:none;padding:40px 10px">
+         <div class="ne">🔍</div><div class="nt">Nothing found</div>
+         <div class="nd">${q ? `No rows match “${esc(q)}”.` : 'No changes of this type in the selected period.'}</div>
+       </div></td></tr>`
+
+  document.querySelectorAll('.crow').forEach(tr =>
+    tr.onclick = () => openDrawer(tr.dataset.handle, tr.dataset.title))
+
+}
+
+// ═══ drawer — full product timeline ═══
+const EV = {
+  new:['New',           'var(--s1)'], price_down:['Price dropped','var(--critical)'],
+  price_up:['Price rose','var(--good)'], discount_change:['Discount changed','var(--warning)'],
+  stock_out:['Sold out', 'var(--s2)'],  stock_in:['Back in stock','var(--good)'],
+  removed:['Removed',    'var(--muted)'], relisted:['Back on the feed','var(--s1)']
+}
+/**
+ * Turn one variant's events into a row per calendar day, from the day it first
+ * appeared to the day it left (or to the latest run if it is still listed).
+ *
+ * Three outcomes per day, and they are not the same fact:
+ *   event  — something changed
+ *   quiet  — the scrape ran and this variant was unchanged
+ *   gap    — no scrape ran, so nothing is known about that day
+ */
+function walkDays (list, runs) {
+  const ranOn = new Set(runs.map(r => r.date))
+  const byDate = {}
+  for (const e of list) (byDate[e.observed_date] ||= []).push(e)
+
+  const gone = list.find(e => e.change_type === 'removed')
+  const start = list[0].observed_date
+  const end = gone ? gone.observed_date
+            : (runs.length ? runs[runs.length-1].date : list[list.length-1].observed_date)
+
+  // Parse, add and format all in UTC. Reading a local-midnight Date back through
+  // toISOString() lands on the previous day east of UTC, so the string never
+  // advances and the loop below never ends.
+  const step = s => { const t = new Date(s + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate()+1)
+                      return t.toISOString().slice(0,10) }
+
+  const out = []
+  for (let day = start; day <= end; day = step(day)) {
+    if (byDate[day]) out.push(...byDate[day].map(e => ({ kind:'event', date:day, e })))
+    else out.push({ kind: ranOn.has(day) ? 'quiet' : 'gap', date: day })
+  }
+  return out
+}
+
+async function openDrawer (handle, title) {
+  scrim.hidden = false; drawer.hidden = false
+  requestAnimationFrame(() => drawer.classList.add('open'))
+  dTitle.textContent = title || handle
+  dHandle.textContent = handle
+  dBody.innerHTML = `<div class="spin">loading timeline…</div>`
+
+  const data = await (await fetch(`/api/stores/${ID}/timeline?handle=${encodeURIComponent(handle)}`)).json()
+  const ev = data.events || [], runs = data.runs || []
+  if (!ev.length) { dBody.innerHTML = `<div class="empty">No history recorded</div>`; return }
+
+  const bySku = {}
+  for (const e of ev) (bySku[e.sku || e.variant_label || '—'] ||= []).push(e)
+
+  dBody.innerHTML = `
+    <div class="dmeta">
+      <div><span>First seen</span><b>${dt(ev[0].variant_first_seen)}</b></div>
+      <div><span>Last seen</span><b>${dt(ev.at(-1).last_seen_at)}</b></div>
+      <div><span>Variants</span><b>${Object.keys(bySku).length}</b></div>
+      <div><span>Events</span><b>${ev.length}</b></div>
+    </div>
+    <a class="btn" style="display:inline-block;margin-bottom:16px" target="_blank" rel="noopener"
+       href="${esc(ev[0].product_url)}">Open on store ↗</a>
+    ${Object.entries(bySku).map(([sku, list]) => `
+      <div class="vgroup">
+        <div class="vgh"><span class="vp">${esc(list[0].variant_label||'—')}</span>
+          <span class="sk">SKU · ${esc(sku)}</span></div>
+        ${(days => days.map((r,i) => {
+          const last = i === days.length - 1
+          if (r.kind !== 'event') return `<div class="ev ${r.kind} ${last?'last':''}">
+            <div class="evd">${dt(r.date)}</div>
+            <div class="evr"><span class="pin"></span><span class="bar"></span></div>
+            <div class="evb"><div class="evt">${r.kind==='quiet'?'No change':'No scrape that day'}</div></div>
+          </div>`
+          const e = r.e
+          const [lbl, col] = EV[e.change_type] || [e.change_type,'var(--muted)']
+          const moved = e.prev_price != null && Number(e.prev_price) !== Number(e.price)
+          return `<div class="ev ${last?'last':''}">
+            <div class="evd">${dt(e.observed_date)}</div>
+            <div class="evr"><span class="pin" style="background:${col}"></span><span class="bar"></span></div>
+            <div class="evb">
+              <div class="evt">${lbl}</div>
+              <div class="evx">
+                ${moved ? `<span class="old">${nf(e.prev_price)}</span><span class="arw">→</span><b>${nf(e.price)}</b>
+                           <span class="${Number(e.price_diff)<0?'dn':'up'}" style="margin-left:7px">
+                           ${Number(e.price_diff)>0?'+':''}${nf(e.price_diff)} (${e.price_diff_pct}%)</span>`
+                        : `<b>${nf(e.price)}</b> ${CUR}`}
+                ${Number(e.discount_pct) ? ` · ${e.discount_pct}% off` : ''}
+                ${e.change_type==='stock_out' ? ' · left the feed' : ''}
+              </div>
+            </div></div>`
+        }).join(''))(walkDays(list, runs))}
+      </div>`).join('')}`
+}
+const closeDrawer = () => {
+  drawer.classList.remove('open')
+  setTimeout(() => { drawer.hidden = true; scrim.hidden = true }, 180)
+}
+scrim.onclick = closeDrawer
+dClose.onclick = closeDrawer
+addEventListener('keydown', e => { if (e.key === 'Escape' && !drawer.hidden) closeDrawer() })
+
+// ═══ wiring ═══
+apply.onclick = applyRange
+document.querySelectorAll('.preset').forEach(b => b.onclick = () => {
+  if (b.dataset.p === 'all') { from.value = RANGE.from || ''; to.value = RANGE.to || '' }
+  else {
+    const end = new Date(RANGE.to || Date.now())
+    const start = new Date(end); start.setDate(start.getDate() - Number(b.dataset.p) + 1)
+    from.value = iso(start); to.value = iso(end)
+  }
+  applyRange()
+})
+const $q = document.getElementById('q')
+$q.addEventListener('input', () => { q = $q.value.trim(); qc.hidden = !q; paint() })
+qc.onclick = () => { $q.value=''; q=''; qc.hidden=true; paint(); $q.focus() }
+function syncExportLinks () {
+  const t = tab ? `type=${tab}&` : ''
+  csv.href = `/api/stores/${ID}/report.csv?${qsDates()}${t}${showBase ? 'baseline=1' : ''}`
+  pdf.href = `/print.html?id=${ID}&${qsDates()}${showBase ? 'baseline=1' : ''}`
+}
+baseChk.onchange = () => { showBase = baseChk.checked; syncExportLinks(); loadRows() }
+dsel.onchange = () => { ONE_DATE = dsel.value; loadRows() }
+tg.onclick = () => {
+  const cur = document.documentElement.getAttribute('data-theme')
+    || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+  document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark')
+}
+
+// ═══ generate: build the audit, then hand back its link ═══
+const syncGenActions = () => {
+  const u = genurl.value.trim()
+  const has = /^https?:\/\/|^\//.test(u)
+  for (const [el, href] of [[genopen, u], [gendl, u.replace(/\/+$/, '') + '/download']]) {
+    el.setAttribute('aria-disabled', String(!has))
+    if (has) el.href = href
+    else el.removeAttribute('href')
+  }
+}
+genurl.addEventListener('input', syncGenActions)
+syncGenActions()
+
+let generating = false
+gen.onclick = async () => {
+  // First click opens the bar and starts a build; while one is running the
+  // button is the only way to see progress, so it must not fire twice.
+  if (generating) return
+  if (genbar.hidden) { genbar.hidden = false; gen.setAttribute('aria-expanded', 'true') }
+  else if (genurl.value.trim()) { // already has a link — just fold the bar away
+    genbar.hidden = true; gen.setAttribute('aria-expanded', 'false'); return
+  }
+
+  generating = true
+  const label = gen.textContent
+  gen.textContent = '⚙ Generating…'
+  gen.classList.add('busy')
+  genurl.value = ''
+  genurl.placeholder = 'Reading the feed and writing the audit — this takes a few seconds…'
+  syncGenActions()
+
+  try {
+    const r = await fetch(`/api/stores/${ID}/audit?${qsDates()}`, { method: 'POST' })
+    const j = await r.json()
+    if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`)
+    genurl.value = location.origin + j.url
+    genurl.placeholder = ''
+    genNote.hidden = false
+    genNote.textContent =
+      `${j.doc_no} · ${(j.generated_ms / 1000).toFixed(1)}s · ${j.model}` +
+      (j.verified ? '' : ' · figures failed the check, deterministic text used')
+    genurl.select()
+  } catch (e) {
+    genurl.placeholder = ''
+    genNote.hidden = false
+    genNote.textContent = 'Could not generate: ' + e.message
+  } finally {
+    generating = false
+    gen.textContent = label
+    gen.classList.remove('busy')
+    syncGenActions()
+  }
+}
+
+// Open and Download need no handlers: syncGenActions sets their href, and the
+// browser follows it. The PDF comes from the browser's own print engine against
+// the report's print stylesheet, which is why /download is just another link.
+
+boot()
+</script>
+</body>
+</html>
