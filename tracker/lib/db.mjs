@@ -48,13 +48,19 @@ async function pool () {
       connectionString: URL,
       // hosted Postgres needs TLS; the pooled endpoints use a shared cert
       ssl: /localhost|127\.0\.0\.1/.test(URL) ? false : { rejectUnauthorized: false },
-      max: Number(process.env.PG_MAX || 3),        // serverless: keep it small
+      // Three was right when this ran on Vercel, where every instance opened its
+      // own pool. Self-hosted it is one pool for the whole site, and three
+      // visitors on a large store's page used all of it: a request that
+      // normally answers in 286ms took 7.7s waiting for a connection.
+      max: Number(process.env.PG_MAX || 12),
       idleTimeoutMillis: 10_000,
       // A suspended serverless compute took 13.5s to wake in testing, and the old
       // 15s ceiling left almost nothing over it: the first visit after an idle
       // spell failed rather than waited.
       connectionTimeoutMillis: 30_000,
-      keepAlive: true
+      keepAlive: true,
+      // One runaway query must not hold a connection until the pool starves.
+      statement_timeout: Number(process.env.PG_STATEMENT_TIMEOUT || 120_000)
     })
 
     // Serverless Postgres suspends its compute when idle and the sockets die
@@ -123,6 +129,32 @@ export async function exec (sql) {
     try { return await client.query(sql) } finally { client.release() }
   }
   return (await lite()).exec(sql)
+}
+
+/**
+ * Run a body on ONE pooled connection, inside a transaction.
+ *
+ * Temp tables live on the connection that made them, and the pool hands out a
+ * different one per query — so anything that builds scratch data and then reads
+ * it back has to hold a single client for the whole sequence. Rolls back on
+ * throw, which also drops the temp tables.
+ */
+export async function withClient (fn) {
+  if (MODE !== 'postgres') return fn(q, one)
+  const client = await (await pool()).connect()
+  const cq = async (sql, params = []) => (await client.query(sql, params)).rows
+  const cone = async (sql, params = []) => (await cq(sql, params))[0] ?? null
+  try {
+    await client.query('BEGIN')
+    const out = await fn(cq, cone)
+    await client.query('COMMIT')
+    return out
+  } catch (err) {
+    try { await client.query('ROLLBACK') } catch {}
+    throw err
+  } finally {
+    client.release()
+  }
 }
 
 export async function close () {

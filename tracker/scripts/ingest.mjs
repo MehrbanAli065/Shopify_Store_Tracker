@@ -94,7 +94,14 @@ for (const r of rows) {
       tags:         s(r['Tags']) ? s(r['Tags']).split(',').map(t => t.trim()).filter(Boolean) : [],
       published_at: s(r['Published'])    || null,
       status:       s(r['Status'])       || null,
-      image_src:    s(r['Image Src'])    || null
+      image_src:    s(r['Image Src'])    || null,
+      // Added to the export on 21 Aug 2026: "Yes" on the parent row of each of
+      // the store's 20 best sellers, blank everywhere else. Exports older than
+      // that carry no such column, and one store's still does not, so a missing
+      // column stays null rather than becoming a store-wide false.
+      is_top_seller: 'Top 20 Selling Product' in r
+        ? /^y/i.test(s(r['Top 20 Selling Product']))
+        : null
     })
   } else if (csvProducts.has(handle) && !csvProducts.get(handle).image_src && s(r['Image Src'])) {
     csvProducts.get(handle).image_src = s(r['Image Src'])
@@ -225,9 +232,10 @@ const newProducts = [...csvProducts.values()].filter(p => !dbProducts.has(p.hand
 if (newProducts.length) {
   const inserted = await bulk('products',
     ['store_id','handle','title','vendor','product_type','tags','published_at','status',
-     'image_src','first_seen_at','last_seen_at','is_active'],
+     'image_src','is_top_seller','first_seen_at','last_seen_at','is_active'],
     newProducts.map(p => [STORE_ID, p.handle, p.title, p.vendor, p.product_type, p.tags,
-                          p.published_at, p.status, p.image_src, RUN_DATE, RUN_DATE, true]),
+                          p.published_at, p.status, p.image_src, p.is_top_seller,
+                          RUN_DATE, RUN_DATE, true]),
     { returning: 'id, handle' })
   for (const r of inserted) dbProducts.set(r.handle, { id: r.id, handle: r.handle, first_seen_at: RUN_DATE, is_active: true })
 }
@@ -235,21 +243,46 @@ const seenHandles = [...csvProducts.keys()]
 if (seenHandles.length) {
   await q(`UPDATE products SET last_seen_at = $2, is_active = true
             WHERE store_id = $1 AND handle = ANY($3)`, [STORE_ID, RUN_DATE, seenHandles])
+
+  // Only an export that carries the column may overwrite the flag. An unmarked
+  // product in such an export is false, not null, so dropping out of the top 20
+  // lands; an export without the column leaves yesterday's answer alone.
+  const top = [...csvProducts.values()].filter(p => p.is_top_seller !== null)
+  if (top.length) {
+    await q(`UPDATE products p SET is_top_seller = c.flag
+               FROM (SELECT unnest($2::text[]) AS handle, unnest($3::boolean[]) AS flag) c
+              WHERE p.store_id = $1 AND p.handle = c.handle`,
+            [STORE_ID, top.map(p => p.handle), top.map(p => p.is_top_seller)])
+
+    // The flag above is overwritten every day. Keep the day itself as well, so
+    // the frontend can show when a product entered or left the top 20.
+    const marked = top.filter(p => p.is_top_seller).map(p => p.handle)
+    if (marked.length) {
+      await q(`INSERT INTO product_top_sellers (product_id, scrape_run_id, observed_date)
+               SELECT p.id, $3, $4 FROM products p
+                WHERE p.store_id = $1 AND p.handle = ANY($2)
+               ON CONFLICT (product_id, observed_date) DO NOTHING`,
+              [STORE_ID, marked, RUN_ID, RUN_DATE])
+    }
+  }
 }
 
 // ── 6 · variants: insert new, then diff the rest ──────────────────
 const newVariants = [...csvVariants.entries()].filter(([k]) => !dbVariants.has(k))
 if (newVariants.length) {
   const inserted = await bulk('variants',
-    ['product_id','sku','option1_name','option1_value','option2_name','option2_value',
+    // store_id is denormalised here and on variant_history: without it every
+    // store-scoped read had to join back through products, which on a large
+    // store turned one archived day into a 54s query. See db/store-id.sql.
+    ['store_id','product_id','sku','option1_name','option1_value','option2_name','option2_value',
      'option3_name','option3_value','variant_image','variant_key',
      'current_price','current_compare_at_price','current_in_stock','current_qty',
-     'first_seen_at','last_seen_at','is_active'],   // current_discount_pct is generated
+     'first_seen_at','last_seen_at','is_active','in_feed'],  // current_discount_pct is generated
     newVariants.map(([, v]) => [
-      dbProducts.get(v.handle).id, v.sku,
+      STORE_ID, dbProducts.get(v.handle).id, v.sku,
       v.option1_name, v.option1_value, v.option2_name, v.option2_value,
       v.option3_name, v.option3_value, v.variant_image, v.variant_key,
-      v.price, v.compare_at, v.available, v.qty, RUN_DATE, RUN_DATE, v.available]),
+      v.price, v.compare_at, v.available, v.qty, RUN_DATE, RUN_DATE, v.available, true]),
     { returning: 'id, product_id, variant_key' })
 
   const byPid = new Map([...dbProducts.values()].map(p => [String(p.id), p.handle]))
@@ -268,7 +301,7 @@ for (const [key, v] of csvVariants) {
   const isNew = newVariants.some(([k]) => k === key)
 
   if (isNew) {
-    history.push([dbv.id, RUN_ID, RUN_DATE, v.price, v.compare_at, true, v.available, v.qty, null, null, null, 'new'])
+    history.push([STORE_ID, dbv.id, RUN_ID, RUN_DATE, v.price, v.compare_at, true, v.available, v.qty, null, null, null, 'new'])
     continue
   }
 
@@ -291,7 +324,7 @@ for (const [key, v] of csvVariants) {
   else if (priceChanged)       type = v.price > num(dbv.current_price) ? 'price_up' : 'price_down'
   else                         type = 'discount_change'
 
-  history.push([dbv.id, RUN_ID, RUN_DATE, v.price, v.compare_at, true, v.available, v.qty,
+  history.push([STORE_ID, dbv.id, RUN_ID, RUN_DATE, v.price, v.compare_at, true, v.available, v.qty,
                 num(dbv.current_price), num(dbv.current_compare_at_price), dbv.current_in_stock, type])
   cacheUpdates.push([dbv.id, v.price, v.compare_at, v.available, v.qty])
 }
@@ -317,7 +350,7 @@ if (allowRemovals && !isFirstRun) {
     if (dbv.last_in_feed === false) continue
 
     const type = 'removed'
-    history.push([dbv.id, RUN_ID, RUN_DATE,
+    history.push([STORE_ID, dbv.id, RUN_ID, RUN_DATE,
                   num(dbv.current_price), num(dbv.current_compare_at_price), false, false, null,
                   num(dbv.current_price), num(dbv.current_compare_at_price), dbv.current_in_stock, type])
     cacheUpdates.push([dbv.id, num(dbv.current_price), num(dbv.current_compare_at_price), false, null])
@@ -336,7 +369,7 @@ if (allowRemovals && !isFirstRun) {
 // ── 9 · write history, then refresh the Layer 1 cache ─────────────
 if (history.length) {
   await bulk('variant_history',
-    ['variant_id','scrape_run_id','observed_date','price','compare_at_price','in_feed','in_stock',
+    ['store_id','variant_id','scrape_run_id','observed_date','price','compare_at_price','in_feed','in_stock',
      'inventory_qty','prev_price','prev_compare_at_price','prev_in_stock','change_type'], history)
 }
 for (let i = 0; i < cacheUpdates.length; i += 400) {
@@ -350,13 +383,33 @@ for (let i = 0; i < cacheUpdates.length; i += 400) {
     [slice.map(r => r[0]), slice.map(r => r[1]), slice.map(r => r[2]),
      slice.map(r => r[3]), slice.map(r => r[4])])
 }
-const seenKeys = [...csvVariants.keys()].map(k => k.split('\u0000')[1])
-if (seenKeys.length) {
-  await q(`UPDATE variants v SET last_seen_at = $2
-             FROM products p
-            WHERE p.id = v.product_id AND p.store_id = $1 AND v.variant_key = ANY($3)`,
-          [STORE_ID, RUN_DATE, seenKeys])
+// Matched on handle AND variant_key. Keying on variant_key alone marked every
+// variant in the store that shared a SKU+options combination as seen today,
+// including ones that left the feed weeks ago: 4,790 rows across 70 stores.
+// last_seen_at is what says which variants were in a given day's file, so it
+// has to be exact.
+const seenIds = [...csvVariants.keys()].map(k => dbVariants.get(k)?.id).filter(Boolean)
+for (let i = 0; i < seenIds.length; i += 20000) {
+  await q(`UPDATE variants SET last_seen_at = $1, in_feed = true WHERE id = ANY($2)`,
+          [RUN_DATE, seenIds.slice(i, i + 20000)])
 }
+
+// in_feed is what lets the archive answer "the newest day" without replaying
+// history — see db/in-feed.sql. It has to be cleared for the ones that left,
+// and only when removals were trusted this run: a collapsed feed marks the run
+// partial precisely because its absences are not real.
+if (allowRemovals && !isFirstRun) {
+  const seen = new Set(seenIds.map(String))
+  const gone = [...dbVariants.values()].map(v => v.id).filter(id => !seen.has(String(id)))
+  for (let i = 0; i < gone.length; i += 20000) {
+    await q(`UPDATE variants SET in_feed = false WHERE id = ANY($1) AND in_feed`,
+            [gone.slice(i, i + 20000)])
+  }
+}
+
+// The report page reads its per-day counts from store_day_stats rather than
+// scanning history on every request; this is where they change.
+await q('SELECT refresh_day_stats($1, $2)', [STORE_ID, RUN_DATE])
 
 // ── 10 · close the run ────────────────────────────────────────────
 await q(`UPDATE scrape_runs SET status = $2, changes_found = $3, finished_at = now() WHERE id = $1`,

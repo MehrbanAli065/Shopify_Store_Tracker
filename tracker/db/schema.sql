@@ -63,6 +63,9 @@ CREATE TABLE products (
   published_at   TIMESTAMPTZ,
   status         TEXT,
   image_src      TEXT,                           -- first image only
+  -- The scraper began marking each store's best sellers on 21 Aug 2026. NULL
+  -- means the export predates the column, which is not the same as false.
+  is_top_seller  BOOLEAN,
   first_seen_at  DATE NOT NULL,                  -- detects new products
   last_seen_at   DATE NOT NULL,                  -- detects removals
   is_active      BOOLEAN NOT NULL DEFAULT true,
@@ -76,6 +79,12 @@ CREATE TABLE products (
 CREATE TABLE variants (
   id             BIGSERIAL PRIMARY KEY,
   product_id     BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  -- Denormalised from products. Every store-scoped read otherwise had to walk
+  -- variant_history -> variants -> products just to learn which store a row
+  -- belonged to: on a 540k-variant store that was a 1.6M-row join sorted to
+  -- disk, 54s to show 100 rows. A variant cannot move between stores, so
+  -- there is no update anomaly to guard against.
+  store_id       BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
   sku            TEXT,
   option1_name   TEXT, option1_value TEXT,       -- Size / Color
   option2_name   TEXT, option2_value TEXT,       -- Color / Fabric
@@ -99,6 +108,10 @@ CREATE TABLE variants (
   first_seen_at  DATE NOT NULL,
   last_seen_at   DATE NOT NULL,
   is_active      BOOLEAN NOT NULL DEFAULT true,
+  -- Was this variant in the store’s newest file? Almost every view is of the
+  -- newest day, and for that day this answers without touching history at all.
+  -- is_active could not serve: it tracks stock, which is a different fact.
+  in_feed        BOOLEAN NOT NULL DEFAULT true,
   UNIQUE (product_id, variant_key)
 );
 
@@ -110,6 +123,10 @@ CREATE TABLE variants (
 CREATE TABLE variant_history (
   id                BIGSERIAL PRIMARY KEY,
   variant_id        BIGINT NOT NULL REFERENCES variants(id) ON DELETE CASCADE,
+  -- Denormalised for the same reason as variants.store_id, and this is the
+  -- table where it pays: rebuilding one store on a date is a DISTINCT ON
+  -- scoped to that store, which without this column cannot use an index.
+  store_id          BIGINT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
   scrape_run_id     BIGINT REFERENCES scrape_runs(id) ON DELETE CASCADE,
   observed_date     DATE NOT NULL,
 
@@ -164,3 +181,18 @@ CREATE INDEX idx_runs_store_date        ON scrape_runs (store_id, run_date DESC)
 
 -- Views and the store_state_on() function live in db/views.sql so they can be
 -- re-applied to a live database without touching tables.
+-- One row per product per day that the export marked as a best seller. Append
+-- only, the same contract as variant_history: products.is_top_seller answers
+-- "today", this answers "when". The export carries no rank, only a Yes, so
+-- there is no position to record.
+CREATE TABLE IF NOT EXISTS product_top_sellers (
+  id            BIGSERIAL PRIMARY KEY,
+  product_id    BIGINT NOT NULL REFERENCES products(id)    ON DELETE CASCADE,
+  scrape_run_id BIGINT NOT NULL REFERENCES scrape_runs(id) ON DELETE CASCADE,
+  observed_date DATE   NOT NULL,
+  UNIQUE (product_id, observed_date)
+);
+-- scrape_run_id is what makes a replay safe: the rewind deletes the run row,
+-- and the cascade takes that day's marks with it.
+CREATE INDEX IF NOT EXISTS product_top_sellers_date_idx ON product_top_sellers (observed_date);
+CREATE INDEX IF NOT EXISTS product_top_sellers_run_idx  ON product_top_sellers (scrape_run_id);

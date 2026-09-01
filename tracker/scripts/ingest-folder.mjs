@@ -58,11 +58,22 @@ function dateFor (file, full) {
   return iso(fs.statSync(full).mtime)
 }
 
-/** Longest matching csv_prefix wins, so similar domains cannot collide. */
+/** Longest matching csv_prefix wins, so similar domains cannot collide.
+ *
+ *  Both sides have their www dropped before comparing. The scraper stopped
+ *  putting www in the filename on 7 Aug - 6 Aug has
+ *  https___www_1822denim_com_shopify.csv and every day after it has
+ *  https___1822denim_com_shopify.csv - while the sheet still spells 74 of the
+ *  242 stores with www. Matching literally therefore skipped 70 files, 65 of
+ *  them a whole day for stores that are very much in the sheet, and skipped
+ *  them silently. Neither spelling is wrong, so neither is trusted.
+ */
+const noWww = s => s.toLowerCase().replace(/^https___www_/, 'https___')
+
 function storeFor (file, stores) {
-  const f = file.toLowerCase()
+  const f = noWww(file)
   return stores
-    .filter(s => s.csv_prefix && f.startsWith(s.csv_prefix.toLowerCase()))
+    .filter(s => s.csv_prefix && f.startsWith(noWww(s.csv_prefix)))
     .sort((a, b) => b.csv_prefix.length - a.csv_prefix.length)[0] || null
 }
 
@@ -145,9 +156,19 @@ for (const r of ok) {
   const changes = (r.out.match(/changes recorded: (\d+)/) || [])[1] ?? '?'
   console.log(`  ✓ ${String(r.store.id).padStart(3)} ${r.store.name.padEnd(20)} ${r.date}  ${changes} changes`)
 }
+/** Node prints the message, then a stack, then its own version banner, so the
+ *  last line is almost always "Node.js v24.15.0" and says nothing. Prefer the
+ *  line that actually names the fault, and keep the tail of the output beneath
+ *  it so a cause is never lost to a one-line summary again. */
+const reason = out => {
+  const ls = out.split('\n').map(l => l.trimEnd()).filter(l => l.trim())
+  const named = ls.find(l => /[A-Za-z]*Error\b|error:|FATAL|out of memory/.test(l))
+  return (named ?? ls[ls.length - 1] ?? 'no output').trim().slice(0, 160)
+}
+
 for (const r of fail) {
-  const why = (r.out.trim().split('\n').pop() || '').slice(0, 90)
-  console.log(`  ✗ ${String(r.store.id).padStart(3)} ${r.store.name.padEnd(20)} ${r.date}  FAILED — ${why}`)
+  console.log(`  ✗ ${String(r.store.id).padStart(3)} ${r.store.name.padEnd(20)} ${r.date}  FAILED — ${reason(r.out)}`)
+  for (const l of r.out.split('\n').filter(l => l.trim()).slice(-12)) console.log(`        ${l.trimEnd()}`)
 }
 console.log(`\n  ${ok.length} succeeded · ${fail.length} failed · ${Math.round((Date.now()-started)/1000)}s\n`)
 
@@ -164,6 +185,25 @@ if (ARCHIVE || DELETE) {
   }
   console.log(`  ${ARCHIVE ? 'archived' : 'deleted'} ${moved} file(s)` +
               (fail.length ? `; left ${fail.length} failed file(s) in place\n` : '\n'))
+}
+
+// The store list reads its counts from store_rollup instead of recomputing
+// them per request, which took ~19s once variants passed 4M rows. Refresh here,
+// where the numbers have just changed and no browser is waiting.
+if (ok.length) {
+  const t0 = Date.now()
+  process.stdout.write('  refreshing store counts ... ')
+  try {
+    await q('SELECT refresh_store_rollup()')
+    console.log(`${Math.round((Date.now() - t0) / 1000)}s
+`)
+  } catch (e) {
+    // Never fail an ingest over this. The data is in; the rollup is only a
+    // cache, and a stale one shows old totals rather than wrong history.
+    console.log(`
+  ! could not refresh store counts: ${e.message}
+`)
+  }
 }
 
 await close()

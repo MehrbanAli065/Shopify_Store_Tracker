@@ -74,7 +74,7 @@ SELECT
 FROM variant_history h
 JOIN variants  v ON v.id = h.variant_id
 JOIN products  p ON p.id = v.product_id
-JOIN stores    s ON s.id = p.store_id
+JOIN stores    s ON s.id = h.store_id
 LEFT JOIN first_run fr ON fr.store_id = s.id;
 
 
@@ -97,7 +97,7 @@ RETURNS TABLE (
   FROM   variant_history h
   JOIN   variants v ON v.id = h.variant_id
   JOIN   products p ON p.id = v.product_id
-  WHERE  p.store_id = p_store_id
+  WHERE  h.store_id = p_store_id
     AND  h.observed_date <= p_date
   ORDER  BY h.variant_id, h.observed_date DESC;
 $$ LANGUAGE sql STABLE;
