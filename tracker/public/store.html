@@ -551,10 +551,16 @@ function walkDays (list, runs) {
   const byDate = {}
   for (const e of list) (byDate[e.observed_date] ||= []).push(e)
 
-  const gone = list.find(e => e.change_type === 'removed')
   const start = list[0].observed_date
-  const end = gone ? gone.observed_date
-            : (runs.length ? runs[runs.length-1].date : list[list.length-1].observed_date)
+
+  // A removal ends the story only if nothing came after it. Keying on the FIRST
+  // 'removed' cut every variant that left the feed and returned: this one was
+  // removed on 6 Aug and relisted on the 14th, and the drawer showed two events
+  // out of five. Relisting is a change type the schema has on purpose.
+  const last = list[list.length - 1]
+  const end = last.change_type === 'removed'
+            ? last.observed_date
+            : (runs.length ? runs[runs.length-1].date : last.observed_date)
 
   // Parse, add and format all in UTC. Reading a local-midnight Date back through
   // toISOString() lands on the previous day east of UTC, so the string never
