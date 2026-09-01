@@ -652,7 +652,7 @@ app.get('/api/stores/:id/audits', wrap(async (req, res) => {
 app.get('/api/stores/:id/state', wrap(async (req, res) => {
   const date = req.query.date || (await range(req.params.id)).to
   const rows = await q(
-    `SELECT * FROM store_state_on($1, $2) ORDER BY handle LIMIT 500`, [req.params.id, date])
+    `SELECT * FROM store_state_on($1, $2) ORDER BY handle, variant_id LIMIT 500`, [req.params.id, date])
   res.json({ date, count: rows.length, rows: rows.map(r => ({ ...r, changed_on: d(r.changed_on) })) })
 }))
 
