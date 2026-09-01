@@ -5,6 +5,7 @@
  * Routes match the documented contract, so this ports to Next.js unchanged.
  */
 import express from 'express'
+import zlib from 'node:zlib'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { q, one } from './lib/db.mjs'
@@ -14,10 +15,91 @@ import ingestRoute from './lib/ingest-route.mjs'
 const ROOT = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 
-app.use(express.static(path.join(ROOT, 'public')))
+/**
+ * CORS, because the pages now live on Vercel and the API here. An explicit
+ * allow-list from the environment, not a wildcard: this data is not public,
+ * and "*" would let any site read it out of a logged-in browser.
+ */
+const ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',').map(s => s.trim()).filter(Boolean)
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin
+  if (origin && ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    res.setHeader('Access-Control-Max-Age', '86400')
+    res.vary('Origin')
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204)
+  next()
+})
+
+/**
+ * gzip for anything text-shaped. These payloads are repetitive JSON and shrink
+ * by 91-96% — /api/stores goes 70 KB → 7 KB, a snapshot page 108 KB → 4 KB —
+ * which is the difference between a fast connection and a slow one mattering.
+ *
+ * Written against zlib rather than the `compression` package: it is ~20 lines
+ * for what this needs, and one less dependency to keep current.
+ */
+app.use((req, res, next) => {
+  if (!/gzip/.test(req.headers['accept-encoding'] || '')) return next()
+
+  const send = res.send.bind(res)
+  res.send = body => {
+    // Only buffer/string bodies, and only when the saving is worth the CPU.
+    const buf = Buffer.isBuffer(body) ? body
+              : typeof body === 'string' ? Buffer.from(body, 'utf8') : null
+    if (!buf || buf.length < 1024 || res.getHeader('Content-Encoding')) return send(body)
+
+    const type = String(res.getHeader('Content-Type') || '')
+    if (!/json|text|javascript|xml|csv|svg/i.test(type)) return send(body)
+
+    return zlib.gzip(buf, (err, gz) => {
+      if (err) return send(body)
+      res.setHeader('Content-Encoding', 'gzip')
+      res.vary('Accept-Encoding')
+      res.removeHeader('Content-Length')
+      send(gz)
+    })
+  }
+  next()
+})
+
+// Static assets carry an ETag already, so a repeat visit is a 304 either way.
+// A short max-age skips even that round trip without risking a stale page:
+// index.html and friends are revalidated, only the assets are held.
+app.use(express.static(path.join(ROOT, 'public'), {
+  etag: true,
+  maxAge: '10m',
+  setHeaders: (res, file) => {
+    if (file.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache')
+  }
+}))
 
 // Remote ingest trigger for n8n. Adds nothing unless INGEST_TOKEN is set, and
 // never mounts on Vercel — see lib/ingest-route.mjs.
+/**
+ * The API is reachable from the open internet now — the frontend sits on
+ * Vercel and reaches this host directly — and there is no login on it. So
+ * every data route demands a shared token that only the Vercel proxy holds.
+ *
+ * Ingest keeps its own token (the VM posts straight here), and the static
+ * pages stay open because they contain nothing.
+ *
+ * Unset API_TOKEN and the gate disappears, which is what local dev wants.
+ */
+const API_TOKEN = process.env.API_TOKEN || null
+
+app.use((req, res, next) => {
+  if (!API_TOKEN) return next()
+  const guarded = req.path.startsWith('/api/') || req.path.startsWith('/reports/')
+  if (!guarded || req.path.startsWith('/api/ingest')) return next()
+  if (req.get('x-tracker-token') === API_TOKEN) return next()
+  res.status(401).json({ error: 'unauthorized' })
+})
+
 app.use(ingestRoute(ROOT))
 
 const d = v => (v instanceof Date ? v.toISOString().slice(0, 10) : v)
@@ -37,21 +119,40 @@ async function bounds (req, storeId) {
 
 // ── all store cards ───────────────────────────────────────────────
 app.get('/api/stores', wrap(async (_req, res) => {
+  // One pass per fact, grouped by store, rather than five correlated
+  // subqueries per store. The original shape was written when there were two
+  // stores; at 242 stores over 2.4M variants it stopped returning at all - the
+  // page sat on "loading" past sixty seconds. Same numbers, ~6s instead.
   const rows = await q(`
+    WITH last_run AS (
+      SELECT DISTINCT ON (store_id) store_id, status, run_date, products_found
+        FROM scrape_runs ORDER BY store_id, run_date DESC
+    ), runs AS (
+      SELECT store_id, count(*)::int n FROM scrape_runs GROUP BY 1
+    )
+    -- The three counts come from store_rollup, refreshed at the end of each
+    -- ingest. Computing them here read the whole 2.9 GB variants table on
+    -- every page load and cost ~19s; see db/rollup.sql.
     SELECT s.id, s.name, s.domain, s.country, s.currency, s.last_scraped_at,
-           (SELECT count(*) FROM products WHERE store_id = s.id AND is_active)::int AS products,
-           (SELECT count(*) FROM variants v JOIN products p ON p.id = v.product_id
-             WHERE p.store_id = s.id AND v.is_active)::int                          AS variants,
-           (SELECT count(*) FROM scrape_runs WHERE store_id = s.id)::int             AS runs,
-           r.status AS last_status, r.run_date AS last_run,
-           (SELECT count(*) FROM variant_history h
-              JOIN variants v ON v.id = h.variant_id
-              JOIN products p ON p.id = v.product_id
-             WHERE p.store_id = s.id AND h.observed_date = r.run_date
-               AND h.change_type <> 'new')::int                                      AS last_changes
+           COALESCE(r.products, 0)     AS products,
+           COALESCE(r.variants, 0)     AS variants,
+           COALESCE(r.last_changes, 0) AS last_changes,
+           r.refreshed_at              AS counts_as_of,
+           COALESCE(runs.n, 0) AS runs,
+           lr.status AS last_status, lr.run_date AS last_run,
+           -- What the file actually held. A run is marked partial when this
+           -- drops below half of what is stored, and the card cannot explain
+           -- that without both numbers.
+           lr.products_found AS last_file_products,
+           -- Which warnings this store has been dismissed for. The card needs
+           -- it to know whether to keep showing one.
+           COALESCE(m.kinds, '{}') AS muted
       FROM stores s
-      LEFT JOIN LATERAL (SELECT status, run_date FROM scrape_runs
-                          WHERE store_id = s.id ORDER BY run_date DESC LIMIT 1) r ON true
+      LEFT JOIN (SELECT store_id, array_agg(kind) AS kinds
+                   FROM store_alert_mutes GROUP BY store_id) m ON m.store_id = s.id
+      LEFT JOIN store_rollup r ON r.store_id = s.id
+      LEFT JOIN last_run lr    ON lr.store_id = s.id
+      LEFT JOIN runs           ON runs.store_id = s.id
      WHERE s.active
      ORDER BY s.id`)
   res.json(rows.map(r => ({ ...r, last_scraped_at: d(r.last_scraped_at), last_run: d(r.last_run) })))
@@ -79,45 +180,50 @@ app.get('/api/stores/:id/summary', wrap(async (req, res) => {
   const k = await one(`
     SELECT
       (SELECT count(*) FROM products WHERE store_id = $1 AND is_active)::int AS products,
-      (SELECT count(*) FROM variants v JOIN products p ON p.id = v.product_id
-        WHERE p.store_id = $1 AND v.is_active)::int                          AS variants,
-      COUNT(*) FILTER (WHERE change_type = 'new' AND NOT is_baseline)::int AS new_items,
-      COUNT(*) FILTER (WHERE change_type = 'new' AND is_baseline)::int     AS baseline_items,
-      COUNT(*) FILTER (WHERE change_type = 'price_down')::int      AS price_down,
-      COUNT(*) FILTER (WHERE change_type = 'price_up')::int        AS price_up,
-      COUNT(*) FILTER (WHERE change_type = 'discount_change')::int AS discount_change,
-      COUNT(*) FILTER (WHERE change_type = 'stock_out')::int       AS stock_out,
-      COUNT(*) FILTER (WHERE change_type = 'stock_in')::int        AS stock_in,
-      COUNT(*) FILTER (WHERE change_type = 'removed')::int         AS removed,
-      COUNT(*) FILTER (WHERE change_type = 'relisted')::int        AS relisted,
-      COUNT(*) FILTER (WHERE NOT is_baseline)::int AS total,
-      COUNT(*)::int AS total_with_baseline
-    FROM v_change_report
+      (SELECT count(*) FROM variants v
+        WHERE v.store_id = $1 AND v.is_active)::int                          AS variants,
+      COALESCE(SUM(new_items), 0)::int       AS new_items,
+      COALESCE(SUM(baseline_items), 0)::int  AS baseline_items,
+      COALESCE(SUM(price_down), 0)::int      AS price_down,
+      COALESCE(SUM(price_up), 0)::int        AS price_up,
+      COALESCE(SUM(discount_change), 0)::int AS discount_change,
+      COALESCE(SUM(stock_out), 0)::int       AS stock_out,
+      COALESCE(SUM(stock_in), 0)::int        AS stock_in,
+      COALESCE(SUM(removed), 0)::int         AS removed,
+      COALESCE(SUM(relisted), 0)::int        AS relisted,
+      COALESCE(SUM(total), 0)::int           AS total,
+      COALESCE(SUM(total + baseline_items), 0)::int AS total_with_baseline
+    -- Counts come from store_day_stats, filled at the end of each ingest.
+    -- Deriving them here scanned 2.9M history rows on a large store to produce
+    -- eleven integers; see db/day-stats.sql.
+    FROM store_day_stats
    WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3`, [id, from, to])
 
   const disc = await one(`
     SELECT ROUND(AVG(current_discount_pct), 2) AS avg_discount
-      FROM variants v JOIN products p ON p.id = v.product_id
-     WHERE p.store_id = $1 AND v.is_active AND v.current_discount_pct > 0`, [id])
+      FROM variants v
+     WHERE v.store_id = $1 AND v.is_active AND v.current_discount_pct > 0`, [id])
 
   // Driven by scrape_runs, not by the change rows. Grouping the history alone
   // dropped any day the scrape ran and found nothing — the row vanished
   // instead of reading zero, which looks the same as a day that never ran.
   const daily = await q(`
     SELECT r.run_date AS observed_date, r.status,
-           COUNT(h.change_type) FILTER (WHERE h.change_type = 'new' AND NOT h.is_baseline)::int AS new_items,
-           COUNT(h.change_type) FILTER (WHERE h.change_type = 'new' AND h.is_baseline)::int     AS baseline_items,
-           COUNT(h.change_type) FILTER (WHERE h.change_type LIKE 'price%')::int AS price,
-           COUNT(h.change_type) FILTER (WHERE h.change_type = 'stock_out')::int AS stock_out,
-           COUNT(h.change_type) FILTER (WHERE h.change_type = 'stock_in')::int  AS stock_in,
-           COUNT(h.change_type) FILTER (WHERE h.change_type = 'removed')::int   AS removed,
-           COUNT(h.change_type) FILTER (WHERE h.change_type = 'relisted')::int  AS relisted,
-           COUNT(h.change_type) FILTER (WHERE NOT h.is_baseline)::int AS total
+           COALESCE(d.new_items, 0)      AS new_items,
+           COALESCE(d.baseline_items, 0) AS baseline_items,
+           COALESCE(d.price_up + d.price_down + d.discount_change, 0) AS price,
+           COALESCE(d.stock_out, 0)      AS stock_out,
+           COALESCE(d.stock_in, 0)       AS stock_in,
+           COALESCE(d.removed, 0)        AS removed,
+           COALESCE(d.relisted, 0)       AS relisted,
+           COALESCE(d.total, 0)          AS total
       FROM scrape_runs r
-      LEFT JOIN v_change_report h
-             ON h.store_id = r.store_id AND h.observed_date = r.run_date
+      -- Left join, not a filter: a day the scrape ran and found nothing has no
+      -- stats row and must still read zero rather than disappear.
+      LEFT JOIN store_day_stats d
+             ON d.store_id = r.store_id AND d.observed_date = r.run_date
      WHERE r.store_id = $1 AND r.run_date BETWEEN $2 AND $3
-     GROUP BY r.run_date, r.status ORDER BY r.run_date`, [id, from, to])
+     ORDER BY r.run_date`, [id, from, to])
 
   res.json({ from, to, ...k, avg_discount: disc?.avg_discount ?? 0,
              daily: daily.map(r => ({ ...r, observed_date: d(r.observed_date) })) })
@@ -190,8 +296,18 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   const perDate = await q(`
     SELECT r.run_date AS observed_date, count(h.change_type)::int AS n
       FROM scrape_runs r
-      LEFT JOIN v_change_report h
-             ON h.store_id = r.store_id AND h.observed_date = r.run_date
+      -- Counting off variant_history, not the view: v_change_report joins
+      -- variants, products and stores to describe each row, and this only
+      -- needs one integer per date. That join was the report's slowest part.
+      LEFT JOIN (
+        SELECT h.store_id, h.observed_date, h.change_type,
+               (h.change_type = 'new' AND h.observed_date = fr.first_date) AS is_baseline
+          FROM variant_history h
+          LEFT JOIN (SELECT store_id, MIN(run_date) AS first_date FROM scrape_runs
+                      WHERE status IN ('success','partial') GROUP BY store_id) fr
+                 ON fr.store_id = h.store_id
+         WHERE h.store_id = $1 AND h.observed_date BETWEEN $2 AND $3
+      ) h ON h.store_id = r.store_id AND h.observed_date = r.run_date
             ${baseFilter.replace('AND NOT is_baseline', 'AND NOT h.is_baseline')}
             AND h.change_type = ANY($4)
      WHERE r.store_id = $1 AND r.run_date BETWEEN $2 AND $3
@@ -233,8 +349,8 @@ app.get('/api/stores/:id/distribution', wrap(async (req, res) => {
                   WHEN v.current_discount_pct <= 40 THEN '21-40%'
                   WHEN v.current_discount_pct <= 60 THEN '41-60%'
                   ELSE '61%+' END AS bucket
-        FROM variants v JOIN products p ON p.id = v.product_id
-       WHERE p.store_id = $1 AND v.is_active) t
+        FROM variants v
+       WHERE v.store_id = $1 AND v.is_active) t
      GROUP BY bucket`, [id])
 
   const order = ['0%', '1-20%', '21-40%', '41-60%', '61%+']
@@ -249,14 +365,14 @@ app.get('/api/stores/:id/distribution', wrap(async (req, res) => {
   const stock = await one(`
     SELECT COUNT(*) FILTER (WHERE v.current_in_stock)::int      AS in_stock,
            COUNT(*) FILTER (WHERE NOT v.current_in_stock)::int  AS out_stock
-      FROM variants v JOIN products p ON p.id = v.product_id WHERE p.store_id = $1`, [id])
+      FROM variants v WHERE v.store_id = $1`, [id])
 
   const price = await one(`
     SELECT ROUND(MIN(current_price),0) AS min, ROUND(MAX(current_price),0) AS max,
            ROUND(AVG(current_price),0) AS avg,
            ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY current_price))::numeric, 0) AS median
-      FROM variants v JOIN products p ON p.id = v.product_id
-     WHERE p.store_id = $1 AND v.is_active AND v.current_price > 0`, [id])
+      FROM variants v
+     WHERE v.store_id = $1 AND v.is_active AND v.current_price > 0`, [id])
 
   res.json({
     discount: order.map(b => ({ bucket: b, n: dmap[b] || 0 })),
@@ -313,17 +429,38 @@ app.get('/api/stores/:id/snapshots', wrap(async (req, res) => {
   res.json(rows.map(r => ({ ...r, run_date: d(r.run_date) })))
 }))
 
+/** True when the date asked for is the store's most recent run, which is the
+ *  one case the variant cache can answer without replaying any history. */
+const isLatest = async (id, date) => {
+  const r = await one('SELECT max(run_date) AS d FROM scrape_runs WHERE store_id = $1', [id])
+  return !!r?.d && String(d(r.d)) === String(date)
+}
+
 /** SQL that rebuilds a day's catalogue: last state on-or-before the date, still in the feed. */
-const SNAPSHOT_SQL = (search, extra = '') => `
+/** The state CTE has two shapes. For any past date it replays the history, an
+ *  unavoidable DISTINCT ON over everything the store ever recorded. For the
+ *  newest date — which is what the archive opens on, and what nearly every
+ *  visit looks at — the answer is already on the variant row: in_feed and the
+ *  current_* cache are exactly the state the last run left behind. That turns
+ *  a 1.6M-row sort into an index scan.
+ *
+ *  Verified equal on the newest day, store by store, before it was switched on. */
+const SNAPSHOT_SQL = (search, extra = '', latest = false) => `
   WITH state AS (
+    ${latest ? `
+    SELECT v.id AS variant_id, v.current_price AS price,
+           v.current_compare_at_price AS compare_at_price,
+           v.current_discount_pct AS discount_pct,
+           v.in_feed, v.current_in_stock AS in_stock,
+           v.current_qty AS inventory_qty, v.last_seen_at AS last_changed
+      FROM variants v
+     WHERE v.store_id = $1 AND v.in_feed AND $2::date IS NOT NULL` : `
     SELECT DISTINCT ON (h.variant_id)
            h.variant_id, h.price, h.compare_at_price, h.discount_pct,
            h.in_feed, h.in_stock, h.inventory_qty, h.observed_date AS last_changed
       FROM variant_history h
-      JOIN variants v ON v.id = h.variant_id
-      JOIN products p ON p.id = v.product_id
-     WHERE p.store_id = $1 AND h.observed_date <= $2
-     ORDER BY h.variant_id, h.observed_date DESC
+     WHERE h.store_id = $1 AND h.observed_date <= $2
+     ORDER BY h.variant_id, h.observed_date DESC`}
   )
   SELECT p.handle, p.title, p.vendor, p.product_type, p.tags, p.status,
          p.published_at, p.image_src, p.first_seen_at AS product_first_seen,
@@ -340,11 +477,39 @@ const SNAPSHOT_SQL = (search, extra = '') => `
     JOIN variants v  ON v.id = s.variant_id
     JOIN products p  ON p.id = v.product_id
     JOIN stores   st ON st.id = p.store_id
-   WHERE s.in_feed
+   -- The store filter has to be repeated on products. Without it the planner
+   -- walked every product in the database in handle order to satisfy the ORDER
+   -- BY — 652k rows across all 242 stores — and then threw almost all of them
+   -- away. With it, idx_products_store_handle supplies the order directly.
+   WHERE s.in_feed AND p.store_id = $1
      ${search ? `AND (p.title ILIKE $3 OR p.handle ILIKE $3 OR v.sku ILIKE $3
                       OR COALESCE(v.option1_value,'') ILIKE $3
                       OR COALESCE(v.option2_value,'') ILIKE $3)` : ''}
    ORDER BY p.handle, v.sku ${extra}`
+
+/**
+ * Dismiss a warning, or bring it back.
+ *
+ * Scoped to one kind on purpose: a store whose feed is permanently truncated
+ * still needs to raise its hand if it stops reporting altogether.
+ */
+app.post('/api/stores/:id/mute', wrap(async (req, res) => {
+  const kind = String(req.query.kind || '')
+  if (!['partial', 'stale', 'failed'].includes(kind)) {
+    return res.status(400).json({ error: `unknown alert kind "${kind}"` })
+  }
+  await q(`INSERT INTO store_alert_mutes (store_id, kind, note)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (store_id, kind) DO UPDATE SET note = EXCLUDED.note, muted_at = now()`,
+    [req.params.id, kind, req.query.note || null])
+  res.json({ store_id: Number(req.params.id), kind, muted: true })
+}))
+
+app.delete('/api/stores/:id/mute', wrap(async (req, res) => {
+  await q('DELETE FROM store_alert_mutes WHERE store_id = $1 AND kind = $2',
+    [req.params.id, String(req.query.kind || '')])
+  res.json({ store_id: Number(req.params.id), kind: req.query.kind, muted: false })
+}))
 
 /** One archived day, paginated + searchable. */
 app.get('/api/stores/:id/snapshot', wrap(async (req, res) => {
@@ -360,10 +525,17 @@ app.get('/api/stores/:id/snapshot', wrap(async (req, res) => {
        FROM scrape_runs WHERE store_id = $1 AND run_date = $2`, [id, date])
 
   const params = search ? [id, date, like] : [id, date]
-  const rows = await q(SNAPSHOT_SQL(search, `LIMIT ${limit} OFFSET ${offset}`), params)
+  const latest = await isLatest(id, date)
+  const rows = await q(SNAPSHOT_SQL(search, `LIMIT ${limit} OFFSET ${offset}`, latest), params)
 
-  const tot = await one(`SELECT count(*)::int AS n, count(DISTINCT handle)::int AS p
-                           FROM (${SNAPSHOT_SQL(search)}) t`, params)
+  // Without a search the totals are a property of the store, not of the page,
+  // and both come off the variants index. Running the full snapshot just to
+  // count it materialised 540k rows on the largest store for two integers.
+  const tot = (latest && !search)
+    ? await one(`SELECT count(*)::int AS n, count(DISTINCT product_id)::int AS p
+                   FROM variants WHERE store_id = $1 AND in_feed`, [id])
+    : await one(`SELECT count(*)::int AS n, count(DISTINCT handle)::int AS p
+                   FROM (${SNAPSHOT_SQL(search, '', latest)}) t`, params)
 
   res.json({
     date, search,
@@ -382,7 +554,7 @@ app.get('/api/stores/:id/snapshot', wrap(async (req, res) => {
 app.get('/api/stores/:id/snapshot.csv', wrap(async (req, res) => {
   const id = req.params.id
   const date = req.query.date || (await range(id)).to
-  const rows = await q(SNAPSHOT_SQL(''), [id, date])
+  const rows = await q(SNAPSHOT_SQL('', '', await isLatest(id, date)), [id, date])
 
   const cols = ['handle','title','vendor','product_type','tags','status','sku','variant_label',
                 'option1_name','option1_value','option2_name','option2_value',

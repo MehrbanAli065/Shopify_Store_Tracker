@@ -1,241 +1,153 @@
-# Deploying to Vercel
+# How this is deployed
 
-## Read this first
+Three pieces, on purpose in three places:
 
-The app currently runs on **PGlite** — a Postgres that lives in a file under `data/`.
-That cannot go to Vercel: serverless functions get a **read-only, throwaway filesystem**,
-so the database would be empty on every request.
-
-So deployment is two things, not one:
-
-| Piece | Where it goes |
-|---|---|
-| Frontend + API | **Vercel** |
-| Database | **Hosted Postgres** — any provider, or your own server |
-| Ingest (CSV → DB) | **Stays off Vercel.** Run it from your machine or the UiPath VM |
-
-> **A local PostgreSQL cannot serve the deployed site.** Vercel runs in a data
-> centre; `localhost` there is Vercel's own container, not your machine. If the
-> database is on your laptop, the site can only be used locally with `npm start`.
-> This is the one decision deployment actually rests on.
-
-> **Why ingest cannot run on Vercel:** it reads multi-megabyte CSVs from disk and takes
-> minutes for 100 stores. Vercel functions cap at 30–60s and have no file access. Ingest
-> is a batch job — it belongs next to wherever the CSVs land.
-
-The code is already dual-mode. Set `DATABASE_URL` and it uses hosted Postgres; leave it
-unset and it uses the local PGlite file. Nothing else changes.
-
----
-
-## Step 1 · Create a hosted Postgres
-
-### Easiest: create it inside Vercel
-
-If the project is already on Vercel, you do not need a separate account:
-
-1. Open the project → **Storage** tab → **Create Database** → **Postgres**
-2. Pick a region near your users → **Create**
-3. Connect it to the project when prompted
-
-Vercel provisions the database and injects the connection string into the project
-automatically (`DATABASE_URL` / `POSTGRES_URL` — the app accepts either). **Redeploy**
-once so the running build picks the variable up.
-
-To run migrations and ingest from your machine, copy the string from
-**Storage → your database → `.env.local` tab** into `tracker/.env`.
-
-### Or bring your own
-
-Any PostgreSQL 14+ works. Nothing in this project uses a provider-specific feature —
-the same schema and the same `ingest_store_day()` run on PGlite locally, on a managed
-service, and on `apt install postgresql`.
-
-```
-postgresql://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require
-```
-
-Two things to get right whoever hosts it:
-
-- **Take the pooled endpoint** if the provider offers one (often marked `-pooler`, or
-  "Transaction pooler"). Serverless functions open many short connections and a direct
-  endpoint runs out of them.
-- **It has to be reachable from Vercel.** Own-server setups need port 5432 open to the
-  internet and TLS on, which is why a managed service is usually less work.
-
-> Storage is the thing to size in advance. Measured on real data: about 1 GB of
-> `products` + `variants` for 100 stores, plus roughly 2–6 GB of history per year.
-> Most free tiers are 0.5 GB.
-
----
-
-## Step 2 · Point your machine at it and create the tables
-
-In the `tracker/` folder:
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and paste your connection string:
-
-```
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require
-```
-
-Check the connection:
-
-```bash
-npm run migrate:check
-```
-
-You should see `target: PostgreSQL · your-host/your-db  [postgres]` and `database is empty`.
-
-Now create the schema and the store registry:
-
-```bash
-npm run migrate
-```
-
-Expected output:
-
-```
-  tables: products, scrape_runs, stores, variant_history, variants
-  stores:
-    1 · Alkaram Studio   www.alkaramstudio.com  [PKR]
-    2 · Brooklinen       www.brooklinen.com  [USD]
-✓ migration complete
-```
-
----
-
-## Step 3 · Load the data into the cloud database
-
-With `.env` still pointing at the hosted DB, run the same ingest commands:
-
-```bash
-node scripts/ingest.mjs --store 1 --date 2026-07-27 --file "C:\path\alkaram-27jul.csv"
-node scripts/ingest.mjs --store 1 --date 2026-07-28 --file "C:\path\alkaram-28jul.csv"
-node scripts/ingest.mjs --store 2 --date 2026-07-28 --file "C:\path\brooklinen.csv"
-```
-
-This is slower than PGlite because every statement crosses the network — a few minutes
-per store is normal.
-
-Verify:
-
-```bash
-npm run dev
-```
-
-The banner should now read `db PostgreSQL · your-host/your-db  [postgres]`. Open
-<http://localhost:3000> — you are looking at the cloud database through the local server.
-If the stores and reports appear, deployment will work.
-
----
-
-## Step 4 · Push to GitHub
-
-`.gitignore` already excludes `node_modules/`, `data/`, `.env` and `.vercel/`.
-**Never commit `.env`** — it holds the database password.
-
-```bash
-git init
-git add .
-git commit -m "Shopify store tracker"
-git branch -M main
-git remote add origin https://github.com/<you>/shopify-tracker.git
-git push -u origin main
-```
-
----
-
-## Step 5 · Deploy
-
-1. <https://vercel.com> → **Add New → Project** → import the repo
-2. **Root Directory** — set it to `tracker` if the repo root is `Shopify_Stores`
-3. **Framework Preset** — `Other`
-4. Leave build and output settings empty
-5. Open **Environment Variables** and add:
-
-| Name | Value | Environments |
+| Piece | Where | Why there |
 |---|---|---|
-| `DATABASE_URL` | your pooled connection string | Production, Preview, Development |
-| `PG_MAX` | `3` | all |
+| Pages | Vercel — `shopify-tracker-web` | Static HTML/CSS. Free HTTPS, and a login in front of it |
+| API | Company server, `pm2` on port 3200 | Needs a persistent connection pool and long-running report queries |
+| Database | PostgreSQL 16 on that same server | Next to the API, so a query is a socket away rather than an internet hop |
+| Ingest | Your machine or the scraper VM | Reads multi-megabyte CSVs and takes minutes; not a web request |
 
-6. **Deploy**
+```
+browser ──HTTPS──▶ Vercel ──HTTP + shared token──▶ server:3200 ──socket──▶ PostgreSQL
+          (pages)          (api/index.mjs proxy)      (Express)
+```
 
-`vercel.json` routes every `/api/*` request into `api/index.mjs`, which mounts the same
-Express app you run locally. Everything in `public/` is served as static files.
+## Why a proxy instead of calling the API directly
+
+The pages are on `vercel.app` and the API is on the company server, so the browser
+would be making a cross-origin call to a plain-HTTP host — which a HTTPS page is not
+allowed to do at all, certificate or no certificate.
+
+`api/index.mjs` on Vercel forwards `/api/*` and `/reports/*` to the server instead.
+The browser only ever talks to Vercel, over HTTPS, on one origin. No CORS is involved,
+and the shared token stays on the server side where the browser cannot read it.
+
+## What guards it
+
+The app itself has **no login**. Two things stand in for one, and neither is a
+substitute for the real thing:
+
+- **Vercel Authentication** on the project. Anyone opening the URL is bounced to a
+  Vercel login, so only members of the Vercel team see the dashboard.
+- **`API_TOKEN`** on the server. Port 3200 is open to the internet — it has to be, for
+  Vercel to reach it — so every `/api` and `/reports` request must carry
+  `x-tracker-token`. Without it the answer is 401. Only the Vercel proxy holds it.
+
+`/api/ingest` is deliberately outside that gate: the VM posts straight to the server
+and has its own `INGEST_TOKEN`.
+
+> Add a real login before showing this to anyone outside the Vercel team.
 
 ---
 
-## Step 6 · Check it
+## The server
 
-Open your `*.vercel.app` URL. Then verify the API directly:
-
-```
-https://your-app.vercel.app/api/stores
+```bash
+ssh mehrban@66.45.238.72
 ```
 
-You should get the store list as JSON.
+| | |
+|---|---|
+| App | `~/tracker`, run by `pm2` as `tracker` |
+| Port | 3200, `HOST=0.0.0.0` (Vercel reaches it directly) |
+| Config | `~/tracker/.env`, mode 600 |
+| Database | `shopify_tracker_db`, user `tracker`, on localhost:5432 |
+| Backups | `~/backup-db.sh` nightly at 02:30, seven kept in `~/backups` |
+
+Apache holds ports 80/443 with 40 other sites on this machine and is **not** part of
+this deployment. Do not change it without running `apache2ctl configtest` first.
+
+### Everyday commands
+
+```bash
+pm2 status                       # is it up
+pm2 logs tracker --lines 50      # what it is saying
+pm2 restart tracker --update-env # after editing .env
+tail -5 ~/backups/backup.log     # did last night's backup run
+```
+
+### Pushing new code
+
+From `tracker/` on your machine:
+
+```bash
+tar czf - --exclude=node_modules --exclude=.env --exclude=vercel-site \
+    app.mjs server.mjs package.json package-lock.json lib db scripts public api \
+  | ssh mehrban@66.45.238.72 'tar xzf - -C ~/tracker && cd ~/tracker \
+      && npm install --omit=dev && pm2 restart tracker --update-env'
+```
+
+`.env` is excluded on purpose — the server's copy differs from yours.
 
 ---
 
-## Daily routine after deployment
+## The frontend
 
-```
-UiPath drops CSVs on Drive
-        ↓
-you (or a scheduled job) run:
-        node scripts/ingest.mjs --store N --date YYYY-MM-DD --file <path>
-        ↓
-Your database provider
-        ↓
-Vercel site shows it immediately — no redeploy needed
+`vercel-site/` is assembled, not edited. The pages live in `public/` because that is
+where Express serves them from; Vercel wants static files at the root and functions
+under `api/`, so the shape it expects is built:
+
+```bash
+node scripts/build-vercel-site.mjs
+cd vercel-site
+npx vercel deploy --prod --scope techbugs-projects-a51e618e
 ```
 
-Deploying again is only needed when the **code** changes, not the data.
+Two environment variables must exist on the Vercel project, and they are what make
+the proxy work:
+
+| Name | Value |
+|---|---|
+| `TRACKER_API_ORIGIN` | `http://66.45.238.72:3200` |
+| `TRACKER_API_TOKEN` | must equal `API_TOKEN` in the server's `.env` |
+
+```bash
+printf '%s' "$TOKEN" | npx vercel env add TRACKER_API_TOKEN production
+```
+
+If the dashboard loads but every panel is empty, these two are the first thing to
+check: a mismatched token gives 401 on every call and an empty page with no error.
 
 ---
 
-## Troubleshooting
+## Restoring the database
 
-**`DATABASE_URL is not set` on the live site**
-The variable is missing or was added after the last deploy. Add it under
-Project Settings → Environment Variables, then **Redeploy** — Vercel only picks up
-env vars at build time.
+```bash
+ssh mehrban@66.45.238.72
+zcat ~/backups/tracker-YYYY-MM-DD.sql.gz | psql -h localhost -U tracker -d shopify_tracker_db
+```
 
-**`too many connections`**
-You are on the direct endpoint. Switch to the pooled one (often marked `-pooler`,
-Transaction pooler on Supabase) and keep `PG_MAX=3`.
+Into a fresh, empty database. The dumps are plain SQL so `psql` alone is enough —
+which is the point, on a machine you have just had to rebuild.
 
-**`self-signed certificate` / TLS errors**
-Make sure the connection string ends with `?sslmode=require`. The code already sets
-`rejectUnauthorized: false`, which is what these providers' shared certs need.
+To build the schema without any data — a new environment, or a test:
 
-**API returns 404 but pages load**
-`vercel.json` is missing or wasn't committed. It must sit next to `package.json`.
+```bash
+npm run migrate       # applies every file in lib/schema-files.mjs, in order
+```
 
-**Function timeout on a big report**
-Lower the `limit` query parameter, or narrow the date range. `maxDuration` is set to
-30s in `vercel.json`; the Hobby plan allows up to 60.
+That list is the single source of truth for what a complete database contains.
+Adding a table means adding its `.sql` file to it, or a rebuild will silently
+come out missing it.
 
 ---
 
-## Before real users get the link
+## Ingest
 
-1. **Add authentication.** There is none right now — anyone with the URL sees everything.
-   Vercel Password Protection is the quickest cover; Supabase Auth or NextAuth is the
-   proper fix.
-2. **Turn on partitioning** for `variant_history` once several months of data exist
-   (see the note at the end of `db/schema.sql`).
-3. **Lock the history table** so nothing can rewrite the past:
+Ingest never runs on Vercel — it reads CSVs from disk and takes minutes for 100
+stores, while a Vercel function has neither a filesystem nor that much time.
 
-```sql
-REVOKE UPDATE, DELETE ON variant_history FROM PUBLIC;
+Point `DATABASE_URL` at the server and run it from wherever the CSVs are:
+
+```
+DATABASE_URL=postgresql://tracker:PASSWORD@66.45.238.72:5432/shopify_tracker_db
 ```
 
-4. **Watch the free tiers.** Most managed Postgres free tiers are 0.5 GB, which 100 stores exceed on the base tables alone; Vercel Hobby is non-commercial.
-   At 100 stores × ~15k change rows/day you will outgrow the free database in a few
-   months — budget for the paid tier.
+> PostgreSQL on that server currently listens on **localhost only**. To ingest from
+> your machine, either run ingest over SSH on the server, or open 5432 to your IP
+> specifically — never to the whole internet.
+
+See [`VM-SETUP.md`](VM-SETUP.md) for running it on the scraper VM and
+[`DRIVE.md`](DRIVE.md) for pulling the CSVs from Drive.
