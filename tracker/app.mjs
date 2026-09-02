@@ -385,7 +385,12 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
 app.get('/api/stores/:id/products', wrap(async (req, res) => {
   const id = req.params.id
   const term = String(req.query.q || '').trim()
-  const limit = Math.min(Number(req.query.limit) || 50, 200)
+  const limit = Math.min(Number(req.query.limit) || 100, 500)
+  // The filter scrolls through the whole catalogue rather than stopping at the
+  // first page, so it asks for the next slice as it goes. ORDER BY title, id is
+  // a total order, which is what makes an offset land where the last page ended
+  // instead of repeating or skipping rows.
+  const offset = Math.max(0, Number(req.query.offset) || 0)
 
   // No term lists the store's catalogue, so the filter beside the table opens
   // as a browsable list rather than an empty box that must be guessed at.
@@ -403,12 +408,14 @@ app.get('/api/stores/:id/products', wrap(async (req, res) => {
          FROM products p WHERE ${WHERE}
         -- A catalogue of near-identical listings repeats titles, so id breaks
         -- the tie and the same search comes back in the same order.
-        ORDER BY p.title, p.id LIMIT $${params.push(limit)}`, params),
+        ORDER BY p.title, p.id
+        LIMIT $${params.push(limit)} OFFSET $${params.push(offset)}`, params),
     one(`SELECT count(*)::int AS n FROM products p WHERE ${WHERE}`, params.slice(0, term ? 2 : 1))
   ])
 
   res.json({
-    q: term, total: n.n, shown: rows.length,
+    q: term, total: n.n, shown: rows.length, offset,
+    more: offset + rows.length < n.n,
     products: rows.map(r => ({ ...r, first_seen_at: d(r.first_seen_at),
                                      last_seen_at:  d(r.last_seen_at) }))
   })

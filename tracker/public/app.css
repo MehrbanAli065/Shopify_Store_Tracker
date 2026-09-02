@@ -593,20 +593,22 @@ th.hint::after{content:'';display:block;border-bottom:1px dotted var(--rule);
 #dnext{border-left:1px solid var(--line);border-radius:0 9px 9px 0}
 
 /* the results menu */
+/* A name and a count per row, so the whole catalogue can be scrolled without
+   each entry costing three lines and a thumbnail to read past. */
 .fmenu{position:absolute;top:100%;left:0;right:0;z-index:30;margin-top:6px;padding:5px;
-  max-height:340px;overflow-y:auto;background:var(--plane);border:1px solid var(--border);
+  max-height:min(58vh,460px);overflow-y:auto;overscroll-behavior:contain;
+  background:var(--plane);border:1px solid var(--border);
   border-radius:11px;box-shadow:0 14px 34px rgba(0,0,0,.18)}
-.fitem{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:inherit;
-  border:0;background:none;padding:7px 8px;border-radius:8px;cursor:pointer}
+.fitem{display:flex;align-items:baseline;gap:12px;width:100%;text-align:left;font:inherit;color:inherit;
+  border:0;background:none;padding:7px 10px;border-radius:8px;cursor:pointer}
 .fitem:hover,.fitem.on{background:var(--surface-2)}
-.fthumb{width:34px;height:34px;border-radius:7px;object-fit:cover;background:var(--surface-2);flex-shrink:0}
-.fmain{min-width:0;flex:1}
-.fi-t{font-size:13px;font-weight:620;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fi-h{font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);
+.fi-t{flex:1;min-width:0;font-size:13px;font-weight:620;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fi-n{font-size:11.5px;color:var(--muted);font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
 .fi-x{margin-left:6px;color:var(--s4);font-weight:650}
-.fmsg{padding:10px 11px;font-size:12.5px;color:var(--muted)}
+.fmsg{padding:9px 11px;font-size:12.5px;color:var(--muted)}
+/* the footer counts what is loaded; it is the bottom of a scrolling list */
+#ffoot{position:sticky;bottom:-5px;background:var(--plane);border-top:1px solid var(--line);margin-top:2px}
 
 /* what the table is currently narrowed to, and the way back out */
 .fpin{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;font-size:12.5px;color:var(--muted)}

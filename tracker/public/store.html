@@ -795,7 +795,8 @@ document.querySelectorAll('.preset').forEach(b => b.onclick = () => {
 // event it has. So the box searches the catalogue, the user picks one product,
 // and the table filters by that product's handle. See the /products route.
 const $q = document.getElementById('q')
-let FIND = { items: [], hi: -1, seq: 0 }
+const FIND_PAGE = 100
+let FIND = { items: [], hi: -1, term: '', total: 0, seq: 0, loading: false }
 
 const closeMenu = () => { qmenu.hidden = true; $q.setAttribute('aria-expanded', 'false') }
 const openMenu  = () => { qmenu.hidden = false; $q.setAttribute('aria-expanded', 'true') }
@@ -807,19 +808,35 @@ const hl = (str, t) => {
     `<mark>${esc(str.slice(i, i + t.length))}</mark>` + esc(str.slice(i + t.length))
 }
 
-async function runFind (term) {
+/**
+ * Fill the menu with the store's products, or with the ones matching a term.
+ *
+ * It pages: a first slice on open, another whenever the list is scrolled near
+ * its end. Stopping at the first fifty made a filter that could not reach the
+ * back of a 2,560-product catalogue without being told what to search for.
+ */
+async function runFind (term, append = false) {
   // Every keystroke starts a request and they do not come back in order; only
-  // the newest one is allowed to write to the menu.
-  const seq = ++FIND.seq
-  openMenu()
-  qmenu.innerHTML = `<div class="fmsg">searching…</div>`
+  // the newest one is allowed to write to the menu. An append belongs to the
+  // search already on screen, so it keeps that search's number.
+  if (!append) {
+    FIND = { items: [], hi: -1, term, total: 0, seq: FIND.seq + 1, loading: false }
+    openMenu()
+    qmenu.innerHTML = `<div class="fmsg">loading…</div>`
+  } else {
+    if (FIND.loading || FIND.items.length >= FIND.total) return
+    ffoot.textContent = 'loading…'
+  }
+  const seq = FIND.seq
+  FIND.loading = true
 
   // The pages deploy on a push and the API deploys by hand, so a page can be
   // live against a server that has not been updated yet. Say so plainly rather
-  // than leaving "searching…" on screen for ever.
+  // than leaving "loading…" on screen for ever.
   let r
   try {
-    const res = await fetch(`/api/stores/${ID}/products?q=${encodeURIComponent(term)}`)
+    const res = await fetch(`/api/stores/${ID}/products?q=${encodeURIComponent(term)}` +
+                            `&limit=${FIND_PAGE}&offset=${FIND.items.length}`)
     if (!res.ok) throw new Error(res.status)
     r = await res.json()
   } catch {
@@ -828,33 +845,52 @@ async function runFind (term) {
   }
   if (seq !== FIND.seq) return
 
-  FIND.items = r.products || []; FIND.hi = -1
+  FIND.loading = false
+  FIND.items = FIND.items.concat(r.products || [])
+  FIND.total = r.total || 0
+
   if (!FIND.items.length) {
     qmenu.innerHTML = `<div class="fmsg">${term
       ? `No product matches “${esc(term)}”` : 'This store has no products yet'}</div>`
     return
   }
-  qmenu.innerHTML = (term ? '' :
-    `<div class="fmsg">Every product in this store — type to narrow</div>`) +
-    FIND.items.map((p, i) => `
-    <button class="fitem" data-i="${i}" role="option">
-      ${p.image_src ? `<img class="fthumb" src="${esc(p.image_src)}" loading="lazy" alt="">`
-                    : `<div class="fthumb"></div>`}
-      <div class="fmain">
-        <div class="fi-t">${hl(p.title || '—', term)}</div>
-        <div class="fi-h">${hl(p.handle, term)}</div>
-      </div>
-      <div class="fi-n">${nf(p.variants)} var${p.variants === 1 ? '' : 's'}${
-        p.is_active ? '' : `<span class="fi-x">gone</span>`}</div>
-    </button>`).join('') +
-    (r.total > r.shown
-      ? `<div class="fmsg">showing ${nf(r.shown)} of ${nf(r.total)}${
-          term ? ' matches' : ' products'} — keep typing to narrow</div>`
-      : '')
 
-  qmenu.querySelectorAll('.fitem').forEach(b =>
-    b.onclick = () => pick(FIND.items[Number(b.dataset.i)]))
+  const rows = (p, i) => `
+    <button class="fitem" data-i="${i}" role="option">
+      <span class="fi-t">${hl(p.title || p.handle, term)}</span>
+      <span class="fi-n">${nf(p.variants)} var${p.variants === 1 ? '' : 's'}${
+        p.is_active ? '' : `<span class="fi-x">gone</span>`}</span>
+    </button>`
+
+  if (append) {
+    // Only the new slice is built. Rebuilding the list on every page turned
+    // scrolling a long catalogue into quadratic work.
+    flist.insertAdjacentHTML('beforeend',
+      FIND.items.slice(r.offset).map((p, i) => rows(p, r.offset + i)).join(''))
+  } else {
+    qmenu.innerHTML = `<div id="flist"></div><div class="fmsg" id="ffoot"></div>`
+    flist.innerHTML = FIND.items.map(rows).join('')
+    // One delegated handler, so rows appended later need no wiring of their own.
+    flist.onclick = e => {
+      const b = e.target.closest('.fitem')
+      if (b) pick(FIND.items[Number(b.dataset.i)])
+    }
+    qmenu.scrollTop = 0
+  }
+
+  const done = FIND.items.length >= FIND.total
+  ffoot.textContent = done
+    ? `${nf(FIND.total)} ${term
+        ? `match${FIND.total === 1 ? '' : 'es'}`
+        : `product${FIND.total === 1 ? '' : 's'}`}`
+    : `${nf(FIND.items.length)} of ${nf(FIND.total)} — scroll for more`
 }
+
+// Load the next slice as the list nears its end, rather than making the user
+// ask for it.
+qmenu.addEventListener('scroll', () => {
+  if (qmenu.scrollTop + qmenu.clientHeight >= qmenu.scrollHeight - 90) runFind(FIND.term, true)
+})
 
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms) } }
 const find = debounce(runFind, 220)
