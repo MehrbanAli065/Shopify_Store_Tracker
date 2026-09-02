@@ -255,49 +255,6 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   // starting inventory, not news. Keep it out unless explicitly requested.
   const baseFilter = req.query.baseline === '1' ? '' : 'AND NOT is_baseline'
 
-  // Was this product in the store's top 20 on the day this row is about? The
-  // flag on products is overwritten nightly and only ever answers "today", so
-  // the question goes to product_top_sellers, which keeps the day.
-  //
-  // It is answered AFTER the page has been cut, never inside the query over the
-  // view. A correlated subquery in the target list stops the planner flattening
-  // v_change_report, and with the view materialised in full the store_id filter
-  // has nothing to push down to: one date's rows went from 0.6s to over 30s.
-  // Wrapping the finished page in a LEFT JOIN leaves the inner query exactly as
-  // it was and costs one index lookup per row returned.
-  const topOnly = req.query.top === '1'
-  const withTop = (inner, order) => `
-    SELECT r.*, (s.product_id IS NOT NULL) AS top_seller
-      FROM (${inner}) r
-      LEFT JOIN product_top_sellers s
-        ON s.product_id = r.product_id AND s.observed_date = r.observed_date
-     ORDER BY ${order}`
-
-  // Filtering to the top 20 is a join against a set fetched for THIS store
-  // first, carried into the query as two arrays.
-  //
-  // Every form that let the planner reach product_top_sellers itself — IN, a
-  // correlated EXISTS, a plain join on the table — was fine on most days and
-  // hung on 01 September. That table has no store_id, so a date-first plan
-  // joins every store's rows for that date before store_id can narrow
-  // anything, and the newest date is the one every store has just been
-  // ingested for. A literal set of at most a few hundred pairs has no such
-  // plan to find.
-  const topPairs = topOnly ? await (async () => {
-    const rows = await q(`SELECT t.product_id, t.observed_date
-                            FROM product_top_sellers t
-                            JOIN products p ON p.id = t.product_id
-                           WHERE p.store_id = $1 AND t.observed_date BETWEEN $2 AND $3`,
-      [id, req.query.date || from, req.query.date || to])
-    return [rows.map(r => r.product_id), rows.map(r => d(r.observed_date))]
-  })() : null
-
-  // Named apart from the view's own columns so the row list stays unqualified.
-  const topJoin = params => topOnly ? `
-    JOIN (SELECT unnest($${params.push(topPairs[0])}::bigint[]) AS tp_product,
-                 unnest($${params.push(topPairs[1])}::date[])   AS tp_date) tp
-      ON tp.tp_product = v_change_report.product_id
-     AND tp.tp_date    = v_change_report.observed_date` : ''
 
   const ROW_COLS = `handle, title, sku, product_id, variant_id, variant_label,
     product_url, image_src, observed_date, change_type, is_baseline,
@@ -333,11 +290,11 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
     const rowP = [id, req.query.date, types, limit, off]
     const cntP = [id, req.query.date, types]
     const [rows, n] = await Promise.all([
-      q(withTop(`SELECT ${ROW_COLS} FROM v_change_report ${topJoin(rowP)}
+      q(`SELECT ${ROW_COLS} FROM v_change_report
           WHERE store_id = $1 AND observed_date = $2::date ${baseFilter}
             AND change_type = ANY($3) ${pFilter(rowP)}
-          ORDER BY ${ROW_ORDER} LIMIT $4 OFFSET $5`, ROW_ORDER), rowP),
-      one(`SELECT count(*)::int AS n FROM v_change_report ${topJoin(cntP)}
+          ORDER BY ${ROW_ORDER} LIMIT $4 OFFSET $5`, rowP),
+      one(`SELECT count(*)::int AS n FROM v_change_report
             WHERE store_id = $1 AND observed_date = $2::date ${baseFilter}
               AND change_type = ANY($3) ${pFilter(cntP)}`, cntP)
     ])
@@ -360,10 +317,10 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   // view instead is affordable here precisely because one product is a handful
   // of variants. Only the dates that product changed on come back, so the date
   // picker beside the table becomes a list of the days it actually moved.
-  const perDate = (handle || variantId || topOnly) ? await (async () => {
+  const perDate = (handle || variantId) ? await (async () => {
     const p = [id, from, to, types]
     return q(`SELECT observed_date, count(*)::int AS n
-                FROM v_change_report ${topJoin(p)}
+                FROM v_change_report
                WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
                  AND change_type = ANY($4) ${pFilter(p)}
                GROUP BY observed_date ORDER BY observed_date DESC`, p)
@@ -396,17 +353,16 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   // date picker beside the table reaches any day directly, so a busy day no
   // longer buries the ones behind it the way a plain LIMIT used to.
   const rowParams = [id, from, to, types, limit, offset]
-  const rows = await q(withTop(`
-    SELECT ${ROW_COLS} FROM v_change_report ${topJoin(rowParams)}
+  const rows = await q(`
+    SELECT ${ROW_COLS} FROM v_change_report
      WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
        AND change_type = ANY($4) ${pFilter(rowParams)}
      ORDER BY observed_date DESC, ${ROW_ORDER}
-     LIMIT $5 OFFSET $6`, `observed_date DESC, ${ROW_ORDER}`), rowParams)
+     LIMIT $5 OFFSET $6`, rowParams)
 
   res.json({
     from, to, total, offset, limit, shown: rows.length,
     handle: handle || undefined, variant_id: variantId || undefined,
-    top: topOnly || undefined,
     more: offset + rows.length < total,
     // Heads each group, and fills the date picker.
     per_date: perDate.map(r => ({ date: d(r.observed_date), total: r.n })),
@@ -602,40 +558,19 @@ app.get('/api/stores/:id/report.csv', wrap(async (req, res) => {
   // filter too. Without this, narrowing to one product and hitting CSV handed
   // back the whole store without saying so.
   const variantId = String(req.query.variant_id || '').trim()
-  const topOnly = req.query.top === '1'
   const params = types ? [id, from, to, types] : [id, from, to]
   const pFilter = (handle    ? ` AND handle = $${params.push(handle)}` : '') +
                   (variantId ? ` AND variant_id = $${params.push(variantId)}` : '')
 
-  // Same join as the table's, for the same reason — see the report route.
-  const topRows = topOnly ? await q(`SELECT t.product_id, t.observed_date
-                                       FROM product_top_sellers t
-                                       JOIN products p ON p.id = t.product_id
-                                      WHERE p.store_id = $1 AND t.observed_date BETWEEN $2 AND $3`,
-                                    [id, from, to]) : []
-  const topJoin = topOnly ? `
-    JOIN (SELECT unnest($${params.push(topRows.map(r => r.product_id))}::bigint[]) AS tp_product,
-                 unnest($${params.push(topRows.map(r => d(r.observed_date)))}::date[]) AS tp_date) tp
-      ON tp.tp_product = v_change_report.product_id
-     AND tp.tp_date    = v_change_report.observed_date` : ''
-
   const rows = await q(`
-    SELECT r.store_name, r.handle, r.title, r.sku, r.variant_label, r.observed_date, r.change_type,
-           r.prev_price, r.price, r.price_diff, r.price_diff_pct,
-           r.prev_compare_at_price, r.compare_at_price, r.prev_discount_pct, r.discount_pct,
-           r.prev_in_stock, r.in_stock, r.inventory_qty, r.currency, r.product_url,
-           (s.product_id IS NOT NULL) AS top_20_selling_product
-      FROM (
-        SELECT store_name, handle, title, sku, product_id, variant_label, observed_date,
-               change_type, prev_price, price, price_diff, price_diff_pct,
-               prev_compare_at_price, compare_at_price, prev_discount_pct, discount_pct,
-               prev_in_stock, in_stock, inventory_qty, currency, product_url
-          FROM v_change_report ${topJoin}
-         WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
-           ${types ? 'AND change_type = ANY($4)' : ''} ${pFilter}) r
-      LEFT JOIN product_top_sellers s
-        ON s.product_id = r.product_id AND s.observed_date = r.observed_date
-     ORDER BY r.observed_date, r.handle`, params)
+    SELECT store_name, handle, title, sku, variant_label, observed_date, change_type,
+           prev_price, price, price_diff, price_diff_pct,
+           prev_compare_at_price, compare_at_price, prev_discount_pct, discount_pct,
+           prev_in_stock, in_stock, inventory_qty, currency, product_url
+      FROM v_change_report
+     WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
+       ${types ? 'AND change_type = ANY($4)' : ''} ${pFilter}
+     ORDER BY observed_date, handle`, params)
 
   const cols = Object.keys(rows[0] ?? { note: 1 })
   const esc = v => v == null ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v)

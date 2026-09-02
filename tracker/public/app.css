@@ -266,10 +266,6 @@ tbody tr:hover{background:var(--surface-2)}
 .bdg.out{color:var(--critical)} .bdg.out .d{background:var(--critical)}
 .bdg.nw{color:var(--blue)}      .bdg.nw .d{background:var(--blue)}
 .bdg.rm{color:var(--muted)}     .bdg.rm .d{background:var(--muted)}
-/* a mark, not a state: the star carries it, so the dot rule is undone here */
-.bdg.top{color:var(--ink);background:color-mix(in srgb,var(--warning) 16%,transparent);
-  border-color:color-mix(in srgb,var(--warning) 42%,transparent)}
-.bdg.top .d{width:auto;height:auto;border-radius:0;background:none;color:var(--warning);font-size:10px}
 .lnk{color:var(--blue);font-size:11.5px;font-weight:620;white-space:nowrap}
 .lnk:hover{text-decoration:underline}
 .thumb{width:38px;height:38px;border-radius:7px;object-fit:cover;border:1px solid var(--border);
@@ -605,18 +601,10 @@ th.hint::after{content:'';display:block;border-bottom:1px dotted var(--rule);
 .fbox input[type=date]::-webkit-calendar-picker-indicator:hover{opacity:1}
 .tsnote{justify-content:flex-end;font-size:12.5px;color:var(--muted);padding-bottom:10px}
 .tsnote b{color:var(--ink)}
-/* the top-20 toggle sits in the bar as a field, so it lines up with the rest */
-.ftog{display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer;
-  font:13.5px system-ui,sans-serif;font-weight:620;padding:10px 13px;border-radius:10px;
-  border:1px solid var(--border);background:var(--surface);color:var(--muted);box-shadow:var(--shadow)}
-.ftog .star{font-size:12px;line-height:1}
-.ftog:hover{color:var(--ink)}
-.ftog.on{border-color:color-mix(in srgb,var(--warning) 60%,transparent);color:var(--ink);
-  background:color-mix(in srgb,var(--warning) 15%,var(--surface))}
-.ftog.on .star{color:var(--warning)}
 /* Firefox and some Chromium builds do not inherit either onto the option. */
 .fbox select option{background-color:var(--surface);color:var(--ink)}
 .fbox select option:disabled{color:var(--muted)}
+.dbox #dmode{border-right:1px solid var(--line);border-radius:9px 0 0 9px}
 .dstep{width:30px;border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:0}
 .dstep:hover:not(:disabled){background:var(--surface-2);color:var(--ink)}
 .dstep:disabled{opacity:.28;cursor:default}
