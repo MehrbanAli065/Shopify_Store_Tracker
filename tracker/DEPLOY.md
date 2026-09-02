@@ -83,6 +83,24 @@ tar czf - --exclude=node_modules --exclude=.env --exclude=vercel-site \
 
 `.env` is excluded on purpose — the server's copy differs from yours.
 
+The pages and the API deploy separately, and the pages deploy faster: a `git
+push` rebuilds Vercel in a minute while the API waits for the command above. So
+when a change spans both, **push the API first**. A page calling a route its
+server does not have yet is a live 404.
+
+### One-off: the product-search indexes
+
+The product finder searches by substring, which no ordinary index serves. After
+the first deploy that carries `db/search-indexes.sql`, run once on the server:
+
+```bash
+ssh mehrban@66.45.238.72 'cd ~/tracker && npm run search:init'
+```
+
+It creates `pg_trgm` and two GIN indexes on `products` — about a minute over
+708k rows, and safe to re-run. If the database role cannot create the extension
+the script says so and skips the indexes; search still works, just by scanning.
+
 ---
 
 ## The frontend

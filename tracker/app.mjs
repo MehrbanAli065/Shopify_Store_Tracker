@@ -265,19 +265,31 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   // list rather than reshuffling it.
   const ROW_ORDER = 'abs(COALESCE(price_diff_pct, 0)) DESC, handle'
 
+  // ?handle= narrows the whole table to one product — what the finder beside
+  // the table hands back when a product is picked. It is an equality match on
+  // an indexed column, so it stays cheap on the largest stores; searching the
+  // change log itself by substring is not, which is why the finder searches
+  // the products table and this filter only takes its answer.
+  const handle = String(req.query.handle || '').trim()
+
+  // Array.push returns the new length, which is exactly the placeholder number
+  // the value has just taken — so a filter and its parameter cannot drift.
+  const pFilter = params => handle ? `AND handle = $${params.push(handle)}` : ''
+
   // ?date= drills into a single day. The grouped view can only ever show a
   // slice of a busy date, and without this there is no way to reach the rest.
   if (req.query.date) {
     const off = Math.max(0, Number(req.query.offset) || 0)
+    const rowP = [id, req.query.date, types, limit, off]
+    const cntP = [id, req.query.date, types]
     const [rows, n] = await Promise.all([
       q(`SELECT ${ROW_COLS} FROM v_change_report
           WHERE store_id = $1 AND observed_date = $2::date ${baseFilter}
-            AND change_type = ANY($3)
-          ORDER BY ${ROW_ORDER} LIMIT $4 OFFSET $5`,
-        [id, req.query.date, types, limit, off]),
+            AND change_type = ANY($3) ${pFilter(rowP)}
+          ORDER BY ${ROW_ORDER} LIMIT $4 OFFSET $5`, rowP),
       one(`SELECT count(*)::int AS n FROM v_change_report
             WHERE store_id = $1 AND observed_date = $2::date ${baseFilter}
-              AND change_type = ANY($3)`, [id, req.query.date, types])
+              AND change_type = ANY($3) ${pFilter(cntP)}`, cntP)
     ])
     return res.json({
       date: req.query.date, offset: off, total: n.n, shown: rows.length,
@@ -293,7 +305,18 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   // earlier dates look empty when they are not.
   // Driven by scrape_runs so a day that ran and changed nothing still appears
   // and reads zero, rather than vanishing and looking like a day never checked.
-  const perDate = await q(`
+  // With a product filter the fast path below cannot answer: it counts off
+  // variant_history, which knows nothing about titles or handles. Counting the
+  // view instead is affordable here precisely because one product is a handful
+  // of variants. Only the dates that product changed on come back, so the date
+  // picker beside the table becomes a list of the days it actually moved.
+  const perDate = handle ? await (async () => {
+    const p = [id, from, to, types]
+    return q(`SELECT observed_date, count(*)::int AS n FROM v_change_report
+               WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
+                 AND change_type = ANY($4) ${pFilter(p)}
+               GROUP BY observed_date ORDER BY observed_date DESC`, p)
+  })() : await q(`
     SELECT r.run_date AS observed_date, count(h.change_type)::int AS n
       FROM scrape_runs r
       -- Counting off variant_history, not the view: v_change_report joins
@@ -321,21 +344,64 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   // One page, newest first. The date headings are drawn from per_date, and the
   // date picker beside the table reaches any day directly, so a busy day no
   // longer buries the ones behind it the way a plain LIMIT used to.
+  const rowParams = [id, from, to, types, limit, offset]
   const rows = await q(`
     SELECT ${ROW_COLS} FROM v_change_report
      WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
-       AND change_type = ANY($4)
+       AND change_type = ANY($4) ${pFilter(rowParams)}
      ORDER BY observed_date DESC, ${ROW_ORDER}
-     LIMIT $5 OFFSET $6`,
-    [id, from, to, types, limit, offset])
+     LIMIT $5 OFFSET $6`, rowParams)
 
   res.json({
-    from, to, total, offset, limit, shown: rows.length,
+    from, to, total, offset, limit, shown: rows.length, handle: handle || undefined,
     more: offset + rows.length < total,
     // Heads each group, and fills the date picker.
     per_date: perDate.map(r => ({ date: d(r.observed_date), total: r.n })),
     rows: rows.map(r => ({ ...r, observed_date: d(r.observed_date),
                            product_first_seen: d(r.product_first_seen) }))
+  })
+}))
+
+// ── the product finder ────────────────────────────────────────────
+/**
+ * Search a store's catalogue by product name or handle.
+ *
+ * It searches `products`, not the change log, and that is the whole point. A
+ * substring search over the log means ILIKE across every event the store has
+ * ever recorded: 16 seconds on a store holding 2.8M of them, because a term
+ * like "dress" matches 18,143 of that store's 19,377 products and no index can
+ * narrow a request for nearly everything. The catalogue is three orders of
+ * magnitude smaller, answers in milliseconds with the trigram indexes from
+ * db/search-indexes.sql, and the product picked from it then filters the log
+ * by an indexed equality.
+ */
+app.get('/api/stores/:id/products', wrap(async (req, res) => {
+  const id = req.params.id
+  const term = String(req.query.q || '').trim()
+  const limit = Math.min(Number(req.query.limit) || 20, 50)
+
+  // One or two characters match most of a catalogue and answer nothing.
+  if (term.length < 2) return res.json({ q: term, total: 0, shown: 0, products: [] })
+
+  // % and _ are wildcards to LIKE; a user typing them means the characters.
+  const pat = '%' + term.replace(/[\\%_]/g, c => '\\' + c) + '%'
+  const WHERE = `p.store_id = $1 AND (p.title ILIKE $2 OR p.handle ILIKE $2)`
+
+  const [rows, n] = await Promise.all([
+    q(`SELECT p.id, p.handle, p.title, p.image_src, p.is_active,
+              p.first_seen_at, p.last_seen_at,
+              (SELECT count(*)::int FROM variants v WHERE v.product_id = p.id) AS variants
+         FROM products p WHERE ${WHERE}
+        -- A catalogue of near-identical listings repeats titles, so id breaks
+        -- the tie and the same search comes back in the same order.
+        ORDER BY p.title, p.id LIMIT $3`, [id, pat, limit]),
+    one(`SELECT count(*)::int AS n FROM products p WHERE ${WHERE}`, [id, pat])
+  ])
+
+  res.json({
+    q: term, total: n.n, shown: rows.length,
+    products: rows.map(r => ({ ...r, first_seen_at: d(r.first_seen_at),
+                                     last_seen_at:  d(r.last_seen_at) }))
   })
 }))
 
@@ -391,6 +457,13 @@ app.get('/api/stores/:id/report.csv', wrap(async (req, res) => {
   const types = groups[req.query.type] ||
     ['new', 'price_up', 'price_down', 'discount_change', 'stock_out', 'stock_in', 'removed']
   const baseFilter = req.query.baseline === '1' ? '' : 'AND NOT is_baseline'
+  const handle = String(req.query.handle || '').trim()
+
+  // An export should be the table it was taken from, so it takes the product
+  // filter too. Without this, narrowing to one product and hitting CSV handed
+  // back the whole store without saying so.
+  const params = types ? [id, from, to, types] : [id, from, to]
+  const pFilter = handle ? `AND handle = $${params.push(handle)}` : ''
 
   const rows = await q(`
     SELECT store_name, handle, title, sku, variant_label, observed_date, change_type,
@@ -399,9 +472,8 @@ app.get('/api/stores/:id/report.csv', wrap(async (req, res) => {
            prev_in_stock, in_stock, inventory_qty, currency, product_url
       FROM v_change_report
      WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
-       ${types ? 'AND change_type = ANY($4)' : ''}
-     ORDER BY observed_date, handle`,
-    types ? [id, from, to, types] : [id, from, to])
+       ${types ? 'AND change_type = ANY($4)' : ''} ${pFilter}
+     ORDER BY observed_date, handle`, params)
 
   const cols = Object.keys(rows[0] ?? { note: 1 })
   const esc = v => v == null ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v)

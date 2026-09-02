@@ -79,6 +79,9 @@ const ID   = P.get('id') || '1'
 const FROM = P.get('from') || ''
 const TO   = P.get('to') || ''
 const BASE = P.get('baseline') === '1'
+// Carried through from the table's product filter, so a PDF taken while one
+// product was on screen is that product, not the whole store.
+const HANDLE = P.get('handle') || ''
 const MAX  = 1500
 
 const nf  = n => n == null ? '—' : new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n)
@@ -94,7 +97,8 @@ const SECTIONS = [
   { key:'relisted', label:'Back on the feed', hue:'#5680AC' }
 ]
 
-const qs = extra => (FROM?`from=${FROM}&`:'') + (TO?`to=${TO}&`:'') + (BASE?'baseline=1&':'') + extra
+const qs = extra => (FROM?`from=${FROM}&`:'') + (TO?`to=${TO}&`:'') + (BASE?'baseline=1&':'') +
+  (HANDLE?`handle=${encodeURIComponent(HANDLE)}&`:'') + extra
 
 function priceCell (r) {
   if (r.change_type === 'new' || r.is_baseline)
@@ -146,7 +150,7 @@ async function build () {
   const cur = store.currency
   const from = sum.from, to = sum.to
   document.title = `${store.name} — ${from} to ${to}`
-  ttl.textContent = `${store.name} · ${dts(from)} – ${dts(to)}`
+  ttl.textContent = `${store.name} · ${dts(from)} – ${dts(to)}` + (HANDLE ? ` · ${HANDLE}` : '')
 
   // one request per section, no images anywhere — this is what keeps it fast
   const parts = await Promise.all(SECTIONS.map(async s => {

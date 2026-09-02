@@ -22,5 +22,6 @@ export const SCHEMA_FILES = [
   'alerts.sql',            // store_alert_mutes — dismissed warnings
   'store-id-indexes.sql',  // the indexes the denormalised store_id makes possible
   'in-feed.sql',           // the partial index on variants.in_feed
+  'search-indexes.sql',    // trigram indexes behind the product finder
   'seed.sql',              // the store registry — last, it needs the tables
 ]

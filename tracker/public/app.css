@@ -397,7 +397,7 @@ td.z{color:var(--muted)}
 .ev.gap .evt{font-style:italic}
 
 @media print{
-  .top,.frow,.searchbar,.tabs,.drawer,.scrim,.tip,.cta{display:none!important}
+  .top,.frow,.searchbar,.filterbar,.fpin,.tabs,.drawer,.scrim,.tip,.cta{display:none!important}
   body{background:#fff}
   .chart,.kpi,.tw,.days{break-inside:avoid}
 }
@@ -550,3 +550,57 @@ th.hint::after{content:'';display:block;border-bottom:1px dotted var(--rule);
 .dfilt select{width:100%;font:inherit;font-size:12.5px;padding:7px 9px;border-radius:8px;
   border:1px solid var(--border);background:var(--surface);color:var(--ink);cursor:pointer}
 .dfilt select:focus{outline:none;border-color:var(--blue)}
+
+/* ═══════════ change-log filter bar ═══════════ */
+/* The product finder and the date picker are one control surface: both narrow
+   the same table, so they sit on one line with their labels above them. */
+.filterbar{display:flex;align-items:flex-end;gap:10px;margin:0 0 10px;flex-wrap:wrap}
+.filterbar .fld{position:relative;display:flex;flex-direction:column;gap:5px;min-width:0}
+.filterbar .fld.grow{flex:1 1 300px}
+.flab{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:640}
+.fbox{position:relative;display:flex;align-items:stretch;background:var(--surface);
+  border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow)}
+.fbox:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 15%,transparent)}
+.fbox .si{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;
+  opacity:.55;pointer-events:none}
+.fbox input{width:100%;font:13.5px system-ui,sans-serif;padding:10px 36px 10px 34px;
+  border:0;outline:none;background:none;color:var(--ink);border-radius:10px}
+.fbox input::placeholder{color:var(--muted)}
+.fbox input::-webkit-search-cancel-button{display:none}
+.fbox .clr{top:50%;transform:translateY(-50%)}
+
+/* the date field: a stepper on each side of the picker, so walking day by day
+   does not mean reopening the list every time */
+.dbox select{appearance:none;-webkit-appearance:none;font:13.5px system-ui,sans-serif;font-weight:620;
+  padding:10px 30px 10px 11px;border:0;outline:none;background:none;color:var(--ink);cursor:pointer;
+  font-variant-numeric:tabular-nums;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center}
+.dstep{width:30px;border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:0}
+.dstep:hover:not(:disabled){background:var(--surface-2);color:var(--ink)}
+.dstep:disabled{opacity:.28;cursor:default}
+#dprev{border-right:1px solid var(--line);border-radius:9px 0 0 9px}
+#dnext{border-left:1px solid var(--line);border-radius:0 9px 9px 0}
+
+/* the results menu */
+.fmenu{position:absolute;top:100%;left:0;right:0;z-index:30;margin-top:6px;padding:5px;
+  max-height:340px;overflow-y:auto;background:var(--plane);border:1px solid var(--border);
+  border-radius:11px;box-shadow:0 14px 34px rgba(0,0,0,.18)}
+.fitem{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:inherit;
+  border:0;background:none;padding:7px 8px;border-radius:8px;cursor:pointer}
+.fitem:hover,.fitem.on{background:var(--surface-2)}
+.fthumb{width:34px;height:34px;border-radius:7px;object-fit:cover;background:var(--surface-2);flex-shrink:0}
+.fmain{min-width:0;flex:1}
+.fi-t{font-size:13px;font-weight:620;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi-h{font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi-n{font-size:11.5px;color:var(--muted);font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fi-x{margin-left:6px;color:var(--s4);font-weight:650}
+.fmsg{padding:10px 11px;font-size:12.5px;color:var(--muted)}
+
+/* what the table is currently narrowed to, and the way back out */
+.fpin{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;font-size:12.5px;color:var(--muted)}
+.pin-h{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);background:var(--surface-2);
+  border:1px solid var(--border);border-radius:7px;padding:3px 8px}
+.pin-x{border:0;background:none;color:var(--blue);cursor:pointer;font:inherit;font-weight:620;padding:2px 4px}
+.pin-x:hover{text-decoration:underline}

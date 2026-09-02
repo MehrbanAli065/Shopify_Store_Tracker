@@ -103,18 +103,32 @@
 
   <!-- ── change log ── -->
   <h2>Change log</h2>
-  <div class="searchbar sm">
-    <span class="si">🔍</span>
-    <input id="q" type="search" autocomplete="off" placeholder="Filter by product name, handle or SKU…">
-    <button class="clr" id="qc" hidden>✕</button>
-  </div>
   <label class="basetog"><input type="checkbox" id="baseChk">
     Include the first import <span id="baseHint"></span></label>
   <div class="tabs" id="tabs"></div>
-  <div class="logbar">
-    <label for="dsel">Date</label>
-    <select id="dsel"><option value="">All dates</option></select>
+
+  <div class="filterbar">
+    <div class="fld grow" id="finder">
+      <span class="flab">Product</span>
+      <div class="fbox">
+        <span class="si">🔍</span>
+        <input id="q" type="search" autocomplete="off" spellcheck="false"
+               role="combobox" aria-expanded="false" aria-controls="qmenu"
+               placeholder="Search any product by name or handle…">
+        <button class="clr" id="qc" hidden title="Clear">✕</button>
+      </div>
+      <div class="fmenu" id="qmenu" role="listbox" hidden></div>
+    </div>
+    <div class="fld">
+      <span class="flab">Date</span>
+      <div class="fbox dbox">
+        <button class="dstep" id="dprev" title="Older day">‹</button>
+        <select id="dsel"><option value="">All dates</option></select>
+        <button class="dstep" id="dnext" title="Newer day">›</button>
+      </div>
+    </div>
   </div>
+  <div class="fpin" id="fpin" hidden></div>
   <div class="tw scrolly"><table>
     <thead><tr>
       <th>Product</th><th>Variant</th><th>Price</th><th>Change</th>
@@ -206,7 +220,11 @@ function renderStrip (daily) {
   bindTips(strip)
 }
 
-let tab = '', CUR = 'PKR', RANGE = {}, ROWS = [], q = '', showBase = false, BASE_N = 0
+let tab = '', CUR = 'PKR', RANGE = {}, ROWS = [], showBase = false, BASE_N = 0
+// The product filter is a picked product, not a typed string: the table is
+// filtered by handle on the server, so it holds for every page and every date
+// rather than only for the hundred rows on screen.
+let PROD = null
 let PER_DATE = [], PAGE = 0, TOTAL = 0, ONE_DATE = ''
 const PAGE_SIZE = 100
 
@@ -422,7 +440,8 @@ async function loadRows (keepPage) {
   rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="9"><div class="skl w90"></div></td></tr>`).join('')
   const r = await (await fetch(
     `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}` +
-    `${ONE_DATE?`date=${ONE_DATE}&`:''}limit=${PAGE_SIZE}&offset=${PAGE * PAGE_SIZE}`)).json()
+    `${ONE_DATE?`date=${ONE_DATE}&`:''}${PROD?`handle=${encodeURIComponent(PROD.handle)}&`:''}` +
+    `limit=${PAGE_SIZE}&offset=${PAGE * PAGE_SIZE}`)).json()
   ROWS = r.rows; TOTAL = r.total; window.__total = r.total
   if (r.per_date) { PER_DATE = r.per_date; fillDateSelect() }
   document.querySelector('.tw').scrollTop = 0
@@ -433,9 +452,26 @@ async function loadRows (keepPage) {
 // first: without it, reaching 28 July would mean clicking through 80 pages.
 function fillDateSelect () {
   const cur = dsel.value
-  dsel.innerHTML = `<option value="">All dates</option>` + PER_DATE.map(p =>
-    `<option value="${esc(p.date)}"${p.total ? '' : ' disabled'}>${dt(p.date)} · ${nf(p.total)}</option>`).join('')
+  const all = PER_DATE.reduce((a, p) => a + p.total, 0)
+  dsel.innerHTML = `<option value="">All dates · ${nf(all)}</option>` + PER_DATE.map(p =>
+    `<option value="${esc(p.date)}"${p.total ? '' : ' disabled'}>${dt(p.date)} · ${
+      p.total ? nf(p.total) + (p.total === 1 ? ' change' : ' changes') : 'no changes'}</option>`).join('')
   dsel.value = cur
+  syncSteppers()
+}
+
+/** The ‹ › beside the picker walk the days that actually have something on
+ *  them, so stepping never lands on a day the select itself disables. */
+const dayOpts = () => [...dsel.options].filter(o => !o.disabled)
+function syncSteppers () {
+  const opts = dayOpts(), i = opts.findIndex(o => o.value === dsel.value)
+  dprev.disabled = i < 0 || i >= opts.length - 1
+  dnext.disabled = i <= 0
+}
+function stepDate (dir) {
+  const opts = dayOpts(), nx = opts[opts.findIndex(o => o.value === dsel.value) + dir]
+  if (!nx) return
+  dsel.value = nx.value; ONE_DATE = nx.value; syncSteppers(); loadRows()
 }
 
 function renderPager () {
@@ -462,14 +498,16 @@ function renderPager () {
 }
 
 function paint () {
-  const t = q.toLowerCase()
-  const list = t ? ROWS.filter(x =>
-    (x.title||'').toLowerCase().includes(t) || x.handle.toLowerCase().includes(t) ||
-    (x.sku||'').toLowerCase().includes(t) || (x.variant_label||'').toLowerCase().includes(t)) : ROWS
+  // No client-side filtering left to do: a product filter is applied by the
+  // server, so what arrived is what belongs on the page. Filtering here as
+  // well used to be the whole search, and it could only ever see the hundred
+  // rows already loaded.
+  const list = ROWS
 
   cnt.innerHTML = ROWS.length
-    ? (q ? `<b>${list.length}</b> matching “${esc(q)}” · ` : '') +
-      `${nf(TOTAL)} change events${ONE_DATE ? ' on ' + dt(ONE_DATE) : ''}` : ''
+    ? `${nf(TOTAL)} change event${TOTAL === 1 ? '' : 's'}` +
+      (PROD ? ` for ${esc(PROD.title || PROD.handle)}` : '') +
+      (ONE_DATE ? ' on ' + dt(ONE_DATE) : '') : ''
 
   // Grouped under a heading per date, so the range reads as "what changed on
   // the 27th, then the 28th", not as one undated pile.
@@ -480,10 +518,9 @@ function paint () {
   }
 
   const head = (p, n) => {
-    const held = !q && p.total > n ? p.total - n : 0
-    const what = q ? `${nf(n)} matching`
-                   : p.total ? `${nf(p.total)} change${p.total === 1 ? '' : 's'}`
-                             : 'no changes · the scrape ran and every variant was checked'
+    const held = p.total > n ? p.total - n : 0
+    const what = p.total ? `${nf(p.total)} change${p.total === 1 ? '' : 's'}`
+                         : 'no changes · the scrape ran and every variant was checked'
     return `<tr class="dgrp${p.total ? '' : ' quiet'}"><td colspan="9">
       <span class="dg-d">${dt(p.date)}</span>
       <span class="dg-n">${what}</span>
@@ -498,7 +535,10 @@ function paint () {
   // question nobody asked.
   // Only the dates present on this page get a heading. A heading for a date
   // whose rows are three pages away would promise rows that are not there.
-  const shownDates = PER_DATE.filter(p => grouped.has(p.date) || (!q && !ONE_DATE && !p.total))
+  // A quiet day is worth stating when the question is "what happened in this
+  // range", but not when it is "when did this product change" — there, every
+  // day the product sat still would bury the days it moved.
+  const shownDates = PER_DATE.filter(p => grouped.has(p.date) || (!PROD && !ONE_DATE && !p.total))
 
   rows.innerHTML = shownDates.length ? shownDates.map(p =>
     head(p, (grouped.get(p.date) || []).length) + (grouped.get(p.date) || []).map(x => `
@@ -523,7 +563,9 @@ function paint () {
     </tr>`).join('')).join('')
     : `<tr><td colspan="9"><div class="nores" style="border:0;background:none;padding:40px 10px">
          <div class="ne">🔍</div><div class="nt">Nothing found</div>
-         <div class="nd">${q ? `No rows match “${esc(q)}”.` : 'No changes of this type in the selected period.'}</div>
+         <div class="nd">${PROD
+           ? `${esc(PROD.title || PROD.handle)} has no changes of this type in the selected period.`
+           : 'No changes of this type in the selected period.'}</div>
        </div></td></tr>`
 
   document.querySelectorAll('.crow').forEach(tr =>
@@ -738,16 +780,134 @@ document.querySelectorAll('.preset').forEach(b => b.onclick = () => {
   }
   applyRange()
 })
+// ═══ product finder ═══
+// Searching the change log by substring is not affordable — on the largest
+// store a term like "dress" matches 18,143 of 19,377 products, which is every
+// event it has. So the box searches the catalogue, the user picks one product,
+// and the table filters by that product's handle. See the /products route.
 const $q = document.getElementById('q')
-$q.addEventListener('input', () => { q = $q.value.trim(); qc.hidden = !q; paint() })
-qc.onclick = () => { $q.value=''; q=''; qc.hidden=true; paint(); $q.focus() }
+let FIND = { items: [], hi: -1, seq: 0 }
+
+const closeMenu = () => { qmenu.hidden = true; $q.setAttribute('aria-expanded', 'false') }
+const openMenu  = () => { qmenu.hidden = false; $q.setAttribute('aria-expanded', 'true') }
+
+/** Wrap the matched run so the eye can see why a row is in the list. */
+const hl = (str, t) => {
+  const i = String(str ?? '').toLowerCase().indexOf(t.toLowerCase())
+  return i < 0 ? esc(str) : esc(str.slice(0, i)) +
+    `<mark>${esc(str.slice(i, i + t.length))}</mark>` + esc(str.slice(i + t.length))
+}
+
+async function runFind (term) {
+  // Every keystroke starts a request and they do not come back in order; only
+  // the newest one is allowed to write to the menu.
+  const seq = ++FIND.seq
+  if (term.length < 2) { closeMenu(); return }
+  openMenu()
+  qmenu.innerHTML = `<div class="fmsg">searching…</div>`
+
+  // The pages deploy on a push and the API deploys by hand, so a page can be
+  // live against a server that has not been updated yet. Say so plainly rather
+  // than leaving "searching…" on screen for ever.
+  let r
+  try {
+    const res = await fetch(`/api/stores/${ID}/products?q=${encodeURIComponent(term)}`)
+    if (!res.ok) throw new Error(res.status)
+    r = await res.json()
+  } catch {
+    if (seq === FIND.seq) qmenu.innerHTML = `<div class="fmsg">Product search is unavailable right now</div>`
+    return
+  }
+  if (seq !== FIND.seq) return
+
+  FIND.items = r.products || []; FIND.hi = -1
+  if (!FIND.items.length) {
+    qmenu.innerHTML = `<div class="fmsg">No product matches “${esc(term)}”</div>`
+    return
+  }
+  qmenu.innerHTML = FIND.items.map((p, i) => `
+    <button class="fitem" data-i="${i}" role="option">
+      ${p.image_src ? `<img class="fthumb" src="${esc(p.image_src)}" loading="lazy" alt="">`
+                    : `<div class="fthumb"></div>`}
+      <div class="fmain">
+        <div class="fi-t">${hl(p.title || '—', term)}</div>
+        <div class="fi-h">${hl(p.handle, term)}</div>
+      </div>
+      <div class="fi-n">${nf(p.variants)} var${p.variants === 1 ? '' : 's'}${
+        p.is_active ? '' : `<span class="fi-x">gone</span>`}</div>
+    </button>`).join('') +
+    (r.total > r.shown
+      ? `<div class="fmsg">showing ${nf(r.shown)} of ${nf(r.total)} matches — keep typing to narrow</div>`
+      : '')
+
+  qmenu.querySelectorAll('.fitem').forEach(b =>
+    b.onclick = () => pick(FIND.items[Number(b.dataset.i)]))
+}
+
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms) } }
+const find = debounce(runFind, 220)
+
+function pick (p) {
+  if (!p) return
+  PROD = { handle: p.handle, title: p.title }
+  $q.value = p.title || p.handle
+  qc.hidden = false
+  closeMenu()
+  // The day that was open may hold nothing for this product, and an empty
+  // table would read as "this product never changed" rather than "not on the
+  // 3rd". Start it on the product's whole range instead.
+  ONE_DATE = ''; dsel.value = ''
+  fpin.hidden = false
+  fpin.innerHTML = `<span class="pinl">Filtered to</span>
+    <span class="pin-h">${esc(p.handle)}</span>
+    <button class="pin-x" id="fpinx" title="Show all products">✕ clear</button>`
+  fpinx.onclick = clearProduct
+  syncExportLinks(); loadRows()
+}
+
+function clearProduct (refocus) {
+  const had = !!PROD
+  PROD = null; $q.value = ''; qc.hidden = true; fpin.hidden = true
+  closeMenu()
+  if (had) { ONE_DATE = ''; dsel.value = ''; syncExportLinks(); loadRows() }
+  if (refocus === true) $q.focus()
+}
+
+$q.addEventListener('input', () => {
+  const t = $q.value.trim()
+  qc.hidden = !t
+  // Typing over a picked product drops the filter — the text no longer names
+  // what the table is showing.
+  if (PROD) { PROD = null; fpin.hidden = true; syncExportLinks(); loadRows() }
+  if (!t) closeMenu()
+  find(t)
+})
+$q.addEventListener('focus', () => { if (!PROD && $q.value.trim().length >= 2) runFind($q.value.trim()) })
+$q.addEventListener('keydown', e => {
+  if (e.key === 'Escape') return closeMenu()
+  if (qmenu.hidden || !FIND.items.length) return
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    FIND.hi = (FIND.hi + (e.key === 'ArrowDown' ? 1 : -1) + FIND.items.length) % FIND.items.length
+    qmenu.querySelectorAll('.fitem').forEach((b, i) => b.classList.toggle('on', i === FIND.hi))
+    qmenu.querySelector('.fitem.on')?.scrollIntoView({ block: 'nearest' })
+  } else if (e.key === 'Enter') {
+    e.preventDefault(); pick(FIND.items[Math.max(0, FIND.hi)])
+  }
+})
+qc.onclick = () => clearProduct(true)
+addEventListener('click', e => { if (!finder.contains(e.target)) closeMenu() })
+
 function syncExportLinks () {
   const t = tab ? `type=${tab}&` : ''
-  csv.href = `/api/stores/${ID}/report.csv?${qsDates()}${t}${showBase ? 'baseline=1' : ''}`
-  pdf.href = `/print.html?id=${ID}&${qsDates()}${showBase ? 'baseline=1' : ''}`
+  const h = PROD ? `handle=${encodeURIComponent(PROD.handle)}&` : ''
+  csv.href = `/api/stores/${ID}/report.csv?${qsDates()}${t}${h}${showBase ? 'baseline=1' : ''}`
+  pdf.href = `/print.html?id=${ID}&${qsDates()}${h}${showBase ? 'baseline=1' : ''}`
 }
 baseChk.onchange = () => { showBase = baseChk.checked; syncExportLinks(); loadRows() }
-dsel.onchange = () => { ONE_DATE = dsel.value; loadRows() }
+dsel.onchange = () => { ONE_DATE = dsel.value; syncSteppers(); loadRows() }
+dprev.onclick = () => stepDate(1)   // the list runs newest first
+dnext.onclick = () => stepDate(-1)
 tg.onclick = () => {
   const cur = document.documentElement.getAttribute('data-theme')
     || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
