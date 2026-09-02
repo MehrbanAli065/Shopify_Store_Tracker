@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Store Report — Shopify Store Tracker</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232a78d6'/><path d='M9 12.6h14l-1 11.6a2.2 2.2 0 0 1-2.2 2h-7.6a2.2 2.2 0 0 1-2.2-2L9 12.6Z' fill='%23fff'/><path d='M12.6 12.6V10.2a3.4 3.4 0 0 1 6.8 0v2.4' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round'/><rect x='12.2' y='20.4' width='2.5' height='3.6' rx='1' fill='%232a78d6'/><rect x='14.9' y='18.2' width='2.5' height='5.8' rx='1' fill='%232a78d6'/><rect x='17.6' y='16' width='2.5' height='8' rx='1' fill='%232a78d6'/></svg>">
-<link rel="stylesheet" href="/app.css?v=8fc823ba">
+<link rel="stylesheet" href="/app.css?v=0304d4f3">
 </head>
 <body>
 
@@ -333,7 +333,6 @@ const PAGE_SIZE = 100
 
 const STOCK = { in:'<span class="bdg in"><span class="d"></span>In</span>',
                 out:'<span class="bdg out"><span class="d"></span>Out</span>',
-                nw:'<span class="bdg nw"><span class="d"></span>New</span>',
                 rm:'<span class="bdg rm"><span class="d"></span>Removed</span>' }
 
 const qsDates = () => {
@@ -541,8 +540,17 @@ function changeCell (r) {
   const v = Number(r.price_diff)
   return `<span class="${v<0?'dn':'up'}">${v>0?'+':''}${nf(v)}<div class="s2" style="color:inherit">${r.price_diff_pct>0?'+':''}${r.price_diff_pct}%</div></span>`
 }
-const stockCell = r => r.change_type==='new' ? STOCK.nw
-                     : r.change_type==='removed' ? STOCK.rm
+/**
+ * What this column answers is "could you buy it that day", and on a 'new' row
+ * that is known: in_stock comes from the export the variant first appeared in.
+ * Showing a New badge there duplicated the Change column beside it and hid the
+ * answer — 122 of this store's 208 new variants on 2 Sep 2026 were listed
+ * already sold out, and the table said "New" to all 208.
+ *
+ * 'removed' keeps its own badge, because there the question does not apply:
+ * the variant was not in the file at all, so nothing was measured.
+ */
+const stockCell = r => r.change_type==='removed' ? STOCK.rm
                      : r.in_stock ? STOCK.in : STOCK.out
 /** The store's own count, when it publishes one. Blank and 0 tell us nothing. */
 const qtyCell = r => r.inventory_qty > 0

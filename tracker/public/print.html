@@ -134,8 +134,7 @@ function tableFor (rows, cur) {
       <td class="num">${priceCell(r)}</td>
       <td class="num">${changeCell(r)}</td>
       <td class="num">${Number(r.discount_pct)?`${r.discount_pct}%`:'—'}</td>
-      <td>${r.is_baseline||r.change_type==='new' ? 'In'
-           : r.change_type==='removed' ? 'Removed'
+      <td>${r.change_type==='removed' ? 'Removed'
            : r.in_stock ? 'In' : 'Out'}</td>
       <td class="num">${r.inventory_qty > 0 ? nf(r.inventory_qty) : 'unknown'}</td>
       <td class="num">${dts(r.observed_date)}</td>

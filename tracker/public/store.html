@@ -333,7 +333,6 @@ const PAGE_SIZE = 100
 
 const STOCK = { in:'<span class="bdg in"><span class="d"></span>In</span>',
                 out:'<span class="bdg out"><span class="d"></span>Out</span>',
-                nw:'<span class="bdg nw"><span class="d"></span>New</span>',
                 rm:'<span class="bdg rm"><span class="d"></span>Removed</span>' }
 
 const qsDates = () => {
@@ -541,8 +540,17 @@ function changeCell (r) {
   const v = Number(r.price_diff)
   return `<span class="${v<0?'dn':'up'}">${v>0?'+':''}${nf(v)}<div class="s2" style="color:inherit">${r.price_diff_pct>0?'+':''}${r.price_diff_pct}%</div></span>`
 }
-const stockCell = r => r.change_type==='new' ? STOCK.nw
-                     : r.change_type==='removed' ? STOCK.rm
+/**
+ * What this column answers is "could you buy it that day", and on a 'new' row
+ * that is known: in_stock comes from the export the variant first appeared in.
+ * Showing a New badge there duplicated the Change column beside it and hid the
+ * answer — 122 of this store's 208 new variants on 2 Sep 2026 were listed
+ * already sold out, and the table said "New" to all 208.
+ *
+ * 'removed' keeps its own badge, because there the question does not apply:
+ * the variant was not in the file at all, so nothing was measured.
+ */
+const stockCell = r => r.change_type==='removed' ? STOCK.rm
                      : r.in_stock ? STOCK.in : STOCK.out
 /** The store's own count, when it publishes one. Blank and 0 tell us nothing. */
 const qtyCell = r => r.inventory_qty > 0

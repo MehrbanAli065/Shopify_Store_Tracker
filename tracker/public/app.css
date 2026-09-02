@@ -264,7 +264,6 @@ tbody tr:hover{background:var(--surface-2)}
 .bdg .d{width:6px;height:6px;border-radius:50%}
 .bdg.in{color:var(--good-ink)}  .bdg.in .d{background:var(--good)}
 .bdg.out{color:var(--critical)} .bdg.out .d{background:var(--critical)}
-.bdg.nw{color:var(--blue)}      .bdg.nw .d{background:var(--blue)}
 .bdg.rm{color:var(--muted)}     .bdg.rm .d{background:var(--muted)}
 .lnk{color:var(--blue);font-size:11.5px;font-weight:620;white-space:nowrap}
 .lnk:hover{text-decoration:underline}
