@@ -951,7 +951,19 @@ function renderTimeline () {
                 // It used to read "· left the feed" on a sold-out event, which
                 // is a different fact again: in_feed and in_stock are separate
                 // columns on purpose. Leaving the feed is 'removed'.
-                e.in_stock === null ? ''
+                // Except on a removal, where in_stock is not a measurement:
+                // the variant was not in the file at all, so there was nothing
+                // to measure, and the ingest writes false because something
+                // unlisted cannot be bought. Calling that "out of stock" says
+                // it sold out when it was withdrawn. The table has always
+                // known this — it prints a Removed badge instead of In/Out.
+                // What is real on that row is prev_in_stock: how it stood the
+                // last day it was still listed.
+                e.change_type === 'removed'
+                  ? (e.prev_in_stock === null ? ''
+                     : e.prev_in_stock ? ` · <span class="in-s">was in stock</span>`
+                                       : ` · <span class="out-s">was already sold out</span>`)
+                : e.in_stock === null ? ''
                 : e.in_stock ? ` · <span class="in-s">in stock</span>`
                              : ` · <span class="out-s">out of stock</span>`}
             </div>
