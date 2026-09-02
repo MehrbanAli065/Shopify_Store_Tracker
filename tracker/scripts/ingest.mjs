@@ -316,7 +316,15 @@ for (const [key, v] of csvVariants) {
   }
 
   const priceChanged   = !eqNum(num(dbv.current_price), v.price)
-  const compareChanged = !eqNum(num(dbv.current_compare_at_price), v.compare_at)
+  // A crossed-out price of "nothing" is the same fact whether the export wrote
+  // it blank or wrote 0, and stores switch between the two. Comparing them raw
+  // recorded a change every time that happened: 2,794 events across the
+  // database say the discount changed while both discounts read 0%, and for
+  // Alkaram that was every one of its 699 discount_change rows.
+  const noCompare = v => v == null || v <= 0
+  const compareChanged = noCompare(num(dbv.current_compare_at_price)) && noCompare(v.compare_at)
+    ? false
+    : !eqNum(num(dbv.current_compare_at_price), v.compare_at)
   const stockChanged   = dbv.current_in_stock !== v.available
 
   // Returning to the feed is a change in its own right. Judging only price and
