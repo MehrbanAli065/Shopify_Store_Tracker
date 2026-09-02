@@ -604,15 +604,15 @@ th.hint::after{content:'';display:block;border-bottom:1px dotted var(--rule);
 /* Firefox and some Chromium builds do not inherit either onto the option. */
 .fbox select option{background-color:var(--surface);color:var(--ink)}
 .fbox select option:disabled{color:var(--muted)}
-/* the date field: a label that says what is showing, and a calendar to change it */
-.dlabel{font:13.5px system-ui,sans-serif;font-weight:620;padding:10px 4px 10px 11px;border:0;
-  background:none;color:var(--ink);cursor:pointer;white-space:nowrap;
-  font-variant-numeric:tabular-nums;min-width:74px;text-align:left}
-.dlabel.on{color:var(--blue)}
-.dcal{display:grid;place-items:center;width:32px;border:0;background:none;color:var(--muted);
-  cursor:pointer;padding:0}
-.dcal:hover,.dlabel:hover{color:var(--ink)}
-.dlabel.on:hover{color:var(--blue)}
+/* the date field: two segments, the lit one is what the table is showing */
+.dseg{display:flex;align-items:center;gap:6px;font:13.5px system-ui,sans-serif;font-weight:620;
+  padding:10px 12px;border:0;background:none;color:var(--muted);cursor:pointer;white-space:nowrap;
+  font-variant-numeric:tabular-nums;align-self:stretch}
+.dseg:hover{color:var(--ink)}
+.dseg.on{color:var(--blue);background:color-mix(in srgb,var(--blue) 12%,transparent)}
+#dall{border-radius:9px 0 0 9px}
+#dcal{border-left:1px solid var(--line)}
+#dcaptext:empty{display:none}
 /* zero-width, not display:none — an input that is not rendered cannot open a
    picker, and this one is opened on the calendar button's behalf */
 .dhide{width:0;padding:0;margin:0;border:0;opacity:0;pointer-events:none}

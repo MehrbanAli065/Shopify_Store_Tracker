@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Store Report — Shopify Store Tracker</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232a78d6'/><path d='M9 12.6h14l-1 11.6a2.2 2.2 0 0 1-2.2 2h-7.6a2.2 2.2 0 0 1-2.2-2L9 12.6Z' fill='%23fff'/><path d='M12.6 12.6V10.2a3.4 3.4 0 0 1 6.8 0v2.4' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round'/><rect x='12.2' y='20.4' width='2.5' height='3.6' rx='1' fill='%232a78d6'/><rect x='14.9' y='18.2' width='2.5' height='5.8' rx='1' fill='%232a78d6'/><rect x='17.6' y='16' width='2.5' height='8' rx='1' fill='%232a78d6'/></svg>">
-<link rel="stylesheet" href="/app.css?v=22c253c1">
+<link rel="stylesheet" href="/app.css?v=6fcb1f91">
 </head>
 <body>
 
@@ -102,20 +102,22 @@
     </div>
     <div class="fld">
       <span class="flab">Date</span>
+      <!-- Both choices stay on screen. Hiding the way back behind the label
+           meant a day could be picked and not unpicked. -->
       <div class="fbox dbox">
-        <button class="dstep" id="dprev" title="Earlier day" hidden>‹</button>
-        <button class="dlabel" id="dall" title="Pick a day">All dates</button>
-        <button class="dcal" id="dcal" title="Pick a day">
+        <button class="dseg on" id="dall" title="Show every date in the range">All dates</button>
+        <button class="dseg" id="dcal" title="Pick one day">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="3" y="4.5" width="18" height="16" rx="2.5"/>
             <path d="M3 9.5h18M8 2.8v3.4M16 2.8v3.4"/>
-          </svg>
+          </svg><span id="dcaptext"></span>
         </button>
+        <button class="dstep" id="dprev" title="Earlier day" hidden>‹</button>
+        <button class="dstep" id="dnext" title="Later day" hidden>›</button>
         <!-- The real control. Kept at zero width because a display:none input
              cannot open its own picker, and this one is opened for it. -->
         <input type="date" id="ddate" class="dhide" tabindex="-1" aria-label="Pick a day">
-        <button class="dstep" id="dnext" title="Later day" hidden>›</button>
       </div>
     </div>
   </div>
@@ -197,11 +199,22 @@
   <div class="lgnd" id="striplgnd" style="margin:8px 0 10px"></div>
   <div class="days capped">
     <table class="dt">
-      <thead><tr><th>Date</th><th>New</th><th>Price Δ</th><th>Stock out</th><th>Stock in</th><th>Removed</th><th>Relisted</th><th>History rows</th></tr></thead>
+      <thead><tr><th>Date</th>
+        <th title="Products that appeared in the feed for the first time">New</th>
+        <th title="Variants whose price or discount moved">Price Δ</th>
+        <th title="Variants that went out of stock">Stock out</th>
+        <th title="Variants that came back into stock">Stock in</th>
+        <th title="Variants that left the feed altogether">Removed</th>
+        <th title="Variants that had left the feed and came back">Relisted</th>
+        <th title="Every change recorded that day — the six columns to the left added up">History rows</th>
+      </tr></thead>
       <tbody id="daily"></tbody>
     </table>
   </div>
-  <p class="hintline">A day with <b>0 history rows</b> means nothing changed that day — the scrape still ran and every variant was checked.</p>
+  <p class="hintline">One row per day the scrape ran. Each column counts changes of that kind
+    on that day, and <b>history rows</b> is those six columns added up. A day with
+    <b>0 history rows</b> means nothing changed that day — the scrape still ran and every
+    variant was checked.</p>
 
 </div>
 
@@ -549,9 +562,8 @@ function stepDate (dir) {
 }
 
 /**
- * The field reads "All dates" until a day is picked and then reads that day,
- * so what it says is what the table is showing. The steppers only appear once
- * there is a day to step from.
+ * Two segments, both always there: the range, or one day. Whichever is showing
+ * is the lit one, and the other is the way out of it.
  */
 function setDateMode (mode) {
   const one = mode === 'one'
@@ -560,15 +572,13 @@ function setDateMode (mode) {
     // Open on the newest day that has changes rather than on an empty input.
     ONE_DATE = ONE_DATE || changedDays()[0] || PER_DATE[0]?.date || ''
     ddate.value = ONE_DATE
-    dall.textContent = dt(ONE_DATE)
-    dall.title = 'Back to all dates'
-    dall.classList.add('on')
+    dcaptext.textContent = dt(ONE_DATE)
   } else {
     ONE_DATE = ''; ddate.value = ''
-    dall.textContent = 'All dates'
-    dall.title = 'Pick a day'
-    dall.classList.remove('on')
+    dcaptext.textContent = ''
   }
+  dall.classList.toggle('on', !one)
+  dcal.classList.toggle('on', one)
   syncSteppers()
 }
 
@@ -1190,9 +1200,7 @@ function syncExportLinks () {
 baseChk.onchange = () => { showBase = baseChk.checked; syncExportLinks(); loadRows() }
 vsel.onchange = () => { VAR = vsel.value; syncExportLinks(); loadRows() }
 dcal.onclick = openCalendar
-// The label is the way back out as well as a second way in: it opens the
-// calendar while it says "All dates", and clears the day once it names one.
-dall.onclick = () => { if (ONE_DATE) { setDateMode(''); loadRows() } else openCalendar() }
+dall.onclick = () => { if (ONE_DATE) { setDateMode(''); loadRows() } }
 ddate.onchange = () => {
   ONE_DATE = ddate.value
   setDateMode(ONE_DATE ? 'one' : '')
