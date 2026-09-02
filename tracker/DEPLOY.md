@@ -94,7 +94,7 @@ The product finder searches by substring, which no ordinary index serves. After
 the first deploy that carries `db/search-indexes.sql`, run once on the server:
 
 ```bash
-ssh mehrban@66.45.238.72 'cd ~/tracker && npm run search:init'
+ssh -i ~/.ssh/tracker_deploy mehrban@66.45.238.72 'cd ~/tracker && npm run search:init'
 ```
 
 It creates `pg_trgm` and two GIN indexes on `products` — about a minute over
