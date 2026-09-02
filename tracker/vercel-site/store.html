@@ -961,8 +961,10 @@ function renderTimeline () {
                 // last day it was still listed.
                 e.change_type === 'removed'
                   ? (e.prev_in_stock === null ? ''
-                     : e.prev_in_stock ? ` · <span class="in-s">was in stock</span>`
-                                       : ` · <span class="out-s">was already sold out</span>`)
+                     // "was in stock" beside "Removed" reads as a statement
+                     // about now, not about the day it went. Say when.
+                     : e.prev_in_stock ? ` · <span class="in-s">still in stock when it went</span>`
+                                       : ` · <span class="out-s">had already sold out</span>`)
                 : e.in_stock === null ? ''
                 : e.in_stock ? ` · <span class="in-s">in stock</span>`
                              : ` · <span class="out-s">out of stock</span>`}
