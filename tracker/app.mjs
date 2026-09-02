@@ -255,7 +255,7 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   // starting inventory, not news. Keep it out unless explicitly requested.
   const baseFilter = req.query.baseline === '1' ? '' : 'AND NOT is_baseline'
 
-  const ROW_COLS = `handle, title, sku, variant_label, product_url, image_src,
+  const ROW_COLS = `handle, title, sku, variant_id, variant_label, product_url, image_src,
     observed_date, change_type, is_baseline,
     prev_price, price, price_diff, price_diff_pct,
     prev_compare_at_price, compare_at_price, prev_discount_pct, discount_pct,
@@ -271,10 +271,16 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   // change log itself by substring is not, which is why the finder searches
   // the products table and this filter only takes its answer.
   const handle = String(req.query.handle || '').trim()
+  // A variant of that product, once the variant filter names one. It is the
+  // primary key of the row's variant, so it needs no product filter beside it
+  // — but both are sent, and both are indexed equalities.
+  const variantId = String(req.query.variant_id || '').trim()
 
   // Array.push returns the new length, which is exactly the placeholder number
   // the value has just taken — so a filter and its parameter cannot drift.
-  const pFilter = params => handle ? `AND handle = $${params.push(handle)}` : ''
+  const pFilter = params =>
+    (handle    ? ` AND handle = $${params.push(handle)}` : '') +
+    (variantId ? ` AND variant_id = $${params.push(variantId)}` : '')
 
   // ?date= drills into a single day. The grouped view can only ever show a
   // slice of a busy date, and without this there is no way to reach the rest.
@@ -310,7 +316,7 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
   // view instead is affordable here precisely because one product is a handful
   // of variants. Only the dates that product changed on come back, so the date
   // picker beside the table becomes a list of the days it actually moved.
-  const perDate = handle ? await (async () => {
+  const perDate = (handle || variantId) ? await (async () => {
     const p = [id, from, to, types]
     return q(`SELECT observed_date, count(*)::int AS n FROM v_change_report
                WHERE store_id = $1 AND observed_date BETWEEN $2 AND $3 ${baseFilter}
@@ -353,7 +359,8 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
      LIMIT $5 OFFSET $6`, rowParams)
 
   res.json({
-    from, to, total, offset, limit, shown: rows.length, handle: handle || undefined,
+    from, to, total, offset, limit, shown: rows.length,
+    handle: handle || undefined, variant_id: variantId || undefined,
     more: offset + rows.length < total,
     // Heads each group, and fills the date picker.
     per_date: perDate.map(r => ({ date: d(r.observed_date), total: r.n })),
@@ -378,14 +385,16 @@ app.get('/api/stores/:id/report', wrap(async (req, res) => {
 app.get('/api/stores/:id/products', wrap(async (req, res) => {
   const id = req.params.id
   const term = String(req.query.q || '').trim()
-  const limit = Math.min(Number(req.query.limit) || 20, 50)
+  const limit = Math.min(Number(req.query.limit) || 50, 200)
 
-  // One or two characters match most of a catalogue and answer nothing.
-  if (term.length < 2) return res.json({ q: term, total: 0, shown: 0, products: [] })
-
+  // No term lists the store's catalogue, so the filter beside the table opens
+  // as a browsable list rather than an empty box that must be guessed at.
   // % and _ are wildcards to LIKE; a user typing them means the characters.
-  const pat = '%' + term.replace(/[\\%_]/g, c => '\\' + c) + '%'
-  const WHERE = `p.store_id = $1 AND (p.title ILIKE $2 OR p.handle ILIKE $2)`
+  const params = [id]
+  const WHERE = 'p.store_id = $1' + (term
+    ? ` AND (p.title ILIKE $${params.push('%' + term.replace(/[\\%_]/g, c => '\\' + c) + '%')}
+             OR p.handle ILIKE $${params.length})`
+    : '')
 
   const [rows, n] = await Promise.all([
     q(`SELECT p.id, p.handle, p.title, p.image_src, p.is_active,
@@ -394,8 +403,8 @@ app.get('/api/stores/:id/products', wrap(async (req, res) => {
          FROM products p WHERE ${WHERE}
         -- A catalogue of near-identical listings repeats titles, so id breaks
         -- the tie and the same search comes back in the same order.
-        ORDER BY p.title, p.id LIMIT $3`, [id, pat, limit]),
-    one(`SELECT count(*)::int AS n FROM products p WHERE ${WHERE}`, [id, pat])
+        ORDER BY p.title, p.id LIMIT $${params.push(limit)}`, params),
+    one(`SELECT count(*)::int AS n FROM products p WHERE ${WHERE}`, params.slice(0, term ? 2 : 1))
   ])
 
   res.json({
@@ -403,6 +412,29 @@ app.get('/api/stores/:id/products', wrap(async (req, res) => {
     products: rows.map(r => ({ ...r, first_seen_at: d(r.first_seen_at),
                                      last_seen_at:  d(r.last_seen_at) }))
   })
+}))
+
+// ── one product's variants ────────────────────────────────────────
+/**
+ * Fills the variant filter once a product is picked. Ordered by id, which is
+ * the order the feed lists them in — a store's own sizes run 36, 37, 38, and
+ * sorting the label alphabetically would put 10 before 2.
+ */
+app.get('/api/stores/:id/variants', wrap(async (req, res) => {
+  const handle = String(req.query.handle || '').trim()
+  if (!handle) return res.json({ handle: '', variants: [] })
+
+  const rows = await q(`
+    SELECT v.id AS variant_id, v.sku, v.in_feed,
+           NULLIF(CONCAT_WS(' / ', NULLIF(v.option1_value,''),
+                                   NULLIF(v.option2_value,''),
+                                   NULLIF(v.option3_value,'')), '') AS variant_label
+      FROM variants v
+      JOIN products p ON p.id = v.product_id
+     WHERE v.store_id = $1 AND p.handle = $2
+     ORDER BY v.id`, [req.params.id, handle])
+
+  res.json({ handle, variants: rows })
 }))
 
 // ── distribution charts (current catalogue shape) ─────────────────
@@ -462,8 +494,10 @@ app.get('/api/stores/:id/report.csv', wrap(async (req, res) => {
   // An export should be the table it was taken from, so it takes the product
   // filter too. Without this, narrowing to one product and hitting CSV handed
   // back the whole store without saying so.
+  const variantId = String(req.query.variant_id || '').trim()
   const params = types ? [id, from, to, types] : [id, from, to]
-  const pFilter = handle ? `AND handle = $${params.push(handle)}` : ''
+  const pFilter = (handle    ? ` AND handle = $${params.push(handle)}` : '') +
+                  (variantId ? ` AND variant_id = $${params.push(variantId)}` : '')
 
   const rows = await q(`
     SELECT store_name, handle, title, sku, variant_label, observed_date, change_type,

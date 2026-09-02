@@ -62,6 +62,50 @@
 
   <div class="kpis" id="kpis"></div>
 
+  <!-- ── change log ── -->
+  <h2>Change log</h2>
+  <label class="basetog"><input type="checkbox" id="baseChk">
+    Include the first import <span id="baseHint"></span></label>
+  <div class="tabs" id="tabs"></div>
+
+  <div class="filterbar">
+    <div class="fld grow" id="finder">
+      <span class="flab">Product</span>
+      <div class="fbox">
+        <span class="si">🔍</span>
+        <input id="q" type="search" autocomplete="off" spellcheck="false"
+               role="combobox" aria-expanded="false" aria-controls="qmenu"
+               placeholder="All products — click to browse, or type a name or handle…">
+        <button class="clr" id="qc" hidden title="Clear">✕</button>
+      </div>
+      <div class="fmenu" id="qmenu" role="listbox" hidden></div>
+    </div>
+    <div class="fld">
+      <span class="flab">Variant</span>
+      <div class="fbox">
+        <select id="vsel" disabled><option value="">All variants</option></select>
+      </div>
+    </div>
+    <div class="fld">
+      <span class="flab">Date</span>
+      <div class="fbox dbox">
+        <button class="dstep" id="dprev" title="Older day">‹</button>
+        <select id="dsel"><option value="">All dates</option></select>
+        <button class="dstep" id="dnext" title="Newer day">›</button>
+      </div>
+    </div>
+  </div>
+  <div class="fpin" id="fpin" hidden></div>
+  <div class="tw scrolly"><table>
+    <thead><tr>
+      <th>Product</th><th>Variant</th><th>Price</th><th>Change</th>
+      <th>Discount</th><th>Stock</th><th>Qty</th><th>Date</th><th></th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <div class="pager" id="pager" hidden></div>
+  <div class="foot"><span id="cnt"></span></div>
+
   <!-- ── charts ── -->
   <div class="cgrid">
     <section class="chart">
@@ -101,43 +145,6 @@
   </div>
   <p class="hintline">A day with <b>0 history rows</b> means nothing changed that day — the scrape still ran and every variant was checked.</p>
 
-  <!-- ── change log ── -->
-  <h2>Change log</h2>
-  <label class="basetog"><input type="checkbox" id="baseChk">
-    Include the first import <span id="baseHint"></span></label>
-  <div class="tabs" id="tabs"></div>
-
-  <div class="filterbar">
-    <div class="fld grow" id="finder">
-      <span class="flab">Product</span>
-      <div class="fbox">
-        <span class="si">🔍</span>
-        <input id="q" type="search" autocomplete="off" spellcheck="false"
-               role="combobox" aria-expanded="false" aria-controls="qmenu"
-               placeholder="Search any product by name or handle…">
-        <button class="clr" id="qc" hidden title="Clear">✕</button>
-      </div>
-      <div class="fmenu" id="qmenu" role="listbox" hidden></div>
-    </div>
-    <div class="fld">
-      <span class="flab">Date</span>
-      <div class="fbox dbox">
-        <button class="dstep" id="dprev" title="Older day">‹</button>
-        <select id="dsel"><option value="">All dates</option></select>
-        <button class="dstep" id="dnext" title="Newer day">›</button>
-      </div>
-    </div>
-  </div>
-  <div class="fpin" id="fpin" hidden></div>
-  <div class="tw scrolly"><table>
-    <thead><tr>
-      <th>Product</th><th>Variant</th><th>Price</th><th>Change</th>
-      <th>Discount</th><th>Stock</th><th>Qty</th><th>Date</th><th></th>
-    </tr></thead>
-    <tbody id="rows"></tbody>
-  </table></div>
-  <div class="pager" id="pager" hidden></div>
-  <div class="foot"><span id="cnt"></span></div>
 </div>
 
 <!-- ── product drawer ── -->
@@ -224,7 +231,7 @@ let tab = '', CUR = 'PKR', RANGE = {}, ROWS = [], showBase = false, BASE_N = 0
 // The product filter is a picked product, not a typed string: the table is
 // filtered by handle on the server, so it holds for every page and every date
 // rather than only for the hundred rows on screen.
-let PROD = null
+let PROD = null, VAR = ''
 let PER_DATE = [], PAGE = 0, TOTAL = 0, ONE_DATE = ''
 const PAGE_SIZE = 100
 
@@ -441,6 +448,7 @@ async function loadRows (keepPage) {
   const r = await (await fetch(
     `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}` +
     `${ONE_DATE?`date=${ONE_DATE}&`:''}${PROD?`handle=${encodeURIComponent(PROD.handle)}&`:''}` +
+    `${VAR?`variant_id=${encodeURIComponent(VAR)}&`:''}` +
     `limit=${PAGE_SIZE}&offset=${PAGE * PAGE_SIZE}`)).json()
   ROWS = r.rows; TOTAL = r.total; window.__total = r.total
   if (r.per_date) { PER_DATE = r.per_date; fillDateSelect() }
@@ -507,6 +515,7 @@ function paint () {
   cnt.innerHTML = ROWS.length
     ? `${nf(TOTAL)} change event${TOTAL === 1 ? '' : 's'}` +
       (PROD ? ` for ${esc(PROD.title || PROD.handle)}` : '') +
+      (VAR ? ` · ${esc(vsel.selectedOptions[0]?.text || 'one variant')}` : '') +
       (ONE_DATE ? ' on ' + dt(ONE_DATE) : '') : ''
 
   // Grouped under a heading per date, so the range reads as "what changed on
@@ -802,7 +811,6 @@ async function runFind (term) {
   // Every keystroke starts a request and they do not come back in order; only
   // the newest one is allowed to write to the menu.
   const seq = ++FIND.seq
-  if (term.length < 2) { closeMenu(); return }
   openMenu()
   qmenu.innerHTML = `<div class="fmsg">searching…</div>`
 
@@ -822,10 +830,13 @@ async function runFind (term) {
 
   FIND.items = r.products || []; FIND.hi = -1
   if (!FIND.items.length) {
-    qmenu.innerHTML = `<div class="fmsg">No product matches “${esc(term)}”</div>`
+    qmenu.innerHTML = `<div class="fmsg">${term
+      ? `No product matches “${esc(term)}”` : 'This store has no products yet'}</div>`
     return
   }
-  qmenu.innerHTML = FIND.items.map((p, i) => `
+  qmenu.innerHTML = (term ? '' :
+    `<div class="fmsg">Every product in this store — type to narrow</div>`) +
+    FIND.items.map((p, i) => `
     <button class="fitem" data-i="${i}" role="option">
       ${p.image_src ? `<img class="fthumb" src="${esc(p.image_src)}" loading="lazy" alt="">`
                     : `<div class="fthumb"></div>`}
@@ -837,7 +848,8 @@ async function runFind (term) {
         p.is_active ? '' : `<span class="fi-x">gone</span>`}</div>
     </button>`).join('') +
     (r.total > r.shown
-      ? `<div class="fmsg">showing ${nf(r.shown)} of ${nf(r.total)} matches — keep typing to narrow</div>`
+      ? `<div class="fmsg">showing ${nf(r.shown)} of ${nf(r.total)}${
+          term ? ' matches' : ' products'} — keep typing to narrow</div>`
       : '')
 
   qmenu.querySelectorAll('.fitem').forEach(b =>
@@ -850,15 +862,17 @@ const find = debounce(runFind, 220)
 function pick (p) {
   if (!p) return
   PROD = { handle: p.handle, title: p.title }
+  VAR = ''
   $q.value = p.title || p.handle
   qc.hidden = false
   closeMenu()
+  loadVariants(p.handle)
   // The day that was open may hold nothing for this product, and an empty
   // table would read as "this product never changed" rather than "not on the
   // 3rd". Start it on the product's whole range instead.
   ONE_DATE = ''; dsel.value = ''
   fpin.hidden = false
-  fpin.innerHTML = `<span class="pinl">Filtered to</span>
+  fpin.innerHTML = `<span>Filtered to</span>
     <span class="pin-h">${esc(p.handle)}</span>
     <button class="pin-x" id="fpinx" title="Show all products">✕ clear</button>`
   fpinx.onclick = clearProduct
@@ -867,10 +881,40 @@ function pick (p) {
 
 function clearProduct (refocus) {
   const had = !!PROD
-  PROD = null; $q.value = ''; qc.hidden = true; fpin.hidden = true
+  PROD = null; VAR = ''; $q.value = ''; qc.hidden = true; fpin.hidden = true
+  resetVariants()
   closeMenu()
   if (had) { ONE_DATE = ''; dsel.value = ''; syncExportLinks(); loadRows() }
   if (refocus === true) $q.focus()
+}
+
+/** Nothing to choose between until a product is picked. */
+function resetVariants () {
+  vsel.innerHTML = `<option value="">All variants</option>`
+  vsel.disabled = true
+  vsel.value = ''
+}
+
+/**
+ * The variants of the picked product, in the order the feed lists them. The
+ * table is already filtered to the product at this point, so this narrows a
+ * page that is on screen rather than starting a new search.
+ */
+async function loadVariants (handle) {
+  resetVariants()
+  vsel.innerHTML = `<option value="">loading…</option>`
+  let list = []
+  try {
+    const res = await fetch(`/api/stores/${ID}/variants?handle=${encodeURIComponent(handle)}`)
+    if (res.ok) list = (await res.json()).variants || []
+  } catch {}
+  // A later pick may have landed while this was in flight.
+  if (!PROD || PROD.handle !== handle) return
+  vsel.innerHTML = `<option value="">All variants${list.length ? ` · ${nf(list.length)}` : ''}</option>` +
+    list.map(v => `<option value="${esc(v.variant_id)}">${
+      esc(v.variant_label || v.sku || `#${v.variant_id}`)}${
+      v.in_feed === false ? ' · gone' : ''}</option>`).join('')
+  vsel.disabled = !list.length
 }
 
 $q.addEventListener('input', () => {
@@ -878,11 +922,13 @@ $q.addEventListener('input', () => {
   qc.hidden = !t
   // Typing over a picked product drops the filter — the text no longer names
   // what the table is showing.
-  if (PROD) { PROD = null; fpin.hidden = true; syncExportLinks(); loadRows() }
+  if (PROD) { PROD = null; VAR = ''; fpin.hidden = true; resetVariants(); syncExportLinks(); loadRows() }
   if (!t) closeMenu()
   find(t)
 })
-$q.addEventListener('focus', () => { if (!PROD && $q.value.trim().length >= 2) runFind($q.value.trim()) })
+// Clicking the box opens the catalogue, so the filter can be browsed by
+// someone who does not already know what they are looking for.
+$q.addEventListener('focus', () => runFind(PROD ? '' : $q.value.trim()))
 $q.addEventListener('keydown', e => {
   if (e.key === 'Escape') return closeMenu()
   if (qmenu.hidden || !FIND.items.length) return
@@ -900,11 +946,13 @@ addEventListener('click', e => { if (!finder.contains(e.target)) closeMenu() })
 
 function syncExportLinks () {
   const t = tab ? `type=${tab}&` : ''
-  const h = PROD ? `handle=${encodeURIComponent(PROD.handle)}&` : ''
+  const h = (PROD ? `handle=${encodeURIComponent(PROD.handle)}&` : '') +
+            (VAR ? `variant_id=${encodeURIComponent(VAR)}&` : '')
   csv.href = `/api/stores/${ID}/report.csv?${qsDates()}${t}${h}${showBase ? 'baseline=1' : ''}`
   pdf.href = `/print.html?id=${ID}&${qsDates()}${h}${showBase ? 'baseline=1' : ''}`
 }
 baseChk.onchange = () => { showBase = baseChk.checked; syncExportLinks(); loadRows() }
+vsel.onchange = () => { VAR = vsel.value; syncExportLinks(); loadRows() }
 dsel.onchange = () => { ONE_DATE = dsel.value; syncSteppers(); loadRows() }
 dprev.onclick = () => stepDate(1)   // the list runs newest first
 dnext.onclick = () => stepDate(-1)
