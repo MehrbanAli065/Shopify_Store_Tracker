@@ -612,25 +612,14 @@ async function openDrawer (handle, title, sku) {
   renderDrawer()
 }
 
+/**
+ * The parts of the drawer that do not move: the product's own numbers, the
+ * link out, and the two filters. Rendered once per product so that changing a
+ * filter cannot pull the select the user is holding out from under them —
+ * only the timeline below is repainted.
+ */
 function renderDrawer () {
-  const { ev, runs, bySku, keys, sel } = DR
-  const list = bySku[sel]
-  const days = walkDays(list, runs)
-
-  // The months this variant actually spans — walkDays already returns the days
-  // in order, so the first appearance of each month is enough.
-  const months = []
-  for (const d of days) { const k = mKey(d.date); if (months.at(-1) !== k) months.push(k) }
-
-  // A remembered month can fall outside the variant just picked, so clamp to
-  // this variant's own span rather than rendering an empty timeline by default.
-  if (!months.includes(DR.from)) DR.from = months[0]
-  if (!months.includes(DR.to))   DR.to   = months.at(-1)
-  if (DR.from > DR.to) DR.from = DR.to
-
-  const shown = days.filter(d => { const k = mKey(d.date); return k >= DR.from && k <= DR.to })
-  const nEv = shown.filter(d => d.kind === 'event').length
-  const opt = (v, lbl, on) => `<option value="${esc(v)}"${on ? ' selected' : ''}>${esc(lbl)}</option>`
+  const { ev, bySku, keys, sel } = DR
 
   dBody.innerHTML = `
     <div class="dmeta">
@@ -643,17 +632,63 @@ function renderDrawer () {
        href="${esc(ev[0].product_url)}">Open on store ↗</a>
     <div class="dfilt">
       <label class="wide">Variant
-        <select class="sel" id="dVar">${keys.map(k =>
-          opt(k, `${bySku[k][0].variant_label || '—'}${k === (bySku[k][0].variant_label || '—') ? '' : `  ·  ${k}`}`,
-              k === sel)).join('')}</select></label>
-      <label>From month
-        <select class="sel" id="dFrom">${months.map(m => opt(m, mLab(m), m === DR.from)).join('')}</select></label>
-      <label>To month
-        <select class="sel" id="dTo">${months.map(m => opt(m, mLab(m), m === DR.to)).join('')}</select></label>
+        <select class="sel" id="dVar">${keys.map(k => {
+          const lbl = bySku[k][0].variant_label || '—'
+          return `<option value="${esc(k)}"${k === sel ? ' selected' : ''}>${
+            esc(lbl === k ? lbl : `${lbl}  ·  ${k}`)}</option>` }).join('')}</select></label>
+      <label>From month <select class="sel" id="dFrom"></select></label>
+      <label>To month <select class="sel" id="dTo"></select></label>
     </div>
-    <div class="rescount"><b>${nf(nEv)}</b> ${nEv === 1 ? 'event' : 'events'} over
-      ${nf(shown.length)} ${shown.length === 1 ? 'day' : 'days'} ·
-      ${DR.from === DR.to ? mLab(DR.from) : `${mLab(DR.from)} – ${mLab(DR.to)}`}</div>
+    <div class="rescount" id="dCount"></div>
+    <div id="dTl"></div>`
+
+  // Picking a variant drops the month range: the variant just chosen may not
+  // have been on the feed for any of the months the last one covered.
+  dVar.onchange  = () => { DR.sel = dVar.value; DR.from = DR.to = null; renderTimeline() }
+  dFrom.onchange = () => { DR.from = dFrom.value; if (DR.from > DR.to) DR.to = DR.from; renderTimeline() }
+  dTo.onchange   = () => { DR.to = dTo.value; if (DR.to < DR.from) DR.from = DR.to; renderTimeline() }
+
+  renderTimeline()
+}
+
+/** Refill a month select in place — replacing the element would cost focus. */
+function fillMonths (el, months, cur) {
+  const want = months.join(',')
+  if (el.dataset.months !== want) {
+    el.innerHTML = months.map(m => `<option value="${m}">${esc(mLab(m))}</option>`).join('')
+    el.dataset.months = want
+  }
+  el.value = cur
+}
+
+/** The selected variant's days, cut to the selected months. */
+function renderTimeline () {
+  const { runs, bySku, sel } = DR
+  const list = bySku[sel]
+  const days = walkDays(list, runs)
+
+  // The months this variant was actually on the feed — walkDays returns the
+  // days in order, so the first sighting of each month is enough. Offering a
+  // month with nothing behind it would only ever render an empty timeline.
+  const months = []
+  for (const d of days) { const k = mKey(d.date); if (months.at(-1) !== k) months.push(k) }
+
+  // A remembered month can fall outside the variant just picked, so clamp to
+  // this variant's own span rather than opening on an empty range.
+  if (!months.includes(DR.from)) DR.from = months[0]
+  if (!months.includes(DR.to))   DR.to   = months.at(-1)
+  if (DR.from > DR.to) DR.from = DR.to
+  fillMonths(dFrom, months, DR.from)
+  fillMonths(dTo,   months, DR.to)
+
+  const shown = days.filter(d => { const k = mKey(d.date); return k >= DR.from && k <= DR.to })
+  const nEv = shown.filter(d => d.kind === 'event').length
+
+  dCount.innerHTML = `<b>${nf(nEv)}</b> ${nEv === 1 ? 'event' : 'events'} over
+    ${nf(shown.length)} ${shown.length === 1 ? 'day' : 'days'} ·
+    ${DR.from === DR.to ? esc(mLab(DR.from)) : `${esc(mLab(DR.from))} – ${esc(mLab(DR.to))}`}`
+
+  dTl.innerHTML = `
     <div class="vgroup">
       <div class="vgh"><span class="vp">${esc(list[0].variant_label||'—')}</span>
         <span class="sk">SKU · ${esc(sel)}</span></div>
@@ -683,12 +718,6 @@ function renderDrawer () {
           </div></div>`
       }).join('') : `<div class="empty" style="padding:18px 0">Nothing recorded for this variant in that range</div>`}
     </div>`
-
-  // Picking a variant drops the month range: the new variant may not have been
-  // on the feed for any of the months the last one covered.
-  dVar.onchange  = e => { DR.sel = e.target.value; DR.from = DR.to = null; renderDrawer() }
-  dFrom.onchange = e => { DR.from = e.target.value; if (DR.from > DR.to) DR.to = DR.from; renderDrawer() }
-  dTo.onchange   = e => { DR.to = e.target.value; if (DR.to < DR.from) DR.from = DR.to; renderDrawer() }
 }
 const closeDrawer = () => {
   drawer.classList.remove('open')
