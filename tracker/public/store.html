@@ -100,26 +100,6 @@
         <select id="vsel" disabled><option value="">All variants</option></select>
       </div>
     </div>
-    <div class="fld">
-      <span class="flab">Date</span>
-      <!-- Both choices stay on screen. Hiding the way back behind the label
-           meant a day could be picked and not unpicked. -->
-      <div class="fbox dbox">
-        <button class="dseg on" id="dall" title="Show every date in the range">All dates</button>
-        <button class="dseg" id="dcal" title="Pick one day">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="3" y="4.5" width="18" height="16" rx="2.5"/>
-            <path d="M3 9.5h18M8 2.8v3.4M16 2.8v3.4"/>
-          </svg><span id="dcaptext"></span>
-        </button>
-        <button class="dstep" id="dprev" title="Earlier day" hidden>‹</button>
-        <button class="dstep" id="dnext" title="Later day" hidden>›</button>
-        <!-- The real control. Kept at zero width because a display:none input
-             cannot open its own picker, and this one is opened for it. -->
-        <input type="date" id="ddate" class="dhide" tabindex="-1" aria-label="Pick a day">
-      </div>
-    </div>
   </div>
   <div class="fpin" id="fpin" hidden></div>
   <div class="tw scrolly"><table>
@@ -303,7 +283,7 @@ let tab = '', CUR = 'PKR', RANGE = {}, ROWS = [], showBase = false, BASE_N = 0
 // filtered by handle on the server, so it holds for every page and every date
 // rather than only for the hundred rows on screen.
 let PROD = null, VAR = ''
-let PER_DATE = [], PAGE = 0, TOTAL = 0, ONE_DATE = ''
+let PER_DATE = [], PAGE = 0, TOTAL = 0
 const PAGE_SIZE = 100
 
 const STOCK = { in:'<span class="bdg in"><span class="d"></span>In</span>',
@@ -521,72 +501,17 @@ async function loadRows (keepPage) {
   rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="9"><div class="skl w90"></div></td></tr>`).join('')
   const r = await (await fetch(
     `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}` +
-    `${ONE_DATE?`date=${ONE_DATE}&`:''}${PROD?`handle=${encodeURIComponent(PROD.handle)}&`:''}` +
+    `${PROD?`handle=${encodeURIComponent(PROD.handle)}&`:''}` +
     `${VAR?`variant_id=${encodeURIComponent(VAR)}&`:''}` +
     `limit=${PAGE_SIZE}&offset=${PAGE * PAGE_SIZE}`)).json()
   ROWS = r.rows; TOTAL = r.total; window.__total = r.total
-  if (r.per_date) { PER_DATE = r.per_date; fillDateSelect() }
+  if (r.per_date) PER_DATE = r.per_date
   document.querySelector('.tw').scrollTop = 0
   paint(); renderPager()
 }
 
 // The picker is the way back to an older day now that the table pages newest
 // first: without it, reaching 28 July would mean clicking through 80 pages.
-/** Either the whole range or one day off the calendar — and the calendar is
- *  fenced to the days this store was actually scraped, so it cannot be walked
- *  into a date the tracker knows nothing about. */
-function fillDateSelect () {
-  if (!PER_DATE.length) return
-  ddate.min = PER_DATE[PER_DATE.length - 1].date
-  ddate.max = PER_DATE[0].date
-  syncSteppers()
-}
-
-/** The ‹ › walk the days that carry changes, so stepping never lands on a day
- *  with nothing to show. */
-const changedDays = () => PER_DATE.filter(p => p.total).map(p => p.date)
-function syncSteppers () {
-  const days = changedDays(), i = days.indexOf(ONE_DATE)
-  dprev.disabled = !days.length || i >= days.length - 1
-  dnext.disabled = i <= 0
-}
-function stepDate (dir) {
-  const days = changedDays()
-  const nx = days[(i => i < 0 ? 0 : i)(days.indexOf(ONE_DATE)) + dir]
-  if (!nx) return
-  // Through setDateMode, so the label follows the arrows — stepping used to
-  // move the table and leave the field naming the day before it.
-  ONE_DATE = nx
-  setDateMode('one')
-  loadRows()
-}
-
-/**
- * Two segments, both always there: the range, or one day. Whichever is showing
- * is the lit one, and the other is the way out of it.
- */
-function setDateMode (mode) {
-  const one = mode === 'one'
-  dprev.hidden = dnext.hidden = !one
-  if (one) {
-    // Open on the newest day that has changes rather than on an empty input.
-    ONE_DATE = ONE_DATE || changedDays()[0] || PER_DATE[0]?.date || ''
-    ddate.value = ONE_DATE
-    dcaptext.textContent = dt(ONE_DATE)
-  } else {
-    ONE_DATE = ''; ddate.value = ''
-    dcaptext.textContent = ''
-  }
-  dall.classList.toggle('on', !one)
-  dcal.classList.toggle('on', one)
-  syncSteppers()
-}
-
-/** showPicker needs a user gesture, which every caller here is. */
-const openCalendar = () => {
-  try { ddate.showPicker() } catch { ddate.focus(); ddate.click() }
-}
-
 function renderPager () {
   const pages = Math.ceil(TOTAL / PAGE_SIZE)
   if (pages <= 1) { pager.hidden = true; return }
@@ -620,8 +545,8 @@ function paint () {
   cnt.innerHTML = ROWS.length
     ? `${nf(TOTAL)} change event${TOTAL === 1 ? '' : 's'}` +
       (PROD ? ` for ${esc(PROD.title || PROD.handle)}` : '') +
-      (VAR ? ` · ${esc(vsel.selectedOptions[0]?.text || 'one variant')}` : '') +
-      (ONE_DATE ? ' on ' + dt(ONE_DATE) : '') : ''
+      (VAR ? ` · ${esc(vsel.selectedOptions[0]?.text || 'one variant')}` : '')
+    : ''
 
   // Grouped under a heading per date, so the range reads as "what changed on
   // the 27th, then the 28th", not as one undated pile.
@@ -652,7 +577,7 @@ function paint () {
   // A quiet day is worth stating when the question is "what happened in this
   // range", but not when it is "when did this product change" — there, every
   // day the product sat still would bury the days it moved.
-  const shownDates = PER_DATE.filter(p => grouped.has(p.date) || (!PROD && !ONE_DATE && !p.total))
+  const shownDates = PER_DATE.filter(p => grouped.has(p.date) || (!PROD && !p.total))
 
   rows.innerHTML = shownDates.length ? shownDates.map(p =>
     head(p, (grouped.get(p.date) || []).length) + (grouped.get(p.date) || []).map(x => `
@@ -1113,10 +1038,6 @@ function pick (p) {
   qc.hidden = false
   closeMenu()
   loadVariants(p.handle)
-  // The day that was open may hold nothing for this product, and an empty
-  // table would read as "this product never changed" rather than "not on the
-  // 3rd". Start it on the product's whole range instead.
-  setDateMode('')
   fpin.hidden = false
   fpin.innerHTML = `<span>Filtered to</span>
     <span class="pin-h">${esc(p.handle)}</span>
@@ -1130,7 +1051,7 @@ function clearProduct (refocus) {
   PROD = null; VAR = ''; $q.value = ''; qc.hidden = true; fpin.hidden = true
   resetVariants()
   closeMenu()
-  if (had) { setDateMode(''); syncExportLinks(); loadRows() }
+  if (had) { syncExportLinks(); loadRows() }
   if (refocus === true) $q.focus()
 }
 
@@ -1199,15 +1120,6 @@ function syncExportLinks () {
 }
 baseChk.onchange = () => { showBase = baseChk.checked; syncExportLinks(); loadRows() }
 vsel.onchange = () => { VAR = vsel.value; syncExportLinks(); loadRows() }
-dcal.onclick = openCalendar
-dall.onclick = () => { if (ONE_DATE) { setDateMode(''); loadRows() } }
-ddate.onchange = () => {
-  ONE_DATE = ddate.value
-  setDateMode(ONE_DATE ? 'one' : '')
-  loadRows()
-}
-dprev.onclick = () => stepDate(1)   // PER_DATE runs newest first
-dnext.onclick = () => stepDate(-1)
 tg.onclick = () => {
   const cur = document.documentElement.getAttribute('data-theme')
     || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
