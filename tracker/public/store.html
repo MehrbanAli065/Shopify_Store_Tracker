@@ -101,6 +101,12 @@
       </div>
     </div>
     <div class="fld">
+      <span class="flab">Top sellers</span>
+      <button class="ftog" id="topTog" aria-pressed="false"
+              title="Only the products the store listed in its top 20 that day">
+        <span class="star">★</span> Top 20 only</button>
+    </div>
+    <div class="fld">
       <span class="flab">Date</span>
       <div class="fbox dbox">
         <button class="dstep" id="dprev" title="Older day">‹</button>
@@ -113,7 +119,8 @@
   <div class="tw scrolly"><table>
     <thead><tr>
       <th>Product</th><th>Variant</th><th>Price</th><th>Change</th>
-      <th>Discount</th><th>Stock</th><th>Qty</th><th>Date</th><th></th>
+      <th>Discount</th><th>Stock</th><th>Qty</th><th>Date</th>
+      <th title="Was this product in the store's top 20 on that day?">Top 20</th><th></th>
     </tr></thead>
     <tbody id="rows"></tbody>
   </table></div>
@@ -245,7 +252,7 @@ let tab = '', CUR = 'PKR', RANGE = {}, ROWS = [], showBase = false, BASE_N = 0
 // The product filter is a picked product, not a typed string: the table is
 // filtered by handle on the server, so it holds for every page and every date
 // rather than only for the hundred rows on screen.
-let PROD = null, VAR = ''
+let PROD = null, VAR = '', TOP = false
 let PER_DATE = [], PAGE = 0, TOTAL = 0, ONE_DATE = ''
 const PAGE_SIZE = 100
 
@@ -458,11 +465,11 @@ function discCell (r) {
 
 async function loadRows (keepPage) {
   if (!keepPage) PAGE = 0
-  rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="9"><div class="skl w90"></div></td></tr>`).join('')
+  rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="10"><div class="skl w90"></div></td></tr>`).join('')
   const r = await (await fetch(
     `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}` +
     `${ONE_DATE?`date=${ONE_DATE}&`:''}${PROD?`handle=${encodeURIComponent(PROD.handle)}&`:''}` +
-    `${VAR?`variant_id=${encodeURIComponent(VAR)}&`:''}` +
+    `${VAR?`variant_id=${encodeURIComponent(VAR)}&`:''}${TOP?'top=1&':''}` +
     `limit=${PAGE_SIZE}&offset=${PAGE * PAGE_SIZE}`)).json()
   ROWS = r.rows; TOTAL = r.total; window.__total = r.total
   if (r.per_date) { PER_DATE = r.per_date; fillDateSelect() }
@@ -530,6 +537,7 @@ function paint () {
     ? `${nf(TOTAL)} change event${TOTAL === 1 ? '' : 's'}` +
       (PROD ? ` for ${esc(PROD.title || PROD.handle)}` : '') +
       (VAR ? ` · ${esc(vsel.selectedOptions[0]?.text || 'one variant')}` : '') +
+      (TOP ? ' · top 20 only' : '') +
       (ONE_DATE ? ' on ' + dt(ONE_DATE) : '') : ''
 
   // Grouped under a heading per date, so the range reads as "what changed on
@@ -544,7 +552,7 @@ function paint () {
     const held = p.total > n ? p.total - n : 0
     const what = p.total ? `${nf(p.total)} change${p.total === 1 ? '' : 's'}`
                          : 'no changes · the scrape ran and every variant was checked'
-    return `<tr class="dgrp${p.total ? '' : ' quiet'}"><td colspan="9">
+    return `<tr class="dgrp${p.total ? '' : ' quiet'}"><td colspan="10">
       <span class="dg-d">${dt(p.date)}</span>
       <span class="dg-n">${what}</span>
       ${held ? `<span class="dg-h">${nf(p.total - n)} more on later pages</span>` : ''}
@@ -561,7 +569,7 @@ function paint () {
   // A quiet day is worth stating when the question is "what happened in this
   // range", but not when it is "when did this product change" — there, every
   // day the product sat still would bury the days it moved.
-  const shownDates = PER_DATE.filter(p => grouped.has(p.date) || (!PROD && !ONE_DATE && !p.total))
+  const shownDates = PER_DATE.filter(p => grouped.has(p.date) || (!PROD && !TOP && !ONE_DATE && !p.total))
 
   rows.innerHTML = shownDates.length ? shownDates.map(p =>
     head(p, (grouped.get(p.date) || []).length) + (grouped.get(p.date) || []).map(x => `
@@ -581,13 +589,18 @@ function paint () {
       <td>${stockCell(x)}</td>
       <td class="num">${qtyCell(x)}</td>
       <td class="num">${dt(x.observed_date)}</td>
+      <td>${x.top_seller ? `<span class="bdg top"><span class="d">★</span>Yes</span>` : ''}</td>
       <td><a class="lnk" href="${esc(x.product_url)}" target="_blank" rel="noopener"
              onclick="event.stopPropagation()">Open ↗</a></td>
     </tr>`).join('')).join('')
-    : `<tr><td colspan="9"><div class="nores" style="border:0;background:none;padding:40px 10px">
+    : `<tr><td colspan="10"><div class="nores" style="border:0;background:none;padding:40px 10px">
          <div class="ne">🔍</div><div class="nt">Nothing found</div>
          <div class="nd">${PROD
            ? `${esc(PROD.title || PROD.handle)} has no changes of this type in the selected period.`
+           : TOP
+           // A bestseller that holds its price and stays in stock has nothing to
+           // report, so an empty table here is an answer, not a gap.
+           ? 'No product in the top 20 changed in the selected period. The mark is only recorded from 21 Aug onwards.'
            : 'No changes of this type in the selected period.'}</div>
        </div></td></tr>`
 
@@ -1015,12 +1028,22 @@ addEventListener('click', e => { if (!finder.contains(e.target)) closeMenu() })
 function syncExportLinks () {
   const t = tab ? `type=${tab}&` : ''
   const h = (PROD ? `handle=${encodeURIComponent(PROD.handle)}&` : '') +
-            (VAR ? `variant_id=${encodeURIComponent(VAR)}&` : '')
+            (VAR ? `variant_id=${encodeURIComponent(VAR)}&` : '') +
+            (TOP ? 'top=1&' : '')
   csv.href = `/api/stores/${ID}/report.csv?${qsDates()}${t}${h}${showBase ? 'baseline=1' : ''}`
   pdf.href = `/print.html?id=${ID}&${qsDates()}${h}${showBase ? 'baseline=1' : ''}`
 }
 baseChk.onchange = () => { showBase = baseChk.checked; syncExportLinks(); loadRows() }
 vsel.onchange = () => { VAR = vsel.value; syncExportLinks(); loadRows() }
+topTog.onclick = () => {
+  TOP = !TOP
+  topTog.classList.toggle('on', TOP)
+  topTog.setAttribute('aria-pressed', String(TOP))
+  // The open day may hold no top-20 rows at all, and an empty table would read
+  // as "nothing was a top seller" rather than "not on the 3rd".
+  ONE_DATE = ''; dsel.value = ''
+  syncExportLinks(); loadRows()
+}
 dsel.onchange = () => { ONE_DATE = dsel.value; syncSteppers(); loadRows() }
 dprev.onclick = () => stepDate(1)   // the list runs newest first
 dnext.onclick = () => stepDate(-1)
