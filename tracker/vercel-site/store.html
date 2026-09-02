@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Store Report — Shopify Store Tracker</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232a78d6'/><path d='M9 12.6h14l-1 11.6a2.2 2.2 0 0 1-2.2 2h-7.6a2.2 2.2 0 0 1-2.2-2L9 12.6Z' fill='%23fff'/><path d='M12.6 12.6V10.2a3.4 3.4 0 0 1 6.8 0v2.4' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round'/><rect x='12.2' y='20.4' width='2.5' height='3.6' rx='1' fill='%232a78d6'/><rect x='14.9' y='18.2' width='2.5' height='5.8' rx='1' fill='%232a78d6'/><rect x='17.6' y='16' width='2.5' height='8' rx='1' fill='%232a78d6'/></svg>">
-<link rel="stylesheet" href="/app.css?v=b3ecb017">
+<link rel="stylesheet" href="/app.css?v=8fc823ba">
 </head>
 <body>
 
@@ -940,7 +940,20 @@ function renderTimeline () {
                          ${Number(e.price_diff)>0?'+':''}${nf(e.price_diff)} (${e.price_diff_pct}%)</span>`
                       : `<b>${nf(e.price)}</b> ${CUR}`}
               ${Number(e.discount_pct) ? ` · ${e.discount_pct}% off` : ''}
-              ${e.change_type==='stock_out' ? ' · left the feed' : ''}
+              ${
+                // Stock is a separate fact from the event, and the two look
+                // like a contradiction without it: the table can say "Out"
+                // while this line says the price dropped, because a store will
+                // happily discount something it has sold out of — 1,556 of one
+                // store's 5,329 price drops on 2 Sep were on out-of-stock
+                // variants. Saying both here settles it.
+                //
+                // It used to read "· left the feed" on a sold-out event, which
+                // is a different fact again: in_feed and in_stock are separate
+                // columns on purpose. Leaving the feed is 'removed'.
+                e.in_stock === null ? ''
+                : e.in_stock ? ` · <span class="in-s">in stock</span>`
+                             : ` · <span class="out-s">out of stock</span>`}
             </div>
           </div></div>`
       }).join('') : `<div class="empty" style="padding:18px 0">Nothing recorded for this variant in that range</div>`}

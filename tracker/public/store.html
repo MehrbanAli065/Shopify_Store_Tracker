@@ -940,7 +940,20 @@ function renderTimeline () {
                          ${Number(e.price_diff)>0?'+':''}${nf(e.price_diff)} (${e.price_diff_pct}%)</span>`
                       : `<b>${nf(e.price)}</b> ${CUR}`}
               ${Number(e.discount_pct) ? ` · ${e.discount_pct}% off` : ''}
-              ${e.change_type==='stock_out' ? ' · left the feed' : ''}
+              ${
+                // Stock is a separate fact from the event, and the two look
+                // like a contradiction without it: the table can say "Out"
+                // while this line says the price dropped, because a store will
+                // happily discount something it has sold out of — 1,556 of one
+                // store's 5,329 price drops on 2 Sep were on out-of-stock
+                // variants. Saying both here settles it.
+                //
+                // It used to read "· left the feed" on a sold-out event, which
+                // is a different fact again: in_feed and in_stock are separate
+                // columns on purpose. Leaving the feed is 'removed'.
+                e.in_stock === null ? ''
+                : e.in_stock ? ` · <span class="in-s">in stock</span>`
+                             : ` · <span class="out-s">out of stock</span>`}
             </div>
           </div></div>`
       }).join('') : `<div class="empty" style="padding:18px 0">Nothing recorded for this variant in that range</div>`}
