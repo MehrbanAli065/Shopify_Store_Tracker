@@ -467,6 +467,60 @@ app.get('/api/stores/:id/products', wrap(async (req, res) => {
   })
 }))
 
+// ── the top 20 on one day ─────────────────────────────────────────
+/**
+ * The store's own bestseller list for a single day, as its export declared it.
+ *
+ * This is the list itself, not the changes those products made: a product that
+ * held its price all week still belongs on every one of those days. The change
+ * log answers the other question.
+ *
+ * The day is asked for by calendar, so it can be any date — including one the
+ * scrape never covered. `days` says which dates actually carry a list, and the
+ * caller opens on the newest of them.
+ */
+app.get('/api/stores/:id/top-sellers', wrap(async (req, res) => {
+  const id = req.params.id
+
+  const days = (await q(`SELECT DISTINCT t.observed_date FROM product_top_sellers t
+                           JOIN products p ON p.id = t.product_id
+                          WHERE p.store_id = $1 ORDER BY 1 DESC`, [id])).map(r => d(r.observed_date))
+
+  const asked = String(req.query.date || '').trim()
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : days[0]
+  if (!date) return res.json({ date: null, days, products: [] })
+
+  // Prices are the variant's last known state on or before the day, so the row
+  // reads as the product stood when the store called it a bestseller. One
+  // indexed lookup per variant, over at most twenty products.
+  const products = await q(`
+    SELECT p.id, p.handle, p.title, p.image_src, p.product_type, p.is_active,
+           (SELECT count(*)::int FROM variants v WHERE v.product_id = p.id) AS variants,
+           (SELECT count(*)::int FROM product_top_sellers t2
+             WHERE t2.product_id = p.id) AS days_in_top,
+           st.min_price, st.max_price, st.in_stock, st.discount_pct
+      FROM product_top_sellers t
+      JOIN products p ON p.id = t.product_id
+      LEFT JOIN LATERAL (
+        SELECT min(s.price) AS min_price, max(s.price) AS max_price,
+               bool_or(s.in_stock) AS in_stock, max(s.discount_pct) AS discount_pct
+          FROM variants v
+          CROSS JOIN LATERAL (
+            SELECT h.price, h.in_stock, h.discount_pct FROM variant_history h
+             WHERE h.variant_id = v.id AND h.observed_date <= $2::date
+             ORDER BY h.observed_date DESC LIMIT 1) s
+         WHERE v.product_id = p.id) st ON true
+     WHERE p.store_id = $1 AND t.observed_date = $2::date
+     ORDER BY p.title, p.id`, [id, date])
+
+  const store = await one('SELECT domain, currency FROM stores WHERE id = $1', [id])
+  res.json({
+    date, days, total: products.length, currency: store?.currency,
+    products: products.map(r => ({ ...r,
+      product_url: `https://${store?.domain}/products/${r.handle}` }))
+  })
+}))
+
 // ── one product's variants ────────────────────────────────────────
 /**
  * Fills the variant filter once a product is picked. Ordered by id, which is

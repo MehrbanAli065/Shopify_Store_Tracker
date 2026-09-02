@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Store Report — Shopify Store Tracker</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232a78d6'/><path d='M9 12.6h14l-1 11.6a2.2 2.2 0 0 1-2.2 2h-7.6a2.2 2.2 0 0 1-2.2-2L9 12.6Z' fill='%23fff'/><path d='M12.6 12.6V10.2a3.4 3.4 0 0 1 6.8 0v2.4' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round'/><rect x='12.2' y='20.4' width='2.5' height='3.6' rx='1' fill='%232a78d6'/><rect x='14.9' y='18.2' width='2.5' height='5.8' rx='1' fill='%232a78d6'/><rect x='17.6' y='16' width='2.5' height='8' rx='1' fill='%232a78d6'/></svg>">
-<link rel="stylesheet" href="/app.css?v=16ca5303">
+<link rel="stylesheet" href="/app.css?v=d3e5c8cf">
 </head>
 <body>
 
@@ -119,13 +119,44 @@
   <div class="tw scrolly"><table>
     <thead><tr>
       <th>Product</th><th>Variant</th><th>Price</th><th>Change</th>
-      <th>Discount</th><th>Stock</th><th>Qty</th><th>Date</th>
-      <th title="Was this product in the store's top 20 on that day?">Top 20</th><th></th>
+      <th>Discount</th><th>Stock</th><th>Qty</th><th>Date</th><th></th>
     </tr></thead>
     <tbody id="rows"></tbody>
   </table></div>
   <div class="pager" id="pager" hidden></div>
   <div class="foot"><span id="cnt"></span></div>
+
+  <!-- ── the store's own bestseller list ── -->
+  <div class="sechead">
+    <span class="secico">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3.4l2.6 5.3 5.9.9-4.2 4.1 1 5.9-5.3-2.8-5.3 2.8 1-5.9L3.5 9.6l5.9-.9L12 3.4Z"/>
+      </svg>
+    </span>
+    <div>
+      <h2>Top 20 selling products</h2>
+      <div class="cs">The list the store's own export declared on the day you pick</div>
+    </div>
+  </div>
+  <div class="filterbar">
+    <div class="fld">
+      <span class="flab">Day</span>
+      <div class="fbox dbox">
+        <button class="dstep" id="tprev" title="Earlier day">‹</button>
+        <input type="date" id="tdate">
+        <button class="dstep" id="tnext" title="Later day">›</button>
+      </div>
+    </div>
+    <div class="fld grow tsnote"><span id="tsnote"></span></div>
+  </div>
+  <div class="tw"><table>
+    <thead><tr>
+      <th>Product</th><th>Type</th><th>Variants</th><th>Price</th>
+      <th>Discount</th><th>Stock</th><th>Days in top 20</th><th></th>
+    </tr></thead>
+    <tbody id="tsrows"></tbody>
+  </table></div>
 
   <!-- ── charts ── -->
   <div class="cgrid">
@@ -277,6 +308,9 @@ function showTip (e, html) {
 const hideTip = () => { tip.hidden = true }
 
 tabHistory.href = `/history.html?id=${ID}`
+
+// The bestseller list has its own day, independent of the report's range.
+loadTop()
 
 // ═══ boot ═══
 async function boot () {
@@ -465,7 +499,7 @@ function discCell (r) {
 
 async function loadRows (keepPage) {
   if (!keepPage) PAGE = 0
-  rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="10"><div class="skl w90"></div></td></tr>`).join('')
+  rows.innerHTML = Array.from({length:6},()=>`<tr class="skr"><td colspan="9"><div class="skl w90"></div></td></tr>`).join('')
   const r = await (await fetch(
     `/api/stores/${ID}/report?${qsDates()}${tab?`type=${tab}&`:''}${showBase?'baseline=1&':''}` +
     `${ONE_DATE?`date=${ONE_DATE}&`:''}${PROD?`handle=${encodeURIComponent(PROD.handle)}&`:''}` +
@@ -552,7 +586,7 @@ function paint () {
     const held = p.total > n ? p.total - n : 0
     const what = p.total ? `${nf(p.total)} change${p.total === 1 ? '' : 's'}`
                          : 'no changes · the scrape ran and every variant was checked'
-    return `<tr class="dgrp${p.total ? '' : ' quiet'}"><td colspan="10">
+    return `<tr class="dgrp${p.total ? '' : ' quiet'}"><td colspan="9">
       <span class="dg-d">${dt(p.date)}</span>
       <span class="dg-n">${what}</span>
       ${held ? `<span class="dg-h">${nf(p.total - n)} more on later pages</span>` : ''}
@@ -589,11 +623,10 @@ function paint () {
       <td>${stockCell(x)}</td>
       <td class="num">${qtyCell(x)}</td>
       <td class="num">${dt(x.observed_date)}</td>
-      <td>${x.top_seller ? `<span class="bdg top"><span class="d">★</span>Yes</span>` : ''}</td>
       <td><a class="lnk" href="${esc(x.product_url)}" target="_blank" rel="noopener"
              onclick="event.stopPropagation()">Open ↗</a></td>
     </tr>`).join('')).join('')
-    : `<tr><td colspan="10"><div class="nores" style="border:0;background:none;padding:40px 10px">
+    : `<tr><td colspan="9"><div class="nores" style="border:0;background:none;padding:40px 10px">
          <div class="ne">🔍</div><div class="nt">Nothing found</div>
          <div class="nd">${PROD
            ? `${esc(PROD.title || PROD.handle)} has no changes of this type in the selected period.`
@@ -608,6 +641,89 @@ function paint () {
     tr.onclick = () => openDrawer(tr.dataset.handle, tr.dataset.title, tr.dataset.sku))
 
 }
+
+// ═══ the top 20 on one day ═══
+// A list, not a diff: a bestseller that held its price all week is still on
+// every one of those days, so this reads product_top_sellers directly rather
+// than filtering the change log.
+let TS = { days: [], date: '' }
+
+async function loadTop (date) {
+  tsrows.innerHTML = Array.from({length:4},()=>
+    `<tr class="skr"><td colspan="8"><div class="skl w90"></div></td></tr>`).join('')
+
+  let r
+  try {
+    const res = await fetch(`/api/stores/${ID}/top-sellers${date ? `?date=${date}` : ''}`)
+    if (!res.ok) throw new Error(res.status)
+    r = await res.json()
+  } catch {
+    tsrows.innerHTML = `<tr><td colspan="8" class="empty">Top sellers are unavailable right now</td></tr>`
+    return
+  }
+
+  TS.days = r.days || []
+  TS.date = r.date || ''
+  if (TS.days.length) {
+    // The calendar opens on the newest day that has a list, and cannot be
+    // walked past the ends of what was recorded.
+    tdate.min = TS.days[TS.days.length - 1]
+    tdate.max = TS.days[0]
+  }
+  tdate.value = TS.date
+  const i = TS.days.indexOf(TS.date)
+  tprev.disabled = i < 0 || i >= TS.days.length - 1
+  tnext.disabled = i <= 0
+
+  const list = r.products || []
+  tsnote.innerHTML = !TS.days.length
+    ? 'No bestseller list has been recorded for this store yet — the column arrived in the exports on 21 Aug.'
+    : list.length
+    ? `<b>${nf(list.length)}</b> product${list.length === 1 ? '' : 's'} on ${dt(TS.date)} ·
+       recorded on ${nf(TS.days.length)} day${TS.days.length === 1 ? '' : 's'}`
+    : `Nothing recorded for ${dt(TS.date)}. Lists exist for ${dt(TS.days.at(-1))} – ${dt(TS.days[0])}.`
+
+  tsrows.innerHTML = list.length ? list.map(p => `
+    <tr class="crow" data-handle="${esc(p.handle)}" data-title="${esc(p.title||'')}"
+        data-sku="">
+      <td><div class="pcell">
+        ${p.image_src ? `<img class="thumb" src="${esc(p.image_src)}" loading="lazy" alt="">`
+                      : `<div class="thumb"></div>`}
+        <div style="min-width:0">
+          <div class="pt">${esc(p.title||'—')}</div>
+          <div class="hd">${esc(p.handle)}</div>
+        </div></div></td>
+      <td>${p.product_type ? `<span class="vp">${esc(p.product_type)}</span>` : '—'}</td>
+      <td class="num">${nf(p.variants)}</td>
+      <td class="num">${p.min_price == null ? '—'
+        : Number(p.min_price) === Number(p.max_price) ? `<b>${nf(p.min_price)}</b>`
+        : `<b>${nf(p.min_price)}</b> – <b>${nf(p.max_price)}</b>`}<div class="s2">${CUR}</div></td>
+      <td class="num">${Number(p.discount_pct) ? `${p.discount_pct}%` : '—'}</td>
+      <td>${p.in_stock === null ? '—' : p.in_stock ? STOCK.in : STOCK.out}</td>
+      <td class="num">${nf(p.days_in_top)}</td>
+      <td><a class="lnk" href="${esc(p.product_url)}" target="_blank" rel="noopener"
+             onclick="event.stopPropagation()">Open ↗</a></td>
+    </tr>`).join('')
+    : `<tr><td colspan="8"><div class="nores" style="border:0;background:none;padding:34px 10px">
+         <div class="ne">★</div><div class="nt">No list for this day</div>
+         <div class="nd">The store's export carried no top 20 for ${dt(TS.date)}.</div>
+       </div></td></tr>`
+
+  // Same drawer as the change log — one product, its whole timeline.
+  tsrows.querySelectorAll('.crow').forEach(tr =>
+    tr.onclick = () => openDrawer(tr.dataset.handle, tr.dataset.title))
+}
+
+// The arrows step between days that HAVE a list, rather than by one calendar
+// day into a gap.
+const stepTop = dir => {
+  const i = TS.days.indexOf(TS.date)
+  const nx = TS.days[(i < 0 ? 0 : i) + dir]
+  if (nx) loadTop(nx)
+}
+tdate.onchange = () => loadTop(tdate.value)
+tprev.onclick = () => stepTop(1)   // the list runs newest first
+tnext.onclick = () => stepTop(-1)
 
 // ═══ drawer — full product timeline ═══
 const EV = {

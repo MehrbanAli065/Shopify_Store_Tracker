@@ -598,6 +598,13 @@ th.hint::after{content:'';display:block;border-bottom:1px dotted var(--rule);
   background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 10px center;max-width:230px}
 .fbox select:disabled{color:var(--muted);cursor:default;opacity:.75}
+/* the calendar over the bestseller table, in the same field as everything else */
+.fbox input[type=date]{font:13.5px system-ui,sans-serif;font-weight:620;padding:10px 11px;
+  border:0;outline:none;background:none;color:var(--ink);cursor:pointer;font-variant-numeric:tabular-nums}
+.fbox input[type=date]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.6}
+.fbox input[type=date]::-webkit-calendar-picker-indicator:hover{opacity:1}
+.tsnote{justify-content:flex-end;font-size:12.5px;color:var(--muted);padding-bottom:10px}
+.tsnote b{color:var(--ink)}
 /* the top-20 toggle sits in the bar as a field, so it lines up with the rest */
 .ftog{display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer;
   font:13.5px system-ui,sans-serif;font-weight:620;padding:10px 13px;border-radius:10px;
