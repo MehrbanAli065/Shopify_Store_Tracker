@@ -502,7 +502,8 @@ function paint () {
 
   rows.innerHTML = shownDates.length ? shownDates.map(p =>
     head(p, (grouped.get(p.date) || []).length) + (grouped.get(p.date) || []).map(x => `
-    <tr class="crow" data-handle="${esc(x.handle)}" data-title="${esc(x.title||'')}">
+    <tr class="crow" data-handle="${esc(x.handle)}" data-title="${esc(x.title||'')}"
+        data-sku="${esc(x.sku || x.variant_label || '—')}">
       <td><div class="pcell">
         ${x.image_src ? `<img class="thumb" src="${esc(x.image_src)}" loading="lazy" alt="">` : `<div class="thumb"></div>`}
         <div style="min-width:0">
@@ -526,7 +527,7 @@ function paint () {
        </div></td></tr>`
 
   document.querySelectorAll('.crow').forEach(tr =>
-    tr.onclick = () => openDrawer(tr.dataset.handle, tr.dataset.title))
+    tr.onclick = () => openDrawer(tr.dataset.handle, tr.dataset.title, tr.dataset.sku))
 
 }
 
@@ -576,7 +577,20 @@ function walkDays (list, runs) {
   return out
 }
 
-async function openDrawer (handle, title) {
+/** Month helpers for the drawer's range filter: '2026-07' in, 'Jul 2026' out. */
+const mKey = s => String(s).slice(0, 7)
+const mLab = k => { const [y, m] = k.split('-')
+  return new Date(Date.UTC(+y, +m - 1, 1))
+    .toLocaleDateString('en-GB', { month:'short', year:'numeric' }) }
+
+/**
+ * The open drawer's state. The timeline is fetched once per product and then
+ * re-rendered locally as the filters move — changing the month should not cost
+ * a round trip to re-read days that are already in hand.
+ */
+let DR = null
+
+async function openDrawer (handle, title, sku) {
   scrim.hidden = false; drawer.hidden = false
   requestAnimationFrame(() => drawer.classList.add('open'))
   dTitle.textContent = title || handle
@@ -589,46 +603,92 @@ async function openDrawer (handle, title) {
 
   const bySku = {}
   for (const e of ev) (bySku[e.sku || e.variant_label || '—'] ||= []).push(e)
+  const keys = Object.keys(bySku)
+
+  // A product has one row per variant in the table, and the row that was
+  // clicked names one of them: open on that variant, not on whichever happens
+  // to come first in the feed.
+  DR = { ev, runs, bySku, keys, sel: keys.includes(sku) ? sku : keys[0], from: null, to: null }
+  renderDrawer()
+}
+
+function renderDrawer () {
+  const { ev, runs, bySku, keys, sel } = DR
+  const list = bySku[sel]
+  const days = walkDays(list, runs)
+
+  // The months this variant actually spans — walkDays already returns the days
+  // in order, so the first appearance of each month is enough.
+  const months = []
+  for (const d of days) { const k = mKey(d.date); if (months.at(-1) !== k) months.push(k) }
+
+  // A remembered month can fall outside the variant just picked, so clamp to
+  // this variant's own span rather than rendering an empty timeline by default.
+  if (!months.includes(DR.from)) DR.from = months[0]
+  if (!months.includes(DR.to))   DR.to   = months.at(-1)
+  if (DR.from > DR.to) DR.from = DR.to
+
+  const shown = days.filter(d => { const k = mKey(d.date); return k >= DR.from && k <= DR.to })
+  const nEv = shown.filter(d => d.kind === 'event').length
+  const opt = (v, lbl, on) => `<option value="${esc(v)}"${on ? ' selected' : ''}>${esc(lbl)}</option>`
 
   dBody.innerHTML = `
     <div class="dmeta">
       <div><span>First seen</span><b>${dt(ev[0].variant_first_seen)}</b></div>
       <div><span>Last seen</span><b>${dt(ev.at(-1).last_seen_at)}</b></div>
-      <div><span>Variants</span><b>${Object.keys(bySku).length}</b></div>
+      <div><span>Variants</span><b>${keys.length}</b></div>
       <div><span>Events</span><b>${ev.length}</b></div>
     </div>
-    <a class="btn" style="display:inline-block;margin-bottom:16px" target="_blank" rel="noopener"
+    <a class="btn" style="display:inline-block;margin-bottom:14px" target="_blank" rel="noopener"
        href="${esc(ev[0].product_url)}">Open on store ↗</a>
-    ${Object.entries(bySku).map(([sku, list]) => `
-      <div class="vgroup">
-        <div class="vgh"><span class="vp">${esc(list[0].variant_label||'—')}</span>
-          <span class="sk">SKU · ${esc(sku)}</span></div>
-        ${(days => days.map((r,i) => {
-          const last = i === days.length - 1
-          if (r.kind !== 'event') return `<div class="ev ${r.kind} ${last?'last':''}">
-            <div class="evd">${dt(r.date)}</div>
-            <div class="evr"><span class="pin"></span><span class="bar"></span></div>
-            <div class="evb"><div class="evt">${r.kind==='quiet'?'No change':'No scrape that day'}</div></div>
-          </div>`
-          const e = r.e
-          const [lbl, col] = EV[e.change_type] || [e.change_type,'var(--muted)']
-          const moved = e.prev_price != null && Number(e.prev_price) !== Number(e.price)
-          return `<div class="ev ${last?'last':''}">
-            <div class="evd">${dt(e.observed_date)}</div>
-            <div class="evr"><span class="pin" style="background:${col}"></span><span class="bar"></span></div>
-            <div class="evb">
-              <div class="evt">${lbl}</div>
-              <div class="evx">
-                ${moved ? `<span class="old">${nf(e.prev_price)}</span><span class="arw">→</span><b>${nf(e.price)}</b>
-                           <span class="${Number(e.price_diff)<0?'dn':'up'}" style="margin-left:7px">
-                           ${Number(e.price_diff)>0?'+':''}${nf(e.price_diff)} (${e.price_diff_pct}%)</span>`
-                        : `<b>${nf(e.price)}</b> ${CUR}`}
-                ${Number(e.discount_pct) ? ` · ${e.discount_pct}% off` : ''}
-                ${e.change_type==='stock_out' ? ' · left the feed' : ''}
-              </div>
-            </div></div>`
-        }).join(''))(walkDays(list, runs))}
-      </div>`).join('')}`
+    <div class="dfilt">
+      <label class="wide">Variant
+        <select class="sel" id="dVar">${keys.map(k =>
+          opt(k, `${bySku[k][0].variant_label || '—'}${k === (bySku[k][0].variant_label || '—') ? '' : `  ·  ${k}`}`,
+              k === sel)).join('')}</select></label>
+      <label>From month
+        <select class="sel" id="dFrom">${months.map(m => opt(m, mLab(m), m === DR.from)).join('')}</select></label>
+      <label>To month
+        <select class="sel" id="dTo">${months.map(m => opt(m, mLab(m), m === DR.to)).join('')}</select></label>
+    </div>
+    <div class="rescount"><b>${nf(nEv)}</b> ${nEv === 1 ? 'event' : 'events'} over
+      ${nf(shown.length)} ${shown.length === 1 ? 'day' : 'days'} ·
+      ${DR.from === DR.to ? mLab(DR.from) : `${mLab(DR.from)} – ${mLab(DR.to)}`}</div>
+    <div class="vgroup">
+      <div class="vgh"><span class="vp">${esc(list[0].variant_label||'—')}</span>
+        <span class="sk">SKU · ${esc(sel)}</span></div>
+      ${shown.length ? shown.map((r, i) => {
+        const last = i === shown.length - 1
+        if (r.kind !== 'event') return `<div class="ev ${r.kind} ${last?'last':''}">
+          <div class="evd">${dt(r.date)}</div>
+          <div class="evr"><span class="pin"></span><span class="bar"></span></div>
+          <div class="evb"><div class="evt">${r.kind==='quiet'?'No change':'No scrape that day'}</div></div>
+        </div>`
+        const e = r.e
+        const [lbl, col] = EV[e.change_type] || [e.change_type,'var(--muted)']
+        const moved = e.prev_price != null && Number(e.prev_price) !== Number(e.price)
+        return `<div class="ev ${last?'last':''}">
+          <div class="evd">${dt(e.observed_date)}</div>
+          <div class="evr"><span class="pin" style="background:${col}"></span><span class="bar"></span></div>
+          <div class="evb">
+            <div class="evt">${lbl}</div>
+            <div class="evx">
+              ${moved ? `<span class="old">${nf(e.prev_price)}</span><span class="arw">→</span><b>${nf(e.price)}</b>
+                         <span class="${Number(e.price_diff)<0?'dn':'up'}" style="margin-left:7px">
+                         ${Number(e.price_diff)>0?'+':''}${nf(e.price_diff)} (${e.price_diff_pct}%)</span>`
+                      : `<b>${nf(e.price)}</b> ${CUR}`}
+              ${Number(e.discount_pct) ? ` · ${e.discount_pct}% off` : ''}
+              ${e.change_type==='stock_out' ? ' · left the feed' : ''}
+            </div>
+          </div></div>`
+      }).join('') : `<div class="empty" style="padding:18px 0">Nothing recorded for this variant in that range</div>`}
+    </div>`
+
+  // Picking a variant drops the month range: the new variant may not have been
+  // on the feed for any of the months the last one covered.
+  dVar.onchange  = e => { DR.sel = e.target.value; DR.from = DR.to = null; renderDrawer() }
+  dFrom.onchange = e => { DR.from = e.target.value; if (DR.from > DR.to) DR.to = DR.from; renderDrawer() }
+  dTo.onchange   = e => { DR.to = e.target.value; if (DR.to < DR.from) DR.from = DR.to; renderDrawer() }
 }
 const closeDrawer = () => {
   drawer.classList.remove('open')

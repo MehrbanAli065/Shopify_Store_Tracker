@@ -541,3 +541,12 @@ th.hint::after{content:'';display:block;border-bottom:1px dotted var(--rule);
 .btn.sm:hover:not(:disabled){border-color:var(--rule);color:var(--ink)}
 .btn.sm:disabled{opacity:.55;cursor:progress}
 .btn.sm.undo{border-color:var(--blue);color:var(--blue)}
+
+/* drawer filters — variant on its own row, then the month range */
+.dfilt{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:0 0 12px}
+.dfilt .wide{grid-column:1/-1}
+.dfilt label{display:flex;flex-direction:column;gap:5px;min-width:0;
+  font-size:10px;color:var(--muted);font-weight:620;text-transform:uppercase;letter-spacing:.04em}
+.dfilt select{width:100%;font:inherit;font-size:12.5px;padding:7px 9px;border-radius:8px;
+  border:1px solid var(--border);background:var(--surface);color:var(--ink);cursor:pointer}
+.dfilt select:focus{outline:none;border-color:var(--blue)}
