@@ -103,12 +103,18 @@
     <div class="fld">
       <span class="flab">Date</span>
       <div class="fbox dbox">
-        <select id="dmode">
-          <option value="">All dates</option>
-          <option value="one">One day</option>
-        </select>
         <button class="dstep" id="dprev" title="Earlier day" hidden>‹</button>
-        <input type="date" id="ddate" hidden>
+        <button class="dlabel" id="dall" title="Pick a day">All dates</button>
+        <button class="dcal" id="dcal" title="Pick a day">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="4.5" width="18" height="16" rx="2.5"/>
+            <path d="M3 9.5h18M8 2.8v3.4M16 2.8v3.4"/>
+          </svg>
+        </button>
+        <!-- The real control. Kept at zero width because a display:none input
+             cannot open its own picker, and this one is opened for it. -->
+        <input type="date" id="ddate" class="dhide" tabindex="-1" aria-label="Pick a day">
         <button class="dstep" id="dnext" title="Later day" hidden>›</button>
       </div>
     </div>
@@ -520,9 +526,6 @@ function fillDateSelect () {
   if (!PER_DATE.length) return
   ddate.min = PER_DATE[PER_DATE.length - 1].date
   ddate.max = PER_DATE[0].date
-  // Switching to "One day" before the first load had no days to open on, and
-  // left the mode saying one day while the table showed all of them.
-  if (dmode.value === 'one' && !ONE_DATE) { setDateMode('one'); loadRows(); return }
   syncSteppers()
 }
 
@@ -538,22 +541,40 @@ function stepDate (dir) {
   const days = changedDays()
   const nx = days[(i => i < 0 ? 0 : i)(days.indexOf(ONE_DATE)) + dir]
   if (!nx) return
-  ONE_DATE = nx; ddate.value = nx; syncSteppers(); loadRows()
+  // Through setDateMode, so the label follows the arrows — stepping used to
+  // move the table and leave the field naming the day before it.
+  ONE_DATE = nx
+  setDateMode('one')
+  loadRows()
 }
 
-/** Show the day controls only while a day is the question being asked. */
+/**
+ * The field reads "All dates" until a day is picked and then reads that day,
+ * so what it says is what the table is showing. The steppers only appear once
+ * there is a day to step from.
+ */
 function setDateMode (mode) {
   const one = mode === 'one'
-  dmode.value = mode
-  for (const el of [dprev, ddate, dnext]) el.hidden = !one
+  dprev.hidden = dnext.hidden = !one
   if (one) {
     // Open on the newest day that has changes rather than on an empty input.
     ONE_DATE = ONE_DATE || changedDays()[0] || PER_DATE[0]?.date || ''
     ddate.value = ONE_DATE
+    dall.textContent = dt(ONE_DATE)
+    dall.title = 'Back to all dates'
+    dall.classList.add('on')
   } else {
     ONE_DATE = ''; ddate.value = ''
+    dall.textContent = 'All dates'
+    dall.title = 'Pick a day'
+    dall.classList.remove('on')
   }
   syncSteppers()
+}
+
+/** showPicker needs a user gesture, which every caller here is. */
+const openCalendar = () => {
+  try { ddate.showPicker() } catch { ddate.focus(); ddate.click() }
 }
 
 function renderPager () {
@@ -1168,8 +1189,15 @@ function syncExportLinks () {
 }
 baseChk.onchange = () => { showBase = baseChk.checked; syncExportLinks(); loadRows() }
 vsel.onchange = () => { VAR = vsel.value; syncExportLinks(); loadRows() }
-dmode.onchange = () => { setDateMode(dmode.value); loadRows() }
-ddate.onchange = () => { ONE_DATE = ddate.value; syncSteppers(); loadRows() }
+dcal.onclick = openCalendar
+// The label is the way back out as well as a second way in: it opens the
+// calendar while it says "All dates", and clears the day once it names one.
+dall.onclick = () => { if (ONE_DATE) { setDateMode(''); loadRows() } else openCalendar() }
+ddate.onchange = () => {
+  ONE_DATE = ddate.value
+  setDateMode(ONE_DATE ? 'one' : '')
+  loadRows()
+}
 dprev.onclick = () => stepDate(1)   // PER_DATE runs newest first
 dnext.onclick = () => stepDate(-1)
 tg.onclick = () => {
