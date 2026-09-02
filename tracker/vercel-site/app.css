@@ -33,8 +33,8 @@ a{color:inherit;text-decoration:none}
 .top-in{max-width:1240px;margin:0 auto;padding:15px 24px;display:flex;align-items:center;
   justify-content:space-between;gap:16px;flex-wrap:wrap}
 .bl{display:flex;align-items:center;gap:11px;min-width:0}
-.logo{width:30px;height:30px;border-radius:8px;background:var(--blue);color:#fff;display:grid;
-  place-items:center;font-size:12.5px;font-weight:700;flex-shrink:0}
+/* The mark draws its own rounded square, so the box behind it is only a size. */
+.logo{width:30px;height:30px;border-radius:8px;flex-shrink:0;display:block}
 .ttl{font-weight:670;font-size:16px;letter-spacing:-.012em;line-height:1.25}
 .sub{font-size:12.5px;color:var(--muted)}
 .page{max-width:1240px;margin:0 auto;padding:26px 24px 80px}
@@ -599,11 +599,16 @@ th.hint::after{content:'';display:block;border-bottom:1px dotted var(--rule);
   max-height:min(58vh,460px);overflow-y:auto;overscroll-behavior:contain;
   background:var(--plane);border:1px solid var(--border);
   border-radius:11px;box-shadow:0 14px 34px rgba(0,0,0,.18)}
-.fitem{display:flex;align-items:baseline;gap:12px;width:100%;text-align:left;font:inherit;color:inherit;
-  border:0;background:none;padding:7px 10px;border-radius:8px;cursor:pointer}
+.fitem{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:inherit;
+  border:0;background:none;padding:6px 9px;border-radius:8px;cursor:pointer}
 .fitem:hover,.fitem.on{background:var(--surface-2)}
-.fi-t{flex:1;min-width:0;font-size:13px;font-weight:620;
+.fthumb{width:30px;height:30px;border-radius:6px;object-fit:cover;background:var(--surface-2);flex-shrink:0}
+.fmain{flex:1;min-width:0}
+.fi-t{display:block;font-size:13px;font-weight:620;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Only drawn where a name is not enough to tell two products apart. */
+.fi-h{display:block;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .fi-n{font-size:11.5px;color:var(--muted);font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
 .fi-x{margin-left:6px;color:var(--s4);font-weight:650}
 .fmsg{padding:9px 11px;font-size:12.5px;color:var(--muted)}
