@@ -136,7 +136,8 @@
     </span>
     <div>
       <h2>Top 20 selling products</h2>
-      <div class="cs">The list the store's own export declared on the day you pick</div>
+      <div class="cs">The list the store's own export declared on the day you pick ·
+        “days in top 20” counts every day on record, not just this one</div>
     </div>
   </div>
   <div class="filterbar">
@@ -153,7 +154,8 @@
   <div class="tw"><table>
     <thead><tr>
       <th>Product</th><th>Type</th><th>Variants</th><th>Price</th>
-      <th>Discount</th><th>Stock</th><th>Days in top 20</th><th></th>
+      <th>Discount</th><th>Stock</th>
+      <th title="How many of the days on record this product was in the store's top 20">Days in top 20</th><th></th>
     </tr></thead>
     <tbody id="tsrows"></tbody>
   </table></div>
@@ -700,7 +702,9 @@ async function loadTop (date) {
         : `<b>${nf(p.min_price)}</b> – <b>${nf(p.max_price)}</b>`}<div class="s2">${CUR}</div></td>
       <td class="num">${Number(p.discount_pct) ? `${p.discount_pct}%` : '—'}</td>
       <td>${p.in_stock === null ? '—' : p.in_stock ? STOCK.in : STOCK.out}</td>
-      <td class="num">${nf(p.days_in_top)}</td>
+      <td class="num" title="In the top 20 on ${nf(p.days_in_top)} of the ${
+        nf(TS.days.length)} days recorded for this store">
+        <b>${nf(p.days_in_top)}</b><div class="s2">of ${nf(TS.days.length)}</div></td>
       <td><a class="lnk" href="${esc(p.product_url)}" target="_blank" rel="noopener"
              onclick="event.stopPropagation()">Open ↗</a></td>
     </tr>`).join('')
