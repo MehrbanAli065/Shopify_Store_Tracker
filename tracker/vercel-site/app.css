@@ -24,6 +24,11 @@
   --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
 }
 *{box-sizing:border-box}
+/* The UA rule is [hidden]{display:none}, which any class setting display beats
+   on specificity. .fpin, .pager and .drawer all set display:flex, so setting
+   el.hidden on them did nothing: clearing the product filter left its own
+   "Filtered to …" line on screen, still offering a clear that had happened. */
+[hidden]{display:none!important}
 body{margin:0;background:var(--plane);color:var(--ink);
   font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
@@ -276,6 +281,12 @@ tbody tr:hover{background:var(--surface-2)}
   gap:12px;flex-wrap:wrap}
 .spin{padding:60px 20px;text-align:center;color:var(--muted);font-size:13px}
 h2{font-size:16px;font-weight:660;margin:26px 0 12px;letter-spacing:-.01em}
+.sechead{display:flex;align-items:center;gap:11px;margin:26px 0 14px}
+.sechead h2{margin:0}
+.sechead .cs{margin:2px 0 0}
+.secico{width:33px;height:33px;border-radius:9px;flex-shrink:0;display:grid;place-items:center;
+  color:var(--blue);background:color-mix(in srgb,var(--blue) 13%,transparent);
+  border:1px solid color-mix(in srgb,var(--blue) 22%,transparent)}
 .days{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--surface);
   box-shadow:var(--shadow);margin-bottom:8px}
 table.dt{min-width:560px}
