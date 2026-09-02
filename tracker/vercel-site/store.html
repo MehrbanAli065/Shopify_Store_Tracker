@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Store Report — Shopify Store Tracker</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232a78d6'/><path d='M9 12.6h14l-1 11.6a2.2 2.2 0 0 1-2.2 2h-7.6a2.2 2.2 0 0 1-2.2-2L9 12.6Z' fill='%23fff'/><path d='M12.6 12.6V10.2a3.4 3.4 0 0 1 6.8 0v2.4' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round'/><rect x='12.2' y='20.4' width='2.5' height='3.6' rx='1' fill='%232a78d6'/><rect x='14.9' y='18.2' width='2.5' height='5.8' rx='1' fill='%232a78d6'/><rect x='17.6' y='16' width='2.5' height='8' rx='1' fill='%232a78d6'/></svg>">
-<link rel="stylesheet" href="/app.css?v=0304d4f3">
+<link rel="stylesheet" href="/app.css?v=9c482d7d">
 </head>
 <body>
 
@@ -361,8 +361,19 @@ async function boot () {
   CUR = s.currency; RANGE = s.range
   document.title = `${s.name} — Report`
   nm.textContent = s.name
-  av.textContent = s.name.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()
+  av.innerHTML = `<span>${esc(s.name.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase())}</span>`
   av.style.background = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948'][(s.id-1)%8]
+  // The store's own mark, if we hold one. Held locally rather than hotlinked:
+  // 242 live requests to 242 shops on every page view would be slower, and
+  // would break on every shop that is down or blocks it.
+  fetch('/logos.json').then(r => r.ok ? r.json() : {}).then(m => {
+    if (!m[s.id]) return
+    const img = new Image()
+    img.src = `/logos/${m[s.id]}`
+    img.alt = ''
+    img.onerror = () => img.remove()
+    av.prepend(img)
+  }).catch(() => {})
   meta.textContent = `${s.domain} · ID ${s.id} · ${s.currency}`
   from.value = s.range.from || ''; to.value = s.range.to || ''
   rangeNote.innerHTML = s.range.from ? `data available <b>${dt(s.range.from)} – ${dt(s.range.to)}</b>` : ''

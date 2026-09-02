@@ -361,8 +361,19 @@ async function boot () {
   CUR = s.currency; RANGE = s.range
   document.title = `${s.name} — Report`
   nm.textContent = s.name
-  av.textContent = s.name.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()
+  av.innerHTML = `<span>${esc(s.name.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase())}</span>`
   av.style.background = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948'][(s.id-1)%8]
+  // The store's own mark, if we hold one. Held locally rather than hotlinked:
+  // 242 live requests to 242 shops on every page view would be slower, and
+  // would break on every shop that is down or blocks it.
+  fetch('/logos.json').then(r => r.ok ? r.json() : {}).then(m => {
+    if (!m[s.id]) return
+    const img = new Image()
+    img.src = `/logos/${m[s.id]}`
+    img.alt = ''
+    img.onerror = () => img.remove()
+    av.prepend(img)
+  }).catch(() => {})
   meta.textContent = `${s.domain} · ID ${s.id} · ${s.currency}`
   from.value = s.range.from || ''; to.value = s.range.to || ''
   rangeNote.innerHTML = s.range.from ? `data available <b>${dt(s.range.from)} – ${dt(s.range.to)}</b>` : ''

@@ -57,6 +57,22 @@ for (const f of fs.readdirSync(path.join(ROOT, 'public')).filter(f => PAGE.test(
   console.log('  ' + f)
 }
 console.log(`  app.css version ${CSS_V}`)
+// The store logos live in a folder, and the loop above only walks the root of
+// public/, so they would have been left behind and every tile would have shown
+// its initials on the deployed site.
+const LOGOS = path.join(ROOT, 'public', 'logos')
+if (fs.existsSync(LOGOS)) {
+  fs.cpSync(LOGOS, path.join(OUT, 'logos'), { recursive: true })
+  console.log(`  logos/ (${fs.readdirSync(LOGOS).length} files)`)
+}
+// And the manifest that says which store has which file. It is .json, which
+// the page filter above does not match, so it needs naming.
+const MANIFEST = path.join(ROOT, 'public', 'logos.json')
+if (fs.existsSync(MANIFEST)) {
+  fs.copyFileSync(MANIFEST, path.join(OUT, 'logos.json'))
+  console.log('  logos.json')
+}
+
 fs.copyFileSync(path.join(ROOT, 'api', 'index.mjs'), path.join(OUT, 'api', 'index.mjs'))
 console.log('  api/index.mjs')
 

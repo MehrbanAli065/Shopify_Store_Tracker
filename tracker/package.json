@@ -20,6 +20,7 @@
     "drive:check": "node scripts/drive-check.mjs",
     "reports:init": "node scripts/apply-reports.mjs",
     "search:init": "node scripts/apply-search-indexes.mjs",
+    "logos": "node scripts/fetch-logos.mjs",
     "audit": "node scripts/audit.mjs",
     "audit:facts": "node scripts/audit-facts.mjs",
     "pack:vm": "cd .. && python tracker/scripts/pack-vm.py",

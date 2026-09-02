@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stores — Shopify Store Tracker</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232a78d6'/><path d='M9 12.6h14l-1 11.6a2.2 2.2 0 0 1-2.2 2h-7.6a2.2 2.2 0 0 1-2.2-2L9 12.6Z' fill='%23fff'/><path d='M12.6 12.6V10.2a3.4 3.4 0 0 1 6.8 0v2.4' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round'/><rect x='12.2' y='20.4' width='2.5' height='3.6' rx='1' fill='%232a78d6'/><rect x='14.9' y='18.2' width='2.5' height='5.8' rx='1' fill='%232a78d6'/><rect x='17.6' y='16' width='2.5' height='8' rx='1' fill='%232a78d6'/></svg>">
-<link rel="stylesheet" href="/app.css?v=0304d4f3">
+<link rel="stylesheet" href="/app.css?v=9c482d7d">
 </head>
 <body>
 
@@ -71,6 +71,15 @@ const nf   = n => new Intl.NumberFormat('en-US').format(n ?? 0)
 const dt   = s => s ? new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '—'
 const HUES = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948']
 const initials = n => n.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()
+
+// Which stores have a logo on disk, and under what name — the files are png,
+// jpg, svg, gif or webp depending on the store. Fetched once for the page; a
+// store that is missing, or whose file fails to load, keeps its initials.
+let LOGOS = {}
+fetch('/logos.json').then(r => r.ok ? r.json() : {}).then(m => {
+  LOGOS = m
+  if (typeof render === 'function') render()
+}).catch(() => {})
 
 let STORES = [], filter = 'all', sort = 'id', term = ''
 
@@ -216,7 +225,9 @@ function render (keepPage) {
     return `
     <a class="card" href="/store.html?id=${s.id}" style="animation-delay:${Math.min(i,12)*22}ms">
       <div class="chead">
-        <div class="av" style="background:${hue}">${initials(s.name)}</div>
+        <div class="av" style="background:${hue}">${LOGOS[s.id]
+          ? `<img src="/logos/${LOGOS[s.id]}" alt="" loading="lazy" onerror="this.remove()">` : ''
+          }<span>${initials(s.name)}</span></div>
         <div style="min-width:0;flex:1">
           <div class="nm">${hilite(s.name, term)}</div>
           <div class="dm">${hilite(s.domain, term)}</div>

@@ -185,8 +185,13 @@ mark{background:color-mix(in srgb,var(--warning) 45%,transparent);color:inherit;
 .card:hover{border-color:var(--blue);transform:translateY(-2px);
   box-shadow:0 2px 4px rgba(11,11,11,.05),0 12px 30px rgba(11,11,11,.10)}
 .chead{display:flex;gap:11px;align-items:flex-start}
-.av{width:36px;height:36px;border-radius:10px;color:#fff;display:grid;place-items:center;
-  font-size:13px;font-weight:700;letter-spacing:-.02em;flex-shrink:0}
+.av{position:relative;overflow:hidden;width:36px;height:36px;border-radius:10px;color:#fff;
+  display:grid;place-items:center;font-size:13px;font-weight:700;letter-spacing:-.02em;flex-shrink:0}
+/* The logo sits over the initials rather than replacing them, so a file that
+   fails to load falls back by simply being removed. Most shop favicons are
+   drawn for a light background, hence the white behind them. */
+.av img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+  background:#fff;padding:3px;border-radius:inherit}
 .card .nm{font-weight:660;font-size:15px;letter-spacing:-.008em;line-height:1.3}
 .card .dm{font-size:11.5px;color:var(--muted);font-family:ui-monospace,Consolas,monospace;margin-top:2px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

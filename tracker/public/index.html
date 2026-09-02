@@ -72,6 +72,15 @@ const dt   = s => s ? new Date(s).toLocaleDateString('en-GB',{day:'2-digit',mont
 const HUES = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948']
 const initials = n => n.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()
 
+// Which stores have a logo on disk, and under what name — the files are png,
+// jpg, svg, gif or webp depending on the store. Fetched once for the page; a
+// store that is missing, or whose file fails to load, keeps its initials.
+let LOGOS = {}
+fetch('/logos.json').then(r => r.ok ? r.json() : {}).then(m => {
+  LOGOS = m
+  if (typeof render === 'function') render()
+}).catch(() => {})
+
 let STORES = [], filter = 'all', sort = 'id', term = ''
 
 const isToday = s => s.last_run && s.last_run === STORES.map(x=>x.last_run).sort().at(-1)
@@ -216,7 +225,9 @@ function render (keepPage) {
     return `
     <a class="card" href="/store.html?id=${s.id}" style="animation-delay:${Math.min(i,12)*22}ms">
       <div class="chead">
-        <div class="av" style="background:${hue}">${initials(s.name)}</div>
+        <div class="av" style="background:${hue}">${LOGOS[s.id]
+          ? `<img src="/logos/${LOGOS[s.id]}" alt="" loading="lazy" onerror="this.remove()">` : ''
+          }<span>${initials(s.name)}</span></div>
         <div style="min-width:0;flex:1">
           <div class="nm">${hilite(s.name, term)}</div>
           <div class="dm">${hilite(s.domain, term)}</div>
