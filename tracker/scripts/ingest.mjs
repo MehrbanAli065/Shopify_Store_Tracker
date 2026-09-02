@@ -8,7 +8,7 @@
  * redone. Replaying an older date is refused; see step 2.
  */
 import fs from 'node:fs'
-import { parse } from 'csv-parse/sync'
+import { parse } from 'csv-parse'
 import { q, one, exec, close } from '../lib/db.mjs'
 
 // ── args ──────────────────────────────────────────────────────────
@@ -74,13 +74,23 @@ async function bulk (table, cols, rows, { returning = null, chunk = 400 } = {}) 
 console.log(`\n▸ store ${STORE_ID} · ${RUN_DATE}`)
 console.log(`  file: ${FILE.split(/[\\/]/).pop()}`)
 
-const raw = fs.readFileSync(FILE, 'utf8').replace(/^\uFEFF/, '')
-const rows = parse(raw, { columns: true, skip_empty_lines: true, relax_quotes: true, relax_column_count: true })
+// Streamed, not read whole. The largest export here is 386 MB, which as a JS
+// string is ~770 MB before the parser has built a single row, and the array of
+// row objects it then built came to more again: two stores died on 2 Sep 2026
+// with "heap out of memory" at Node's 2 GB ceiling, on a server with 7 GB.
+// Nothing below ever looks at a row twice, so nothing needs them all at once —
+// only the two maps, which are the products and the variants themselves.
+const parser = fs.createReadStream(FILE).pipe(parse({
+  columns: true, skip_empty_lines: true, relax_quotes: true, relax_column_count: true,
+  bom: true   // was a .replace() on the raw string; the parser strips it in stream
+}))
 
 const csvProducts = new Map()   // handle -> product fields
 const csvVariants = new Map()   // handle|variant_key -> variant fields
+let rowCount = 0
 
-for (const r of rows) {
+for await (const r of parser) {
+  rowCount++
   const handle = s(r['Handle'])
   if (!handle) continue
 
@@ -133,7 +143,7 @@ for (const r of rows) {
   })
 }
 
-console.log(`  parsed: ${rows.length} rows → ${csvProducts.size} products, ${csvVariants.size} variants`)
+console.log(`  parsed: ${rowCount} rows → ${csvProducts.size} products, ${csvVariants.size} variants`)
 
 // ── 2 · open the scrape run ───────────────────────────────────────
 // Re-running a date means undoing it first. That is only safe for the most
@@ -191,7 +201,7 @@ if (prior) {
 const run = await one(
   `INSERT INTO scrape_runs (store_id, run_date, status, file_name, rows_ingested, products_found, variants_found)
    VALUES ($1,$2,'pending',$3,$4,$5,$6) RETURNING id`,
-  [STORE_ID, RUN_DATE, FILE.split(/[\\/]/).pop(), rows.length, csvProducts.size, csvVariants.size])
+  [STORE_ID, RUN_DATE, FILE.split(/[\\/]/).pop(), rowCount, csvProducts.size, csvVariants.size])
 const RUN_ID = run.id
 
 // ── 3 · load yesterday's state (Layer 1 — no history scan) ────────
