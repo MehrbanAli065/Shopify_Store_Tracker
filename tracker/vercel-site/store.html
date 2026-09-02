@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Store Report — Shopify Store Tracker</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232a78d6'/><path d='M9 12.6h14l-1 11.6a2.2 2.2 0 0 1-2.2 2h-7.6a2.2 2.2 0 0 1-2.2-2L9 12.6Z' fill='%23fff'/><path d='M12.6 12.6V10.2a3.4 3.4 0 0 1 6.8 0v2.4' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round'/><rect x='12.2' y='20.4' width='2.5' height='3.6' rx='1' fill='%232a78d6'/><rect x='14.9' y='18.2' width='2.5' height='5.8' rx='1' fill='%232a78d6'/><rect x='17.6' y='16' width='2.5' height='8' rx='1' fill='%232a78d6'/></svg>">
-<link rel="stylesheet" href="/app.css?v=b26ce494">
+<link rel="stylesheet" href="/app.css?v=b3ecb017">
 </head>
 <body>
 
@@ -146,32 +146,65 @@
     <tbody id="tsrows"></tbody>
   </table></div>
 
-  <!-- ── charts ── -->
+  <!-- ── the catalogue as it stands, not as it changed ── -->
+  <div class="sechead">
+    <span class="secico">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/>
+        <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/>
+        <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/>
+        <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/>
+      </svg>
+    </span>
+    <div>
+      <h2>The catalogue today</h2>
+      <div class="cs">How the store's live products stand right now — these two ignore the
+        period above and always describe the latest scrape</div>
+    </div>
+  </div>
   <div class="cgrid">
     <section class="chart">
       <div class="ch">
-        <div><div class="ct">Discount spread</div><div class="cs">Active variants by discount band</div></div>
+        <div><div class="ct">Discount spread</div>
+          <div class="cs">Live variants grouped by how far their price sits below the
+            price the store crosses out. The band with the tallest bar is where most of
+            the catalogue is discounted.</div></div>
       </div>
       <div id="chDisc" class="chold">…</div>
     </section>
 
     <section class="chart">
       <div class="ch">
-        <div><div class="ct">What changed</div><div class="cs" id="csChange">In the selected period</div></div>
-      </div>
-      <div id="chChange" class="chold">…</div>
-    </section>
-
-    <section class="chart wide">
-      <div class="ch">
-        <div><div class="ct">Top product categories</div><div class="cs">Active products by type</div></div>
+        <div><div class="ct">Top product categories</div>
+          <div class="cs">Live products counted by the type the store gives them in its
+            own feed, biggest first. It says what this store mainly sells.</div></div>
       </div>
       <div id="chTypes" class="chold">…</div>
     </section>
   </div>
 
-  <!-- ── daily activity ── -->
-  <h2>Day by day</h2>
+  <!-- ── what happened over the chosen period ── -->
+  <div class="sechead">
+    <span class="secico">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 12.5h3.6l2.6-7 3.8 13.5 2.6-6.5H21"/>
+      </svg>
+    </span>
+    <div>
+      <h2>Activity, day by day</h2>
+      <div class="cs">Every change recorded between the dates chosen at the top of the page</div>
+    </div>
+  </div>
+  <section class="chart solo">
+    <div class="ch">
+      <div><div class="ct">What changed</div>
+        <div class="cs" id="csChange">In the selected period</div></div>
+    </div>
+    <div id="chChange" class="chold">…</div>
+  </section>
+
   <div class="stripwrap">
     <div class="strip" id="strip"></div>
     <div class="striplab" id="striplab"></div>
@@ -189,11 +222,13 @@
         <th title="Every change recorded that day — the six columns to the left added up">History rows</th>
       </tr></thead>
       <tbody id="daily"></tbody>
+      <tfoot id="dailyTot"></tfoot>
     </table>
   </div>
-  <p class="hintline">One row per day the scrape ran. Each column counts changes of that kind
-    on that day, and <b>history rows</b> is those six columns added up. A day with
-    <b>0 history rows</b> means nothing changed that day — the scrape still ran and every
+  <p class="hintline">One row per day the scrape ran, newest last. Each column counts changes
+    of that kind on that day, and <b>history rows</b> is those six columns added up — the bar
+    behind it compares the day with the busiest day in the period. A day with
+    <b>0 history rows</b> means nothing changed that day: the scrape still ran and every
     variant was checked.</p>
 
 </div>
@@ -217,6 +252,8 @@
 const ID  = new URLSearchParams(location.search).get('id') || '1'
 const nf  = n => n == null ? '—' : new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n)
 const dt  = s => s ? new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '—'
+// Weekdays make a store's rhythm visible — most of them push on the same day.
+const wd  = s => s ? new Date(s).toLocaleDateString('en-GB',{weekday:'short'}) : ''
 const iso = d => d.toISOString().slice(0,10)
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
 
@@ -264,10 +301,18 @@ function renderStrip (daily) {
       ).join('') + `</div>`
   }).join('')
 
-  // Labels would collide at a day apart, so only every nth date is written.
+  // Labels would collide at a day apart, so only every nth date is written —
+  // and the last day is always written, because it is the one being asked
+  // about. Writing both used to print them on top of each other whenever the
+  // range did not divide evenly, so the stepped label too close to the end is
+  // dropped in favour of the end itself.
   const step = Math.max(1, Math.ceil(daily.length / 12))
+  const last = daily.length - 1
+  const marks = new Set()
+  for (let i = 0; i <= last; i += step) if (last - i >= step) marks.add(i)
+  marks.add(last)
   striplab.innerHTML = daily.map((d, i) =>
-    `<span>${i % step === 0 || i === daily.length - 1 ? dt(d.observed_date) : ''}</span>`).join('')
+    `<span>${marks.has(i) ? dt(d.observed_date) : ''}</span>`).join('')
 
   const totals = DAY_PARTS.map(([l, get, hue]) =>
     [l, daily.reduce((a, d) => a + get(d), 0), hue]).filter(p => p[1] > 0)
@@ -392,16 +437,25 @@ async function loadKpis () {
     el.textContent = n ? ` ${n}` : ''
   })
 
+  // The busiest day sets the scale for the bar behind the totals, so a row can
+  // be placed against the period without reading every other row.
+  const peak = Math.max(1, ...k.daily.map(x => x.total))
+  const COLS = ['new_items', 'price', 'stock_out', 'stock_in', 'removed', 'relisted']
+  const sum = f => k.daily.reduce((a, x) => a + (x[f] || 0), 0)
+
   daily.innerHTML = k.daily.length ? k.daily.map(d => `
-    <tr><td class="num">${dt(d.observed_date)}</td>
-      <td class="num ${d.new_items?'':'z'}">${d.new_items}${d.baseline_items?`<div class="s2">+${nf(d.baseline_items)} initial</div>`:''}</td>
-      <td class="num ${d.price?'':'z'}">${d.price}</td>
-      <td class="num ${d.stock_out?'':'z'}">${d.stock_out}</td>
-      <td class="num ${d.stock_in?'':'z'}">${d.stock_in}</td>
-      <td class="num ${d.removed?'':'z'}">${d.removed}</td>
-      <td class="num ${d.relisted?'':'z'}">${d.relisted}</td>
-      <td class="num"><b style="color:var(--ink)">${d.total}</b></td></tr>`).join('')
+    <tr><td class="num"><span class="wd">${wd(d.observed_date)}</span> ${dt(d.observed_date)}</td>
+      ${COLS.map(c => `<td class="num ${d[c] ? '' : 'z'}">${nf(d[c])}${
+        c === 'new_items' && d.baseline_items
+          ? `<div class="s2">+${nf(d.baseline_items)} initial</div>` : ''}</td>`).join('')}
+      <td class="num"><b style="color:var(--ink)">${nf(d.total)}</b>
+        <div class="mb"><i style="width:${(d.total / peak * 100).toFixed(1)}%"></i></div></td></tr>`).join('')
     : `<tr><td colspan="8" class="empty">No activity in this range</td></tr>`
+
+  dailyTot.innerHTML = k.daily.length ? `
+    <tr><td>${nf(k.daily.length)} day${k.daily.length === 1 ? '' : 's'}</td>
+      ${COLS.map(c => `<td class="num">${nf(sum(c))}</td>`).join('')}
+      <td class="num"><b>${nf(sum('total'))}</b></td></tr>` : ''
 
   renderStrip(k.daily)
 
