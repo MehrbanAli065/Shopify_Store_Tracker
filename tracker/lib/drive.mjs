@@ -140,6 +140,37 @@ export async function getFolder (folder) {
 }
 
 /** Every CSV directly inside the folder, newest first. */
+/**
+ * The dated subfolders of a folder, newest name first.
+ *
+ * The scraper does not drop its CSVs loose in the Drive folder; it makes one
+ * folder per day, named YYYY-MM-DD, and puts that day's files inside. Anything
+ * not named that way is ignored here, which is how the Shopify_Scraper sheet
+ * that lives beside them stays out of the way.
+ */
+export async function listDayFolders (folder) {
+  const out = []
+  let pageToken
+  do {
+    const p = new URLSearchParams({
+      q: `'${folder}' in parents and trashed = false ` +
+         `and mimeType = 'application/vnd.google-apps.folder'`,
+      fields: 'nextPageToken, files(id, name, modifiedTime)',
+      pageSize: '200',
+      supportsAllDrives: 'true',
+      includeItemsFromAllDrives: 'true'
+    })
+    if (pageToken) p.set('pageToken', pageToken)
+    const j = await call(`${API}/files?${p}`)
+    out.push(...(j.files || []))
+    pageToken = j.nextPageToken
+  } while (pageToken)
+
+  return out
+    .filter(f => /^\d{4}-\d{2}-\d{2}$/.test(f.name))
+    .sort((a, b) => b.name.localeCompare(a.name))
+}
+
 export async function listCsvFiles (folder) {
   const out = []
   let pageToken

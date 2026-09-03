@@ -29,8 +29,8 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { q, close, describe, MODE, ROOT } from '../lib/db.mjs'
-import { folderId, describeAuth, readOnlyAuth, listCsvFiles, downloadFile,
-         trashFile, deleteFile, moveFile, ensureFolder } from '../lib/drive.mjs'
+import { folderId, describeAuth, readOnlyAuth, listCsvFiles, listDayFolders,
+         downloadFile, trashFile, deleteFile, moveFile, ensureFolder } from '../lib/drive.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
@@ -64,11 +64,20 @@ function dateFor (name, modifiedTime) {
   return iso(new Date(modifiedTime))
 }
 
-/** Longest matching csv_prefix wins, so similar domains cannot collide. */
+/** Longest matching csv_prefix wins, so similar domains cannot collide.
+ *
+ *  Both sides have their www dropped before comparing, exactly as
+ *  ingest-folder.mjs does. The scraper stopped putting www in the filename on
+ *  7 Aug while the sheet still spells 74 of the 242 stores with it, and
+ *  matching literally skipped 70 files, 65 of them a whole day, in silence.
+ *  This file was missing the rule that file already had.
+ */
+const noWww = s => String(s).toLowerCase().replace(/^https___www_/, 'https___')
+
 function storeFor (name, stores) {
-  const n = name.toLowerCase()
+  const f = noWww(name)
   return stores
-    .filter(s => s.csv_prefix && n.startsWith(s.csv_prefix.toLowerCase()))
+    .filter(s => s.csv_prefix && f.startsWith(noWww(s.csv_prefix)))
     .sort((a, b) => b.csv_prefix.length - a.csv_prefix.length)[0] || null
 }
 
@@ -136,12 +145,47 @@ console.log(`\n  db     ${describe()}  [${MODE}]`)
 console.log(`  drive  folder ${FOLDER}`)
 console.log(`  auth   ${auth}\n`)
 
+// ── which day's folder ────────────────────────────────────────────
+// The CSVs are not loose in DRIVE_FOLDER_ID. The scraper makes one folder per
+// day, named YYYY-MM-DD, and puts that day's files inside it. Listing the
+// parent and filtering out folders — which is what this did — therefore found
+// the Shopify_Scraper sheet, no CSVs at all, and reported "0 files" as though
+// that were a normal night. It never ingested anything.
+//
+// The folder's name is also the run date. That is better than reading it off
+// the filename or the file's modifiedTime: most filenames carry no date, and a
+// file uploaded after midnight carries the next day's timestamp, which dated a
+// whole night of stores to the wrong day.
+const TZ = process.env.DRIVE_TZ || 'Asia/Karachi'
+
+let dayFolder
+try {
+  const folders = await listDayFolders(FOLDER)     // newest first
+  if (!folders.length) {
+    console.error(`\n  ✗ no YYYY-MM-DD folder inside ${FOLDER} — nothing to ingest\n`)
+    await close(); process.exit(1)
+  }
+  const want  = FORCEDAY || new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date())
+  const exact = folders.find(f => f.name === want)
+  dayFolder = exact || folders[0]
+  if (!exact) {
+    // Falling back rather than stopping: a run a few minutes after midnight, or
+    // a scraper that finished late, should still ingest the day that is there.
+    console.log(`  note   no folder named ${want}; using the newest, ${dayFolder.name}`)
+  }
+} catch (e) {
+  console.error(`  ✗ could not list the day folders: ${e.message}\n`)
+  await close(); process.exit(1)
+}
+
+console.log(`  day    ${dayFolder.name}`)
+
 // ── list ──────────────────────────────────────────────────────────
 let files
 try {
-  files = await listCsvFiles(FOLDER)
+  files = await listCsvFiles(dayFolder.id)
 } catch (e) {
-  console.error(`  ✗ could not list the folder: ${e.message}\n`)
+  console.error(`  ✗ could not list ${dayFolder.name}: ${e.message}\n`)
   await close(); process.exit(1)
 }
 
@@ -154,7 +198,9 @@ const jobs = [], skipped = [], unmatched = []
 for (const f of files) {
   const store = storeFor(f.name, stores)
   if (!store) { unmatched.push(f); continue }
-  const date = dateFor(f.name, f.modifiedTime)
+  // The folder is the day. dateFor() stays for --date and for any file that
+  // is somehow read outside a dated folder.
+  const date = FORCEDAY || dayFolder.name || dateFor(f.name, f.modifiedTime)
   if (!FORCE && done.has(`${store.id}|${date}`)) { skipped.push({ f, store, date }); continue }
   jobs.push({ f, store, date, mb: (Number(f.size || 0) / 1e6).toFixed(1) })
 }
