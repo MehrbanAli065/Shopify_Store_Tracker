@@ -72,14 +72,27 @@ echo "$LINE1" >> "$LOG"
 echo "$LINE2" >> "$LOG"
 
 if [ -n "${MAIL_TO:-}" ]; then
+  HOST=$(hostname -f 2>/dev/null || hostname)
+  # Message-ID and Date are not optional. Gmail refuses a message without a
+  # Message-ID outright — 550 5.7.1 "Messages missing a valid Message-ID header
+  # are not accepted" — and the bounce is addressed to tracker@$HOST, which
+  # does not exist locally, so it is discarded. The result is a mail that
+  # sendmail accepted, that left an empty queue, and that simply never arrived
+  # with nothing anywhere to say why. Postfix only fills these in when
+  # always_add_missing_headers is on, and it is off by default.
+  MID="<$(date +%s).$$.tracker@$HOST>"
   {
     echo "To: $MAIL_TO"
-    echo "From: Shopify Tracker <tracker@$(hostname -f 2>/dev/null || hostname)>"
+    echo "From: Shopify Tracker <tracker@$HOST>"
     echo "Subject: $SUBJECT"
+    echo "Message-ID: $MID"
+    echo "Date: $(date -R)"
+    echo "MIME-Version: 1.0"
+    echo "Content-Type: text/plain; charset=utf-8"
     echo ""
     echo "$LINE1"
     echo "$LINE2"
-  } | /usr/sbin/sendmail -t && echo "  mail sent to $MAIL_TO" >> "$LOG" \
+  } | /usr/sbin/sendmail -t && echo "  mail sent to $MAIL_TO  $MID" >> "$LOG" \
                             || echo "  mail FAILED to send" >> "$LOG"
 else
   echo "  MAIL_TO not set in tracker/.env - no mail sent" >> "$LOG"
