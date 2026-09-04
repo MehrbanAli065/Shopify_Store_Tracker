@@ -28,6 +28,22 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+
+/**
+ * A last resort, not a way of carrying on. Anything that reaches here is a
+ * fault nobody anticipated, and the run cannot be trusted to continue — but it
+ * can end with a line that says what happened instead of a bare stack trace in
+ * a log nobody reads at 7am. The nightly mail reports from the database, so a
+ * run that dies here is still counted honestly: whatever went in, went in.
+ */
+for (const sig of ['unhandledRejection', 'uncaughtException']) {
+  process.on(sig, err => {
+    console.error(`\n  ✗ ${sig}: ${err?.message || err}`)
+    if (err?.stack) console.error(String(err.stack).split('\n').slice(1, 4).join('\n'))
+    console.error('    The run stopped here. Files not yet ingested are still in Drive.\n')
+    process.exit(1)
+  })
+}
 import { q, close, describe, MODE, ROOT } from '../lib/db.mjs'
 import { folderId, describeAuth, readOnlyAuth, listCsvFiles, listDayFolders,
          downloadFile, trashFile, deleteFile, moveFile, ensureFolder } from '../lib/drive.mjs'
@@ -189,10 +205,20 @@ try {
   await close(); process.exit(1)
 }
 
-const stores = await q('SELECT id, name, domain, csv_prefix FROM stores WHERE active ORDER BY id')
-const done   = new Set((await q(
-  `SELECT store_id, run_date FROM scrape_runs WHERE status IN ('success','partial')`))
-  .map(r => `${r.store_id}|${r.run_date}`))
+// Everything else in this run is wrapped; these two were not, and a database
+// that is down or still starting would end the night with a stack trace rather
+// than a sentence.
+let stores, done
+try {
+  stores = await q('SELECT id, name, domain, csv_prefix FROM stores WHERE active ORDER BY id')
+  done = new Set((await q(
+    `SELECT store_id, run_date FROM scrape_runs WHERE status IN ('success','partial')`))
+    .map(r => `${r.store_id}|${r.run_date}`))
+} catch (e) {
+  console.error(`  ✗ could not read the database: ${e.message}`)
+  console.error('    Nothing was ingested. The files are still in Drive.\n')
+  await close(); process.exit(1)
+}
 
 const jobs = [], skipped = [], unmatched = []
 for (const f of files) {

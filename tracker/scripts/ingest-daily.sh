@@ -1,7 +1,8 @@
 #!/bin/sh
 # The nightly job, with a two-line email when it is done.
 #
-#   crontab:  0 7 * * *  /home/mehrban/tracker/scripts/ingest-daily.sh
+#   crontab:  0 6 * * *  /home/mehrban/tracker/scripts/ingest-daily.sh
+#             06:00 UTC, which is 11:00 in Asia/Karachi — the server runs UTC.
 #
 # Runs ingest-drive.mjs, then asks the database what actually landed and mails
 # that. The numbers come from the database rather than from the script's own
