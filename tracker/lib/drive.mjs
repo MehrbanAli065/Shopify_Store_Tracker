@@ -107,30 +107,76 @@ async function tokenSource (writable) {
     'See DRIVE.md for the five-minute setup.')
 }
 
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+/**
+ * Statuses worth asking again about. 403 is on the list because Google uses it
+ * for rate limiting as well as for permissions, and the two are told apart
+ * below by what comes back in the body.
+ */
+const RETRYABLE = new Set([403, 408, 429, 500, 502, 503, 504])
+
+// 3s, 10s, 30s, 90s. Long, because the wall Google puts up is measured in
+// minutes, and a run that waits two minutes for a file beats a day that lands
+// half-ingested.
+const BACKOFF = [3000, 10_000, 30_000, 90_000]
+
+/**
+ * Google answers a rate limit with an HTML page titled "Sorry..." rather than
+ * the JSON error the API documents. That is why this arrived in the log as a
+ * bare "Drive 403: Forbidden" with no detail: there was no JSON to read a
+ * message out of, and 403 reads as a permissions problem to anyone looking.
+ */
+const isRateLimit = (status, body) =>
+  status === 429 ||
+  (status === 403 && /<title>Sorry/i.test(body || '')) ||
+  /rate ?limit|quota|too many requests/i.test(body || '')
+
 async function call (url, { writable = false, raw = false, ...init } = {}) {
   const key = process.env.GOOGLE_API_KEY
-  let headers = init.headers
-  if (key && readOnlyAuth()) {
-    if (writable) throw new Error(
-      'An API key can only read. Use --archive/--trash with a service account, ' +
-      'or leave the files in Drive — already-ingested days are skipped anyway.')
-    url += (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key)
-  } else {
-    const token = await (await tokenSource(writable))()
-    headers = { Authorization: `Bearer ${token}`, ...init.headers }
-  }
-  const res = await fetch(url, { ...init, headers })
-  if (!res.ok) {
+  const useKey = key && readOnlyAuth()
+  if (useKey && writable) throw new Error(
+    'An API key can only read. Use --archive/--trash with a service account, ' +
+    'or leave the files in Drive — already-ingested days are skipped anyway.')
+  if (useKey) url += (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key)
+
+  for (let attempt = 0; ; attempt++) {
+    // The token is taken inside the loop so a retry after a long wait cannot
+    // go out with one that expired while we were waiting.
+    const headers = useKey ? init.headers
+      : { Authorization: `Bearer ${await (await tokenSource(writable))()}`, ...init.headers }
+
+    const res = await fetch(url, { ...init, headers })
+    if (res.ok) return raw ? res : res.json()
+
+    // Read the body once, as text, so both the JSON message and Google's HTML
+    // rate-limit page can be recognised.
+    let body = ''
+    try { body = await res.text() } catch {}
     let detail = ''
-    try { detail = (await res.json())?.error?.message || '' } catch {}
+    try { detail = JSON.parse(body)?.error?.message || '' } catch {}
+
+    const limited = isRateLimit(res.status, body)
+    if (RETRYABLE.has(res.status) && attempt < BACKOFF.length) {
+      // A 403 that is not rate limiting is a permissions problem, and asking
+      // again four times will not change the answer.
+      if (res.status !== 403 || limited) { await sleep(BACKOFF[attempt]); continue }
+    }
+
     if (res.status === 404)
       throw new Error(
         'Drive returned 404. With an API key the folder must be shared as ' +
         '"Anyone with the link"; with a service account it must be shared with ' +
         `its client_email. ${detail}`)
+
+    if (limited)
+      throw new Error(
+        `Drive is rate limiting this account (${res.status}) and did not let up after ` +
+        `${BACKOFF.length} retries over ${BACKOFF.reduce((a, b) => a + b, 0) / 1000}s. ` +
+        'The files are still in Drive; the next run picks them up.')
+
     throw new Error(`Drive ${res.status}: ${detail || res.statusText}`)
   }
-  return raw ? res : res.json()
 }
 
 /** The folder's own metadata — 404 here means the credential cannot see it at all,
