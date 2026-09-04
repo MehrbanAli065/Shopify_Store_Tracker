@@ -39,6 +39,24 @@ if (!fs.existsSync(DIR)) { console.error(`\n  folder nahi mila: ${DIR}\n`); proc
 // Everything except --dir is the remote job's business, not ours.
 const passthrough = argv.filter((_, n) => n !== i && n !== i + 1)
 
+/**
+ * The folder is named for the day; the files inside are not, and the tar drops
+ * the folder name on the way over. Without this the remote job falls back to
+ * each file's mtime — and these CSVs are written the evening before, so a
+ * 2026-09-04 folder carries 2026-09-03 timestamps and the whole day lands on
+ * the wrong date. When that date was already ingested it looked like success:
+ * "239 already done", nothing written, the day silently missing.
+ *
+ * So the folder's own name is passed on as --date. An explicit --date still
+ * wins, and a folder not named for a day is left to the old behaviour.
+ */
+const dayFromDir = path.basename(DIR.replace(/[\\/]+$/, '')).match(/\d{4}-\d{2}-\d{2}/)?.[0]
+if (dayFromDir && !passthrough.includes('--date')) {
+  passthrough.push('--date', dayFromDir)
+  console.log(`
+  folder ka naam hi tareekh hai: --date ${dayFromDir}`)
+}
+
 const csvs = fs.readdirSync(DIR).filter(f => f.toLowerCase().endsWith('.csv'))
 if (!csvs.length) { console.error(`\n  is folder mein koi CSV nahi: ${DIR}\n`); process.exit(1) }
 const mb = csvs.reduce((s, f) => s + fs.statSync(path.join(DIR, f)).size, 0) / 1048576

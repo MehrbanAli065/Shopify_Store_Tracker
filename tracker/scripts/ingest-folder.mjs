@@ -44,9 +44,23 @@ if (!fs.existsSync(DIR)) { console.error(`folder not found: ${DIR}`); process.ex
 // ── helpers ───────────────────────────────────────────────────────
 const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 
-/** Pull a date out of the filename; fall back to the file's own timestamp. */
+/**
+ * The folder is named for the day, and that name is the run date.
+ *
+ * The scrape writes each CSV the evening before it is filed, so a 2026-09-04
+ * folder is full of files stamped 2026-09-03. Reading the day off a file's
+ * timestamp therefore files a whole day under the one before it — and when
+ * that day is already ingested it does not even look like a failure: every
+ * store reports "already done" and nothing is written. The Drive path has
+ * always taken the folder's name for this reason; this is the same rule for a
+ * folder on disk.
+ */
+const dirDay = path.basename(String(DIR).replace(/[\\/]+$/, '')).match(/\d{4}-\d{2}-\d{2}/)?.[0]
+
+/** The folder's day, then a date in the filename, then the file's timestamp. */
 function dateFor (file, full) {
   if (FORCEDAY) return FORCEDAY
+  if (dirDay) return dirDay
   // 27_07_26 / 27-07-2026 / 2026-07-27  — day first unless the year leads
   let m = file.match(/(\d{4})[-_](\d{2})[-_](\d{2})/)
   if (m) return `${m[1]}-${m[2]}-${m[3]}`
