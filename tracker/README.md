@@ -25,6 +25,9 @@ layer holds the newest values and diffing against it would produce nonsense.
 
 ## Putting a day into the server database
 
+Full walk-through with worked examples: **[INGEST.md](INGEST.md)** — written to
+be handed to someone who has not seen this project before.
+
 Two commands, and the everyday answer is the second one. Both write to the
 **server's** database — the one the live site reads — and both are safe to run
 again: a store+date already recorded is skipped.
