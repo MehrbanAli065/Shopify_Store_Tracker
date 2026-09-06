@@ -23,6 +23,38 @@ history rows dropped and the current-state layer rebuilt from what remains) and
 then redone. Replaying an *older* date is refused, because the current-state
 layer holds the newest values and diffing against it would produce nonsense.
 
+## Putting a day into the server database
+
+Two commands, and the everyday answer is the second one. Both write to the
+**server's** database — the one the live site reads — and both are safe to run
+again: a store+date already recorded is skipped.
+
+```bash
+# 1 · from a folder on this machine
+npm run ingest:server                          # today's folder
+npm run ingest:server -- --date 2026-09-05     # a particular day
+npm run ingest:server -- --dir "D:/elsewhere"  # anywhere
+npm run ingest:server -- --dry-run             # see the plan, write nothing
+
+# 2 · from Drive, run on the server itself
+npm run ingest:drive:server                    # start it and watch it
+npm run ingest:drive:server -- --detach        # start it and come back later
+npm run ingest:drive:server -- --status        # is it running, what did it say
+npm run ingest:drive:server -- --dry-run
+```
+
+The folders under `CSV_BASE` (default `E:/Project CSV`) are named for the day,
+and **the folder's name is the run date** — never a file's timestamp. The
+scrape writes each CSV the evening before it is filed, so a `2026-09-04` folder
+holds files stamped `2026-09-03`, and trusting the timestamp files a whole day
+under the one before it. Both commands take the folder's name.
+
+Which to use: the local one moves 2.5 GB over the wire and takes minutes, but
+nothing can rate-limit it. The Drive one moves nothing, but Google throttles
+downloads hard enough that a day has taken five hours and still arrived
+incomplete — `--detach` exists for exactly that, and `--status` tells you where
+it got to.
+
 ## Nightly automation
 
 The daily CSVs live in a **Google Drive folder**, and that folder is the source.

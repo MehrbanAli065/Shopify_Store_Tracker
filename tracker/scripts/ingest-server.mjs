@@ -26,18 +26,42 @@ const KEY = process.env.TRACKER_SSH_KEY ||
 const REMOTE_DIR = '/tmp/ingest-csv'
 
 const argv = process.argv.slice(2)
+const opt = n => { const i = argv.indexOf(`--${n}`); return i < 0 ? null : argv[i + 1] }
+
+/**
+ * --dir names the folder. Without it, today's folder under CSV_BASE is used,
+ * so the everyday case is just `npm run ingest:server` — the folders are named
+ * for the day, and the day is nearly always today.
+ *
+ *   npm run ingest:server                          today
+ *   npm run ingest:server -- --date 2026-09-05     a particular day
+ *   npm run ingest:server -- --dir "D:/elsewhere"  anywhere
+ */
+const BASE = process.env.CSV_BASE || 'E:/Project CSV'
+const today = new Date()
+const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
 const i = argv.indexOf('--dir')
-if (i < 0 || !argv[i + 1]) {
-  console.error('')
-  console.error('  --dir chahiye:  npm run ingest:server -- --dir "E:/Project CSV/2026-09-01"')
+const DIR = (i >= 0 && argv[i + 1]) ? argv[i + 1]
+          : path.join(BASE, opt('date') || isoDay(today))
+
+if (!fs.existsSync(DIR)) {
+  console.error(`\n  folder nahi mila: ${DIR}`)
+  if (i < 0) {
+    console.error(`  (CSV_BASE = ${BASE} — doosri jagah hai to --dir do, ya CSV_BASE set karo)`)
+    // The neighbours are worth printing: nine times out of ten the folder is
+    // simply not there yet, and seeing which days are makes that obvious.
+    try {
+      const days = fs.readdirSync(BASE).filter(f => /^\d{4}-\d{2}-\d{2}$/.test(f)).sort().slice(-3)
+      if (days.length) console.error(`  mojood folders: ${days.join(', ')}`)
+    } catch {}
+  }
   console.error('')
   process.exit(1)
 }
-const DIR = argv[i + 1]
-if (!fs.existsSync(DIR)) { console.error(`\n  folder nahi mila: ${DIR}\n`); process.exit(1) }
 
 // Everything except --dir is the remote job's business, not ours.
-const passthrough = argv.filter((_, n) => n !== i && n !== i + 1)
+const passthrough = argv.filter((_, n) => i < 0 || (n !== i && n !== i + 1))
 
 /**
  * The folder is named for the day; the files inside are not, and the tar drops
