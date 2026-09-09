@@ -222,18 +222,39 @@ no file that day.
 ## Checking what actually landed
 
 ```bash
-ssh -i ~/.ssh/tracker_deploy mehrban@66.45.238.72 \
-  "cd ~/shopify-store-tracker/tracker && node -e \"
-    import('dotenv/config').then(async () => {
-      const { q } = await import('./lib/db.mjs')
-      console.table(await q(\\\`SELECT run_date, count(*)::int stores,
-        count(*) FILTER (WHERE status='success')::int ok,
-        count(*) FILTER (WHERE status='partial')::int partial
-        FROM scrape_runs WHERE run_date >= current_date - 4
-        GROUP BY 1 ORDER BY 1\\\`))
-      process.exit(0)
-    })\""
+ssh -i ~/.ssh/tracker_deploy mehrban@66.45.238.72
+
+psql -U tracker -h localhost -d shopify_tracker_db -c "
+  SELECT run_date, count(*) AS stores,
+         count(*) FILTER (WHERE status='success') AS ok,
+         count(*) FILTER (WHERE status='partial') AS partial,
+         sum(changes_found)                      AS changes
+    FROM scrape_runs
+   WHERE run_date >= current_date - 6
+   GROUP BY 1 ORDER BY 1"
 ```
+
+```
+  run_date  | stores | ok  | partial | changes
+------------+--------+-----+---------+---------
+ 2026-09-08 |    240 | 236 |       4 |  321516
+ 2026-09-09 |    241 | 239 |       2 |  344337
+```
+
+And which stores are missing on one particular day:
+
+```bash
+psql -U tracker -h localhost -d shopify_tracker_db -c "
+  SELECT s.id, s.name FROM stores s
+   WHERE s.active
+     AND NOT EXISTS (SELECT 1 FROM scrape_runs r
+                      WHERE r.store_id = s.id AND r.run_date = DATE '2026-09-09')
+   ORDER BY s.id"
+```
+
+`psql` needs `-U tracker -h localhost`: the login account and the database
+account are not the same, and plain `psql -d shopify_tracker_db` answers
+`role "mehrban" does not exist`. The password comes from `~/.pgpass`.
 
 Or just read the tail of the log:
 

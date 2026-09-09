@@ -155,7 +155,7 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
   <li><a href="#db">3 · Database</a></li>
   <li><a href="#creds">4 · Credentials</a></li>
   <li><a href="#deploy">5 · Deployment</a></li>
-  <li><a href="#run">6 · Daily use</a></li>
+  <li><a href="#run">6 · Commands</a></li>
   <li><a href="#gotchas">7 · Gotchas</a></li>
   <li><a href="#whole">The whole thing</a></li>
 </ul></nav>
@@ -1906,57 +1906,272 @@ git push origin main                   <i># Vercel builds within a minute</i></p
 </section>
 
 
+<!-- ═══════════ COMMANDS ═══════════ -->
 <section id="run">
-  <div class="sec-h"><span class="sec-n">6</span><h2>Running it day to day</h2></div>
-  <p class="sec-d">It runs itself. These are for when it comes back short.</p>
+  <div class="sec-h"><span class="sec-n">6</span><h2>Commands — everything you can run</h2></div>
+  <p class="sec-d">The nightly job does all of this by itself. These are for the days it comes back short.</p>
 
+  <div class="warn"><b>Read this before running anything.</b> Two families of command exist and they do not
+  go to the same place.
+  <table class="kv" style="margin-top:8px">
+    <tr><td><code>ingest:server</code><br><code>ingest:drive:server</code></td><td><b>Reach the live database.</b> They ship the work to <code>66.45.238.72</code> and run it there. These are the ones you almost always want</td></tr>
+    <tr><td><code>ingest</code> · <code>ingest:folder</code><br><code>ingest:drive</code></td><td>Write to whatever <code>DATABASE_URL</code> in <b>your own</b> <code>.env</code> points at. On your machine that is the local copy, not production — the same commands become the production ones once you are ssh'd into the server</td></tr>
+  </table>
+  <span style="display:block;margin-top:8px">Everything is run from the <code>tracker/</code> folder. Every
+  command is safe to run twice: a store+date already recorded is skipped.</span></div>
+
+  <!-- A -->
+  <h3 class="bot">A · Putting a day in <span class="tg">the two you need</span></h3>
   <div class="card">
-    <h3 style="margin-top:0">When a day's Drive folder never appeared — that is Phase 1</h3>
-    <p style="font-size:13.8px">Phase 2 can only read what Bot 3 uploaded. If the folder is missing or short,
-    nothing on the server will fix it; go to the sheet first.</p>
+    <h3 style="margin-top:0">1 — from a folder on this machine</h3>
+    <pre><b>npm run ingest:server</b>                          <i>today's folder, found automatically</i>
+npm run ingest:server -- --date 2026-09-05        <i>a particular day</i>
+npm run ingest:server -- --dir "D:/backup/2026-09-05"   <i>a folder somewhere else</i>
+npm run ingest:server -- --dry-run                <i>show the plan, write nothing</i>
+npm run ingest:server -- --concurrency 2          <i>gentler on the server</i>
+npm run ingest:server -- --force                  <i>re-ingest a date already recorded</i></pre>
+    <p style="font-size:13.7px;color:var(--ink-2)">Sends the CSVs over gzip, then runs the ingest on the
+    server. <b>Nothing can throttle it</b> — use this whenever the folder is on your disk. It looks for
+    <code>E:\Project CSV\YYYY-MM-DD\</code> unless you say otherwise (<code>CSV_BASE</code> changes the root).</p>
+
+    <h3>2 — from Google Drive, run on the server</h3>
+    <pre><b>npm run ingest:drive:server</b>                    <i>run it and watch</i>
+npm run ingest:drive:server -- <b>--detach</b>            <i>start it and walk away ← use this for a full day</i>
+npm run ingest:drive:server -- <b>--status</b>            <i>is it running? what did it say?</i>
+npm run ingest:drive:server -- --dry-run          <i>list what it would do</i>
+npm run ingest:drive:server -- --date 2026-09-05  <i>force the run date for every file</i></pre>
+    <p style="font-size:13.7px;color:var(--ink-2)">Nothing leaves your machine — the server reads Drive
+    itself. But Google rate-limits it, so a full day has taken five hours and still arrived incomplete.
+    <code>--detach</code> lets the server carry on alone; <code>--status</code> tells you where it got to.</p>
+    <div class="good" style="margin-bottom:0"><b>Which to use.</b> Folder on this machine → command 1, always.
+    Not on this machine → command 2, and expect to run it more than once. A real day went
+    <code>119 → 226 → 237 → 240</code> across four runs as the throttle eased.</div>
+  </div>
+
+  <!-- B -->
+  <h3 class="bot">B · A specific day that is missing</h3>
+  <div class="card">
+    <p style="font-size:13.8px">The most common job. Say 6 September never landed:</p>
+    <pre><i># 1 · what does the database actually have?</i>
+npm run ingest:drive:server -- --status
+
+<i># 2 · is the folder on this machine? (E:\Project CSV\2026-09-06)</i>
+<i>#     yes →</i>
+npm run ingest:server -- --date 2026-09-06
+
+<i>#     no  →</i>
+npm run ingest:drive:server -- --detach --date 2026-09-06
+
+<i># 3 · check it landed — see section E below</i></pre>
+    <div class="warn"><b>Always pass <code>--date</code> when you mean a particular day.</b> Left off, the
+    command resolves the date itself, and a wrong guess produces "240 already done" on a day you know is
+    empty — no error, nothing written.</div>
+    <div class="warn" style="margin-bottom:0"><b>Only the newest day can be re-ingested.</b> Replaying an
+    older one is refused on purpose: <code>variants.current_*</code> holds the <i>latest</i> values, and
+    diffing a three-day-old file against them invents changes that never happened. To fill an older gap, see
+    section D.</div>
+  </div>
+
+  <!-- C -->
+  <h3 class="bot">C · One single store</h3>
+  <div class="card">
+    <pre><i># on the server</i>
+ssh -i ~/.ssh/tracker_deploy mehrban@66.45.238.72
+cd ~/shopify-store-tracker/tracker
+
+node scripts/ingest.mjs --store 3 --date 2026-09-09 --file /path/to/store3.csv</pre>
+    <table class="kv">
+      <tr><td><code>--store</code></td><td>The <code>stores.id</code> — the same number as the sheet's Store_ID</td></tr>
+      <tr><td><code>--date</code></td><td>The day this file belongs to. <b>The folder's name, never the file's timestamp</b></td></tr>
+      <tr><td><code>--file</code></td><td>Full path to that store's CSV</td></tr>
+    </table>
+    <p style="font-size:13.7px;color:var(--ink-2)">This is the one every other ingest command ends up calling.
+    Use it when a single store failed and the rest of the day is fine.</p>
+  </div>
+
+  <!-- D -->
+  <h3 class="bot">D · Undoing a day, and filling an older gap <span class="tg">--rewind</span></h3>
+  <div class="card">
+    <pre>node scripts/ingest.mjs --store 3 --date 2026-09-09 <b>--rewind</b></pre>
+    <p style="font-size:13.8px">Deletes that store's run for that date — the history rows, the run record,
+    the counts — and rebuilds <code>variants.current_*</code> from the history that remains. Nothing else is
+    touched.</p>
+    <h3>Filling a gap in the middle</h3>
+    <p style="font-size:13.8px">If 7 September is missing but 8 and 9 are in, you cannot simply add 7 — the
+    current-state cache is already at the 9th. Walk it backwards, then forwards in order:</p>
+    <pre><i># 1 · rewind the days that came after, newest first</i>
+node scripts/ingest.mjs --store 3 --date 2026-09-09 --rewind
+node scripts/ingest.mjs --store 3 --date 2026-09-08 --rewind
+
+<i># 2 · replay in order, oldest first</i>
+node scripts/ingest.mjs --store 3 --date 2026-09-07 --file …/2026-09-07/store3.csv
+node scripts/ingest.mjs --store 3 --date 2026-09-08 --file …/2026-09-08/store3.csv
+node scripts/ingest.mjs --store 3 --date 2026-09-09 --file …/2026-09-09/store3.csv</pre>
+    <div class="warn" style="margin-bottom:0"><b>This is exactly how store 3's missing 7–8 September was
+    recovered.</b> Order is not optional: a day replayed out of sequence compares against the wrong "current"
+    and writes changes that never occurred. Take a backup first if the store is large.</div>
+  </div>
+
+  <!-- E -->
+  <h3 class="bot">E · Checking what actually landed</h3>
+  <div class="card">
+    <pre><i># the quickest look — the last few days, from the database itself</i>
+npm run ingest:drive:server -- --status
+
+<i># the log's tail</i>
+ssh -i ~/.ssh/tracker_deploy mehrban@66.45.238.72 "tail -30 ~/ingest.log"
+
+<i># a proper count, per day — run this ON the server</i>
+ssh -i ~/.ssh/tracker_deploy mehrban@66.45.238.72
+
+psql -U tracker -h localhost -d shopify_tracker_db -c "
+  SELECT run_date, count(*) AS stores,
+         count(*) FILTER (WHERE status='success') AS ok,
+         count(*) FILTER (WHERE status='partial') AS partial,
+         sum(changes_found)                      AS changes
+    FROM scrape_runs
+   WHERE run_date &gt;= current_date - 6
+   GROUP BY 1 ORDER BY 1"
+
+<i># which stores are missing for one particular day?</i>
+psql -U tracker -h localhost -d shopify_tracker_db -c "
+  SELECT s.id, s.name FROM stores s
+   WHERE s.active
+     AND NOT EXISTS (SELECT 1 FROM scrape_runs r
+                      WHERE r.store_id = s.id AND r.run_date = DATE '2026-09-09')
+   ORDER BY s.id"</pre>
+    <p style="font-size:13.7px;color:var(--ink-2)">The first prints exactly this shape — this is a real week:</p>
+    <pre>  run_date  | stores | ok  | partial | changes
+------------+--------+-----+---------+---------
+ 2026-09-05 |    240 | 234 |       6 |   73312
+ 2026-09-06 |    240 | 236 |       4 |  151348
+ 2026-09-07 |    240 | 236 |       4 |  134935
+ 2026-09-08 |    240 | 236 |       4 |  321516
+ 2026-09-09 |    241 | 239 |       2 |  344337</pre>
+    <table class="kv">
+      <tr><td><code>240 of 242 · 0 failed</code></td><td>Normal. Those two simply had no file that day</td></tr>
+      <tr><td><code>N missing</code></td><td>No CSV in Drive for them — check Sheet1, that is Phase 1's end</td></tr>
+      <tr><td><code>DOWNLOAD FAILED</code></td><td>Google's rate limit, not a permissions problem. Run it again</td></tr>
+      <tr><td><code>partial</code></td><td>The feed collapsed, so removals were skipped for safety. Usually resolves itself</td></tr>
+    </table>
+    <div class="warn" style="margin-bottom:0"><b>Never assume a day is in because a command exited quietly.</b>
+    Read the count. That is the whole rule.</div>
+  </div>
+
+  <!-- F -->
+  <h3 class="bot">F · On the server</h3>
+  <div class="card">
+    <pre>ssh -i ~/.ssh/tracker_deploy mehrban@66.45.238.72
+
+<i># the API</i>
+pm2 status                       <i>is it up?</i>
+pm2 logs tracker --lines 100     <i>what is it saying?</i>
+pm2 restart tracker --update-env <i>restart, re-reading .env</i>
+pm2 save                         <i>persist the process list across reboots</i>
+
+<i># the nightly job</i>
+crontab -l                       <i>0 6 * * *  …/scripts/ingest-daily.sh</i>
+tail -f ~/ingest.log             <i>watch tonight's run live</i>
+./scripts/ingest-daily.sh        <i>run the whole nightly job by hand</i>
+
+<i># the machine</i>
+df -h /                          <i>disk left</i>
+free -h                          <i>memory</i>
+
+<i># the database</i>
+psql -U tracker -h localhost -d shopify_tracker_db
+sudo -u postgres psql -c "\l+"   <i>database sizes</i>
+ls -lh ~/backups                 <i>nightly dumps, seven kept</i>
+~/backup-db.sh                   <i>take one now</i></pre>
+    <div class="warn"><b>psql needs <code>-U tracker -h localhost</code>.</b> Plain
+    <code>psql -d shopify_tracker_db</code> fails with <code>role "mehrban" does not exist</code> — the login
+    account and the database account are not the same. The password comes from <code>~/.pgpass</code>, so you
+    are never asked for it.</div>
+    <div class="warn" style="margin-bottom:0"><b>The <code>-i</code> is not optional either.</b> Without the
+    key ssh falls back to asking for a password, and every scripted step that shells out fails with no clear
+    reason.</div>
+  </div>
+
+  <!-- G -->
+  <h3 class="bot">G · Database and setup</h3>
+  <div class="card">
+    <pre>npm run migrate:check    <i>what would a migration do? — always run this first</i>
+npm run migrate          <i>apply pending migrations</i>
+npm run views            <i>rebuild v_change_report</i>
+npm run search:init      <i>create the pg_trgm indexes behind product search</i>
+npm run reports:init     <i>set up the audit-report tables</i>
+npm run seed             <i>load the store registry from the seed file</i>
+npm run init             <i>create the schema from scratch (a fresh database)</i>
+npm run reset            <i>DROP everything and recreate — local only</i>
+
+npm run db:clone         <i>copy the server's database down to your machine</i>
+npm run logos            <i>re-fetch every store's logo (once, not per page load)</i>
+npm run drive:check      <i>can we see the Drive folder? what is in it?</i>
+npm run audit            <i>generate an audit report for a store</i></pre>
+    <div class="warn" style="margin-bottom:0"><b><code>npm run reset</code> drops the database.</b> It exists
+    for a local sandbox. Never run it against a <code>DATABASE_URL</code> pointing at the server — check
+    which <code>.env</code> you are holding first.</div>
+  </div>
+
+  <!-- H -->
+  <h3 class="bot">H · Running it locally</h3>
+  <div class="card">
+    <pre>npm install
+cp .env.example .env     <i>then fill it in</i>
+npm run dev              <i>the API and pages on http://localhost:3200</i>
+
+<i># ingest into your LOCAL database (not the server's)</i>
+node scripts/ingest-folder.mjs --dir "E:/Project CSV/2026-09-09"
+node scripts/ingest-folder.mjs --dir "…" --dry-run
+node scripts/ingest-folder.mjs --dir "…" --date 2026-09-09 --concurrency 3</pre>
+    <p style="font-size:13.7px;color:var(--ink-2)">Handy for trying an ingest change against real files
+    without touching production. <code>@electric-sql/pglite</code> means you can do this with no Postgres
+    installed at all.</p>
+  </div>
+
+  <!-- flags -->
+  <h3 class="bot">Every flag, in one table</h3>
+  <div class="card">
+    <table class="kv">
+      <tr><td><code>--date YYYY-MM-DD</code></td><td>Force the run date for every file. <b>Pass it whenever you mean a specific day</b></td></tr>
+      <tr><td><code>--dir &lt;path&gt;</code></td><td>The folder of CSVs to read</td></tr>
+      <tr><td><code>--file &lt;path&gt;</code></td><td>One store's CSV (with <code>--store</code>)</td></tr>
+      <tr><td><code>--store &lt;id&gt;</code></td><td>Which store, by <code>stores.id</code></td></tr>
+      <tr><td><code>--rewind</code></td><td>Undo that store's day instead of ingesting it</td></tr>
+      <tr><td><code>--dry-run</code></td><td>Print the plan, write nothing. Costs seconds, saves hours</td></tr>
+      <tr><td><code>--force</code></td><td>Re-ingest a store+date already recorded<span class="note">Only ever for the newest date — see section D</span></td></tr>
+      <tr><td><code>--concurrency N</code></td><td>Stores at once, default 3<span class="note">Large stores are run alone regardless; three 380 MB files together do not fit in 7.9 GB</span></td></tr>
+      <tr><td><code>--detach</code></td><td>Drive runs only: start it on the server and return<span class="note">The run survives your laptop sleeping</span></td></tr>
+      <tr><td><code>--status</code></td><td>Drive runs only: is one in progress, and what did the last few days come to</td></tr>
+      <tr><td><code>--folder &lt;id&gt;</code></td><td>Drive runs only: override <code>DRIVE_FOLDER_ID</code></td></tr>
+      <tr><td><code>--archive</code> · <code>--trash</code><br><code>--delete</code> · <code>--keep</code></td><td>What to do with each file after it is ingested<span class="note">Drive runs authenticated with an API key can only read, so the first three do nothing there</span></td></tr>
+    </table>
+  </div>
+
+  <!-- Phase 1 recovery -->
+  <h3 class="bot">When the Drive folder never appeared <span class="tg">that is Phase 1</span></h3>
+  <div class="card">
+    <p style="font-size:13.8px">No command here can fix a day that was never collected. Go to the sheet.</p>
     <table class="kv">
       <tr><td>1 · open Sheet1</td><td>Any row with <code>Fail</code> or a blank in <b>Robot_Status</b> is a store Bot 1 never got. Column H says why</td></tr>
       <tr><td>2 · check column G</td><td>Same for <b>Brand_Search_Bot_Status</b> and Bot 2</td></tr>
-      <tr><td>3 · rerun</td><td>Start <code>Bot_1_CsvScraper</code> from Orchestrator. It picks up exactly those rows — finished stores are not redone</td></tr>
-      <tr><td>4 · then Bot 3</td><td>It refuses to upload while anything is still <code>Fail</code>, so run it only once the sheet is clean</td></tr>
+      <tr><td>3 · rerun</td><td>Start <code>Bot_1_CsvScraper</code> from Orchestrator — it picks up exactly those rows, finished stores are not redone</td></tr>
+      <tr><td>4 · then Bot 3</td><td>It refuses to upload while anything is still <code>Fail</code>, so run it once the sheet is clean</td></tr>
       <tr><td>if it looks stuck</td><td>RDP into the VM and read <code>…\Shopify_Scraper\Log_File\DD-MM-YYYY.txt</code></td></tr>
     </table>
-    <div class="warn" style="margin-bottom:0"><b>Nothing needs to be reset between runs.</b> The queue is
-    "Fail or empty", so an interrupted night simply resumes where it stopped.</div>
+    <div class="good" style="margin-bottom:0"><b>Nothing needs resetting between runs.</b> The queue is "Fail
+    or empty", so an interrupted night simply resumes where it stopped.</div>
   </div>
 
-  <div class="card">
-    <h3 style="margin-top:0">It already happens</h3>
-    <pre>0 6 * * *   /home/mehrban/shopify-store-tracker/tracker/scripts/ingest-daily.sh
-<i>            06:00 UTC = 11:00 Asia/Karachi (the server runs on UTC)</i></pre>
-    <p style="font-size:13.7px;color:var(--ink-2)">It reads Drive, ingests what changed, and emails two lines —
-    taken from the <b>database</b>, not from its own output, so a run that dies half way still reports honestly.</p>
-  </div>
-
-  <div class="card">
-    <h3 style="margin-top:0">Two commands, run from <code>tracker/</code> on the dev machine</h3>
-    <pre><i># 1 · from a folder on this machine — nothing can throttle it</i>
-npm run ingest:server                        <i>today's folder, found automatically</i>
-npm run ingest:server -- --date 2026-09-05   <i>a particular day</i>
-npm run ingest:server -- --dry-run           <i>show the plan, write nothing</i>
-
-<i># 2 · from Drive, run on the server — no upload, but Google throttles it</i>
-npm run ingest:drive:server                  <i>run it and watch</i>
-npm run ingest:drive:server -- --detach      <i>start it and walk away</i>
-npm run ingest:drive:server -- --status      <i>is it running, what did it say</i>
-
-<i># undo a store's newest day (to replay a gap in order)</i>
-node scripts/ingest.mjs --store 3 --date 2026-09-09 --rewind</pre>
-    <p style="font-size:13.7px;color:var(--ink-2)">Both are safe to run again — a store+date already recorded is
-    skipped. See <b>INGEST.md</b> in the repo for the long version.</p>
-  </div>
-
+  <!-- deployment pointer -->
   <div class="card">
     <h3 style="margin-top:0">Deploying a change</h3>
     <p style="font-size:13.8px;margin-bottom:0">Its own section — see
     <a href="#deploy"><b>5 · Deployment</b></a> above for every path and command.</p>
   </div>
 </section>
+
+
 
 <!-- ═══════════ GOTCHAS ═══════════ -->
 <section id="gotchas">
