@@ -39,3 +39,6 @@ mehrban.html
 
 # local copy of the database dump — 295 MB, and the server keeps its own nightly
 _deploy/
+
+# handover credentials — real values, deliberately local only
+CREDENTIALS.local.md

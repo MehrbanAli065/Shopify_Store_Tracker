@@ -51,6 +51,12 @@ section{margin-bottom:48px;scroll-margin-top:60px}
 h2{font-size:21px;font-weight:700;letter-spacing:-.015em}
 .sec-d{color:var(--muted);font-size:14px;margin:0 0 18px 42px}
 h3{font-size:15.5px;font-weight:670;margin:26px 0 10px}
+.sec-n.ph{background:var(--blue);color:#fff;font-size:11.5px;letter-spacing:.02em}
+h3.bot{display:flex;align-items:center;gap:9px;font-size:17px;margin-top:34px;
+  padding-top:18px;border-top:2px solid var(--line)}
+h3.bot .mono{font-family:var(--mono);font-size:14.5px;color:var(--blue);font-weight:700}
+.tg{font-size:11px;font-weight:700;letter-spacing:.03em;padding:3px 9px;border-radius:20px;
+  background:var(--amber-soft);color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 35%,transparent)}
 
 .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -128,10 +134,12 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
       </div>
     </div>
     <div class="meta">
-      <span class="pill">242 stores tracked</span>
+      <span class="pill">Phase 1 · 3 UiPath robots</span>
+      <span class="pill">Phase 2 · API + database + site</span>
+      <span class="pill">242 stores</span>
       <span class="pill">10.9M history rows</span>
       <span class="pill">8.2 GB database</span>
-      <span class="pill">Runs itself daily at 11:00 PKT</span>
+      <span class="pill">Runs itself, every night</span>
       <span class="pill">Written 9 Sep 2026</span>
     </div>
   </div>
@@ -139,7 +147,8 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
 
 <nav class="toc"><ul>
   <li><a href="#what">What it does</a></li>
-  <li><a href="#flow">How it works</a></li>
+  <li><a href="#phase1">Phase 1 · Collection</a></li>
+  <li><a href="#phase2">Phase 2 · Tracker</a></li>
   <li><a href="#arch">Architecture</a></li>
   <li><a href="#frontend">1 · Frontend</a></li>
   <li><a href="#backend">2 · Backend</a></li>
@@ -155,21 +164,457 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
 <section id="what">
   <div class="sec-h"><span class="sec-n">?</span><h2>What it does</h2></div>
   <div class="card">
-    <p>Every night a scraper drops one CSV per Shopify store into a Google Drive folder — 242 stores,
-    about 2.5 GB a day. This project reads those files and records <b>what changed</b>: a price moved,
-    a variant sold out, a product left the store, a product came back.</p>
-    <p style="margin-top:10px">The important word is <b>changed</b>. A day's file holds ~600,000 rows for a
-    large store; almost all of them are identical to yesterday. Only the differences are written, which is
-    why 2.5 GB of CSV a day becomes roughly 150,000 database rows instead of 4 million.</p>
-    <p style="margin-top:10px">The result is a dashboard where you can pick any store, any product, any
-    variant, and see its whole price and stock history day by day.</p>
+    <p>242 Shopify stores are watched every night, and the system records <b>what changed</b>: a price moved,
+    a variant sold out, a product left the store, a product came back. The result is a dashboard where you can
+    pick any store, any product, any variant, and read its whole price and stock history day by day.</p>
+    <p style="margin-top:10px">It is built in <b>two halves that meet in exactly one place</b> — a folder of
+    CSVs on Google Drive. Learn that folder and each half can be understood on its own.</p>
+  </div>
+
+  <div class="grid2" style="margin-top:14px">
+    <div class="card" style="border-color:var(--blue)">
+      <h3 style="margin-top:0;color:var(--blue)">Phase 1 — collecting it</h3>
+      <p style="font-size:13.8px">Three UiPath robots on a Windows VM, coordinating through one Google Sheet.
+      They ask every store for its own product feed, find each store's 20 best sellers, and file the day's
+      ~240 CSVs into a dated Drive folder.</p>
+      <p style="font-size:13.4px;color:var(--muted);margin-top:9px">UiPath Studio · Google Sheets · Chrome ·
+      Google Drive. It knows nothing about the database.</p>
+    </div>
+    <div class="card" style="border-color:var(--green)">
+      <h3 style="margin-top:0;color:var(--green)">Phase 2 — making sense of it</h3>
+      <p style="font-size:13.8px">A Node service reads that folder and writes only the differences into
+      Postgres, then serves them to a dashboard. A day's file holds ~600,000 rows for a large store and almost
+      all are identical to yesterday, so 2.5 GB of CSV becomes about 150,000 rows.</p>
+      <p style="font-size:13.4px;color:var(--muted);margin-top:9px">Node · Express · PostgreSQL · Vercel.
+      It knows nothing about UiPath.</p>
+    </div>
   </div>
 </section>
 
+<!-- ═══════════ PHASE 1 ═══════════ -->
+<section id="phase1">
+  <div class="sec-h"><span class="sec-n ph">P1</span><h2>Phase 1 — Collecting the data</h2></div>
+  <p class="sec-d">Three UiPath robots on a Windows VM. They produce the CSVs; they know nothing about the
+  database or the website.</p>
+
+  <div class="card">
+    <p>Phase 1 answers one question: <b>where do 242 CSV files come from every night?</b> Three robots run in
+    turn on a rented Windows machine, coordinating through a single Google Sheet, and finish by putting the
+    day's folder on Google Drive. Phase 2 picks it up from there and never looks back.</p>
+    <p style="margin-top:10px">Each robot is published to the <b>techbugs86</b> UiPath Cloud account, in the
+    Orchestrator folder <code>ShiftGRit_Automation</code>, and each has its own time trigger.</p>
+  </div>
+
+  <h3>The bigger picture</h3>
+  <div class="arch">
+  <svg viewBox="0 0 700 470" width="700" height="470" font-family="-apple-system,Segoe UI,sans-serif">
+    <defs>
+      <marker id="p1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0 0 L10 5 L0 10 z" fill="#7d8b9c"/>
+      </marker>
+      <marker id="p1o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0 0 L10 5 L0 10 z" fill="#c08a3e"/>
+      </marker>
+    </defs>
+
+    <!-- the VM -->
+    <rect x="16" y="60" width="424" height="290" rx="12" fill="var(--paper)" stroke="var(--line-2)" stroke-width="1.6"/>
+    <text x="32" y="82" font-size="12.5" font-weight="800" letter-spacing=".06em" fill="var(--muted)">WINDOWS VM · 149.104.69.201</text>
+    <text x="32" y="97" font-size="10.5" fill="var(--faint)">UiPath robot, signed in as Administrator, runs unattended</text>
+
+    <rect x="32" y="110" width="392" height="58" rx="9" fill="var(--blue-soft)" stroke="var(--blue)"/>
+    <text x="46" y="130" font-size="12.5" font-weight="700" fill="var(--blue)">Bot 1 · Csv Scraper</text>
+    <text x="46" y="146" font-size="10.5" fill="var(--muted)">12:00 AM — asks every store for its own /products.json,</text>
+    <text x="46" y="159" font-size="10.5" fill="var(--muted)">writes one 49-column CSV per store</text>
+
+    <rect x="32" y="178" width="392" height="58" rx="9" fill="var(--blue-soft)" stroke="var(--blue)"/>
+    <text x="46" y="198" font-size="12.5" font-weight="700" fill="var(--blue)">Bot 2 · BrandSearch</text>
+    <text x="46" y="214" font-size="10.5" fill="var(--muted)">06:00 AM — reads each store's top 20 sellers, then marks</text>
+    <text x="46" y="227" font-size="10.5" fill="var(--muted)">them inside the CSV Bot 1 already wrote</text>
+
+    <rect x="32" y="246" width="392" height="58" rx="9" fill="var(--blue-soft)" stroke="var(--blue)"/>
+    <text x="46" y="266" font-size="12.5" font-weight="700" fill="var(--blue)">Bot 3 · Csv Uploader</text>
+    <text x="46" y="282" font-size="10.5" fill="var(--muted)">08:00 AM — checks the other two finished, files the CSVs</text>
+    <text x="46" y="295" font-size="10.5" fill="var(--muted)">into a dated folder and uploads it to Drive</text>
+
+    <text x="32" y="325" font-size="10.5" fill="var(--muted)">C:\Users\Administrator\Documents\UiPath\Shopify_Scraper\Scrapped_Csv_Files</text>
+    <text x="32" y="340" font-size="10.5" fill="var(--faint)">the working folder all three share</text>
+
+    <!-- the sheet -->
+    <rect x="470" y="60" width="214" height="140" rx="11" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.5"/>
+    <text x="577" y="84" text-anchor="middle" font-size="13" font-weight="700" fill="var(--amber)">Google Sheet</text>
+    <text x="577" y="100" text-anchor="middle" font-size="10.5" fill="var(--muted)">"Shopify_Scraper"</text>
+    <line x1="486" y1="110" x2="668" y2="110" stroke="var(--amber)" stroke-opacity=".4"/>
+    <text x="486" y="126" font-size="10.5" fill="var(--ink-2)">the store list — 242 rows</text>
+    <text x="486" y="142" font-size="10.5" fill="var(--ink-2)">the queue — who still needs doing</text>
+    <text x="486" y="158" font-size="10.5" fill="var(--ink-2)">the result — pass / fail per store</text>
+    <text x="486" y="174" font-size="10.5" fill="var(--ink-2)">the top-20 handles per store</text>
+    <text x="486" y="192" font-size="10" fill="var(--muted)">every bot reads and writes it</text>
+
+    <!-- drive -->
+    <rect x="470" y="240" width="214" height="64" rx="11" fill="var(--green-soft)" stroke="var(--green)" stroke-width="1.5"/>
+    <text x="577" y="264" text-anchor="middle" font-size="13" font-weight="700" fill="var(--green)">Google Drive</text>
+    <text x="577" y="281" text-anchor="middle" font-size="10.5" fill="var(--muted)">one folder per day, named</text>
+    <text x="577" y="295" text-anchor="middle" font-size="10.5" font-family="ui-monospace,Consolas,monospace" fill="var(--green)">2026-09-09</text>
+
+    <!-- links -->
+    <path d="M428 139 L466 130" stroke="#c08a3e" stroke-width="1.4" marker-end="url(#p1o)"/>
+    <path d="M428 207 L466 165" stroke="#c08a3e" stroke-width="1.4" marker-end="url(#p1o)"/>
+    <path d="M428 268 L466 196" stroke="#c08a3e" stroke-width="1.4" marker-end="url(#p1o)"/>
+    <path d="M428 285 L466 272" stroke="#7d8b9c" stroke-width="1.6" marker-end="url(#p1)"/>
+
+    <path d="M228 168 L228 174" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#p1)"/>
+    <path d="M228 236 L228 242" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#p1)"/>
+
+    <!-- handoff -->
+    <rect x="16" y="374" width="668" height="80" rx="11" fill="var(--soft)" stroke="var(--line-2)" stroke-dasharray="5 4"/>
+    <text x="32" y="398" font-size="12.5" font-weight="800" letter-spacing=".06em" fill="var(--muted)">THE HANDOVER TO PHASE 2</text>
+    <text x="32" y="418" font-size="11.5" fill="var(--ink)">A dated Drive folder holding ~240 CSVs. That is the entire contract between the two phases.</text>
+    <text x="32" y="437" font-size="11" fill="var(--muted)">Phase 2 never touches UiPath, the sheet or the VM — it only reads that folder. Either half can be rebuilt without the other.</text>
+
+    <path d="M577 306 L577 340 L350 340 L350 370" stroke="#7d8b9c" stroke-width="1.6" fill="none" marker-end="url(#p1)"/>
+  </svg>
+  </div>
+
+  <h3>The control board — one Google Sheet</h3>
+  <div class="card">
+    <p style="font-size:13.8px">The three robots never call each other. They coordinate entirely through one
+    spreadsheet, so the state of a run is something a human can open and read.</p>
+    <table class="kv" style="margin-top:10px">
+      <tr><td>Spreadsheet</td><td><b>Shopify_Scraper</b><span class="note mono">1kLdowNERzLeI9jyfKW8-4URfsS1w0vupICOWkBANucQ</span></td></tr>
+      <tr><td>Google account</td><td><code>techbugs86@gmail.com</code></td></tr>
+    </table>
+    <h3>Sheet1 — the store list and the queue</h3>
+    <table class="kv">
+      <tr><td>A · Store_ID</td><td>1–242. The same id Phase 2's <code>stores</code> table uses</td></tr>
+      <tr><td>B · Store_Url</td><td>The domain, in whatever shape it was typed — the bots normalise it</td></tr>
+      <tr><td>C · Status</td><td>What happened to this store on the last run</td></tr>
+      <tr><td>D · Updated_Date</td><td>When, shifted +9 hours to the VM's working day</td></tr>
+      <tr><td>E · Row_Index</td><td>The row's own number, so a bot can write back to the right line</td></tr>
+      <tr><td>F · Robot_Status</td><td><b>The queue for Bot 1.</b> <code>Fail</code> or empty means "still to do"</td></tr>
+      <tr><td>G · Brand_Search_Bot_Status</td><td><b>The queue for Bot 2.</b> Same rule</td></tr>
+      <tr><td>H · Failed CSV / No top 20</td><td>The reason, in words, when either bot could not finish</td></tr>
+    </table>
+    <h3>The other tabs</h3>
+    <table class="kv">
+      <tr><td>BrandSearch_Scraping</td><td>Store_ID · Store_Url · Product_Name · Product_Handle — about 20 rows per store, written by Bot 2</td></tr>
+      <tr><td>Error Logging</td><td>Store_ID · Store_Url · Status · Updated_Date · Failed_Reason</td></tr>
+      <tr><td><code>CsvData_YYYY-MM-DD</code><br><code>BrandSearch_YYYY-MM-DD</code></td><td>Yesterday's two tabs, copied aside before the working tabs are cleared for the new day</td></tr>
+    </table>
+    <div class="warn" style="margin-bottom:0"><b>Why "Fail or empty" is the queue.</b> A blank cell is a store
+    that has never been done today; <code>Fail</code> is one that was tried and did not work. Both need doing,
+    so both filter the same way, and a run that is interrupted simply resumes — nothing has to remember where
+    it stopped.</div>
+  </div>
+
+  <!-- ─── BOT 1 ─── -->
+  <h3 class="bot">Bot 1 · <span class="mono">Bot_1_CsvScraper</span> <span class="tg">12:00 AM</span></h3>
+  <p style="font-size:13.8px;color:var(--ink-2);margin-bottom:12px">Asks each store for its own product feed
+  and writes the CSV. <b>No browser.</b> It reads the store's public <code>/products.json</code> directly.</p>
+
+  <div class="arch">
+  <svg viewBox="0 0 700 500" width="700" height="500" font-family="-apple-system,Segoe UI,sans-serif">
+    <defs><marker id="b1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7d8b9c"/></marker>
+      <marker id="b1r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c08a3e"/></marker></defs>
+
+    <rect x="18" y="16" width="180" height="48" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="108" y="38" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">12:00 AM trigger</text>
+    <text x="108" y="53" text-anchor="middle" font-size="10" fill="var(--muted)">UiPath Orchestrator</text>
+
+    <rect x="228" y="16" width="180" height="48" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="318" y="38" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">jane.bat</text>
+    <text x="318" y="53" text-anchor="middle" font-size="10" fill="var(--muted)">prepares the machine</text>
+
+    <rect x="438" y="16" width="244" height="48" rx="9" fill="var(--amber-soft)" stroke="var(--amber)"/>
+    <text x="560" y="38" text-anchor="middle" font-size="12" font-weight="700" fill="var(--amber)">read Sheet1</text>
+    <text x="560" y="53" text-anchor="middle" font-size="10" fill="var(--muted)">keep rows where Robot_Status = Fail or empty</text>
+
+    <path d="M200 40 L224 40" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b1)"/>
+    <path d="M410 40 L434 40" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b1)"/>
+    <path d="M560 66 L560 82 L350 82 L350 96" stroke="#7d8b9c" stroke-width="1.5" fill="none" marker-end="url(#b1)"/>
+
+    <!-- per-store loop -->
+    <rect x="60" y="100" width="580" height="228" rx="12" fill="var(--soft)" stroke="var(--line-2)" stroke-dasharray="5 4"/>
+    <text x="76" y="120" font-size="11.5" font-weight="800" letter-spacing=".05em" fill="var(--muted)">FOR EACH STORE IN THE QUEUE</text>
+
+    <rect x="78" y="132" width="250" height="70" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="94" y="152" font-size="11.5" font-weight="700" fill="var(--ink)">GET /products.json?limit=250</text>
+    <text x="94" y="169" font-size="10" fill="var(--muted)">page after page until an empty one</text>
+    <text x="94" y="182" font-size="10" fill="var(--muted)">3s between pages · 8s between stores</text>
+    <text x="94" y="195" font-size="10" fill="var(--muted)">up to 6 tries: 5s, 15s, 45s, 135s, 300s</text>
+
+    <path d="M203 204 L203 222" stroke="#7d8b9c" stroke-width="1.4" marker-end="url(#b1)"/>
+    <path d="M203 226 L296 250 L203 274 L110 250 Z" fill="var(--blue-soft)" stroke="var(--blue)" stroke-width="1.4"/>
+    <text x="203" y="247" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--blue)">what came</text>
+    <text x="203" y="260" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--blue)">back?</text>
+
+    <rect x="360" y="132" width="262" height="46" rx="9" fill="var(--green-soft)" stroke="var(--green)"/>
+    <text x="376" y="151" font-size="11.5" font-weight="700" fill="var(--green)">OK → write the 49-column CSV</text>
+    <text x="376" y="167" font-size="10" fill="var(--muted)">rebuilt to match the site's export byte for byte</text>
+
+    <rect x="360" y="188" width="262" height="42" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="376" y="206" font-size="11.5" font-weight="700" fill="var(--ink)">5xx → SHRINK</text>
+    <text x="376" y="221" font-size="10" fill="var(--muted)">start the store again at 100, then 50 per page</text>
+
+    <rect x="360" y="240" width="262" height="42" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="376" y="258" font-size="11.5" font-weight="700" fill="var(--ink)">403 / bot page → STOP</text>
+    <text x="376" y="273" font-size="10" fill="var(--muted)">17 stores will never answer; do not retry them</text>
+
+    <path d="M296 250 L356 160" stroke="#7d8b9c" stroke-width="1.4" marker-end="url(#b1)"/>
+    <path d="M296 250 L356 208" stroke="#7d8b9c" stroke-width="1.4" marker-end="url(#b1)"/>
+    <path d="M296 250 L356 260" stroke="#7d8b9c" stroke-width="1.4" marker-end="url(#b1)"/>
+
+    <rect x="78" y="288" width="544" height="28" rx="7" fill="var(--amber-soft)" stroke="var(--amber)"/>
+    <text x="94" y="306" font-size="11" fill="var(--ink)">write the outcome back to this store's row — Status, Updated_Date, Robot_Status, and the reason</text>
+
+    <!-- pass 2 -->
+    <path d="M350 330 L350 348" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b1)"/>
+    <path d="M350 352 L474 380 L350 408 L226 380 Z" fill="var(--blue-soft)" stroke="var(--blue)" stroke-width="1.4"/>
+    <text x="350" y="376" text-anchor="middle" font-size="11" font-weight="700" fill="var(--blue)">any store still</text>
+    <text x="350" y="390" text-anchor="middle" font-size="11" font-weight="700" fill="var(--blue)">marked Fail?</text>
+
+    <path d="M226 380 L44 380 L44 167 L74 167" stroke="#c08a3e" stroke-width="1.5" fill="none" marker-end="url(#b1r)"/>
+    <text x="52" y="362" font-size="10.5" font-weight="700" fill="var(--amber)">YES · re-read the sheet</text>
+    <text x="52" y="375" font-size="10" fill="var(--amber)">Pass 2, up to 2 rounds</text>
+
+    <path d="M474 380 L560 380 L560 424" stroke="#7d8b9c" stroke-width="1.5" fill="none" marker-end="url(#b1)"/>
+    <text x="500" y="374" font-size="10.5" font-weight="700" fill="var(--muted)">NO</text>
+
+    <rect x="430" y="428" width="252" height="44" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="446" y="447" font-size="11.5" font-weight="700" fill="var(--ink)">summary email</text>
+    <text x="446" y="462" font-size="10" fill="var(--muted)">"N files downloaded" — plus a daily .txt log</text>
+
+    <text x="18" y="447" font-size="10.5" fill="var(--muted)">A store that throws is caught on its own and marked Fail —</text>
+    <text x="18" y="462" font-size="10.5" fill="var(--muted)">one bad store never ends the run for the other 241.</text>
+  </svg>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">Settings that matter</h3>
+      <table class="kv">
+        <tr><td>Output folder</td><td class="mono">…\Shopify_Scraper\Scrapped_Csv_Files</td></tr>
+        <tr><td>Page size</td><td>250 → 100 → 50, one whole pass each<span class="note">Never mid-catalogue: page 5 means different products at each size, so changing part way would skip and repeat</span></td></tr>
+        <tr><td>Max pages</td><td>100 (Shopify refuses page × limit past 25,000 anyway)</td></tr>
+        <tr><td>Between pages</td><td>3,000 ms</td></tr>
+        <tr><td>Between stores</td><td><b>8,000 ms</b><span class="note">The single most important number here — Shopify throttles per IP across the whole platform, not per store</span></td></tr>
+        <tr><td>Tries per page</td><td>6, backing off 5s → 300s</td></tr>
+        <tr><td>Stock columns</td><td>On → 49 columns instead of 47</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">What was measured, not guessed</h3>
+      <p style="font-size:13.8px">All 251 stores were probed once, gently, before this was written — one
+      request each at <code>limit=1</code>, 900 ms apart. <b>234 answered with JSON. Not one returned 429 or
+      500.</b></p>
+      <p style="font-size:13.8px;margin-top:9px">So the 429s and 500s in a live run are caused by the
+      <i>pace</i> of the run, not by the stores — which is what the delays above are for.</p>
+      <p style="font-size:13.8px;margin-top:9px">The other 17 will never answer at any pace, and are told
+      apart on purpose so they are not retried for nothing:</p>
+      <table class="kv">
+        <tr><td>403 firewall</td><td>astrthelabel.com, and limestore's ae/sa/bh/om/kw/qa fronts</td></tr>
+        <tr><td>202 bot page</td><td>8 <code>ae.*</code> storefronts</td></tr>
+        <tr><td>200 + HTML</td><td>madkicks.com, ar.thegivingmovement.com</td></tr>
+      </table>
+      <div class="warn" style="margin-bottom:0"><b>The CSV is a reproduction.</b> The 49 columns, their order,
+      the quoting, the LF endings with no BOM and no trailing newline — all read out of shopify-scraper.com's
+      own bundle so the file is byte-identical to the one the site exports. That is why Phase 2 could switch
+      to this without changing a line of its parser.</div>
+    </div>
+  </div>
+
+  <!-- ─── BOT 2 ─── -->
+  <h3 class="bot">Bot 2 · <span class="mono">Bot_2_BrandSearch</span> <span class="tg">06:00 AM</span></h3>
+  <p style="font-size:13.8px;color:var(--ink-2);margin-bottom:12px">Finds each store's 20 best sellers, then
+  goes back into the CSV Bot 1 already wrote and marks them. Two workflows, one after the other.</p>
+
+  <div class="arch">
+  <svg viewBox="0 0 700 452" width="700" height="452" font-family="-apple-system,Segoe UI,sans-serif">
+    <defs><marker id="b2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7d8b9c"/></marker></defs>
+
+    <text x="18" y="20" font-size="11.5" font-weight="800" letter-spacing=".05em" fill="var(--muted)">STAGE 1 — 1_Brandsearch_Top_Products.xaml</text>
+    <rect x="14" y="28" width="672" height="176" rx="11" fill="var(--soft)" stroke="var(--line-2)"/>
+
+    <rect x="30" y="44" width="150" height="48" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="105" y="65" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">06:00 AM trigger</text>
+    <text x="105" y="80" text-anchor="middle" font-size="10" fill="var(--muted)">then read Sheet1</text>
+
+    <rect x="204" y="44" width="190" height="48" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="299" y="63" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">Chrome on port 9222</text>
+    <text x="216" y="79" font-size="10" fill="var(--muted)">its own profile, signed in, kept apart</text>
+
+    <rect x="418" y="44" width="252" height="48" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="434" y="63" font-size="11.5" font-weight="700" fill="var(--ink)">app.brandsearch.co/brand-analysis/</text>
+    <text x="434" y="79" font-size="10" fill="var(--muted)">&lt;store&gt;?brandTab=bestsellers</text>
+
+    <path d="M182 68 L200 68" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b2)"/>
+    <path d="M396 68 L414 68" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b2)"/>
+
+    <rect x="204" y="106" width="466" height="46" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="220" y="125" font-size="11.5" font-weight="700" fill="var(--ink)">a JavaScript reads the grid over the DevTools protocol</text>
+    <text x="220" y="141" font-size="10" fill="var(--muted)">waits for the cards, scrolls until it has 20, returns rank + name + handle · 2 attempts, fresh tab each time</text>
+
+    <path d="M544 94 L544 102" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b2)"/>
+
+    <rect x="204" y="162" width="466" height="30" rx="8" fill="var(--amber-soft)" stroke="var(--amber)"/>
+    <text x="220" y="182" font-size="11" fill="var(--ink)">→ tab <tspan font-weight="700">BrandSearch_Scraping</tspan> · Store_ID · Store_Url · Product_Name · Product_Handle</text>
+    <path d="M437 154 L437 158" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b2)"/>
+
+    <text x="30" y="126" font-size="10.5" fill="var(--muted)">Failure is</text>
+    <text x="30" y="140" font-size="10.5" fill="var(--muted)">returned as a</text>
+    <text x="30" y="154" font-size="10.5" fill="var(--muted)">value, never</text>
+    <text x="30" y="168" font-size="10.5" fill="var(--muted)">thrown — so</text>
+    <text x="30" y="182" font-size="10.5" fill="var(--muted)">the reason</text>
+    <text x="30" y="196" font-size="10.5" fill="var(--muted)">survives.</text>
+
+    <path d="M350 208 L350 226" stroke="#7d8b9c" stroke-width="1.6" marker-end="url(#b2)"/>
+
+    <text x="18" y="248" font-size="11.5" font-weight="800" letter-spacing=".05em" fill="var(--muted)">STAGE 2 — 2_Handle_Matching.xaml</text>
+    <rect x="14" y="256" width="672" height="180" rx="11" fill="var(--soft)" stroke="var(--line-2)"/>
+
+    <rect x="30" y="274" width="196" height="52" rx="9" fill="var(--amber-soft)" stroke="var(--amber)"/>
+    <text x="128" y="294" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--amber)">read the handles back</text>
+    <text x="128" y="310" text-anchor="middle" font-size="10" fill="var(--muted)">~20 per store · 3 tries, 20s apart</text>
+
+    <rect x="252" y="274" width="196" height="52" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="350" y="294" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">open that store's CSV</text>
+    <text x="350" y="310" text-anchor="middle" font-size="10" fill="var(--muted)">the one Bot 1 wrote at midnight</text>
+
+    <rect x="474" y="274" width="196" height="52" rx="9" fill="var(--green-soft)" stroke="var(--green)"/>
+    <text x="572" y="291" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--green)">append a column</text>
+    <text x="572" y="306" text-anchor="middle" font-size="10" fill="var(--muted)">"Top 20 Selling Product"</text>
+    <text x="572" y="319" text-anchor="middle" font-size="10" fill="var(--muted)">= "Yes" on the matching row</text>
+
+    <path d="M228 300 L248 300" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b2)"/>
+    <path d="M450 300 L470 300" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b2)"/>
+
+    <rect x="30" y="340" width="640" height="42" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="46" y="358" font-size="11" font-weight="700" fill="var(--ink)">Only the FIRST row with that handle is marked.</text>
+    <text x="46" y="374" font-size="10.5" fill="var(--muted)">The later rows are the same product's sizes and colours — marking them all would count one best seller many times.</text>
+
+    <rect x="30" y="392" width="640" height="30" rx="8" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="46" y="411" font-size="10.5" fill="var(--muted)">A missing handle is reported and skipped · one bad store is counted and the loop carries on · summary email at the end</text>
+  </svg>
+  </div>
+
+  <div class="warn"><b>Why the handle and not the name.</b> Product names repeat heavily — 45 different products
+  on one store are all called "RTS | SHIRT". The handle (the part of the URL after <code>/products/</code>) is
+  the only thing that actually identifies a product, so that is what is matched on. It is also the same key
+  Phase 2's <code>products.handle</code> column uses, which is why the two halves line up at all.</div>
+
+  <!-- ─── BOT 3 ─── -->
+  <h3 class="bot">Bot 3 · <span class="mono">Bot_3_CsvUploader</span> <span class="tg">08:00 AM</span></h3>
+  <p style="font-size:13.8px;color:var(--ink-2);margin-bottom:12px">The closer. It checks the other two
+  actually finished before it files anything — and if they did not, it restarts them instead of uploading a
+  half-made day.</p>
+
+  <div class="arch">
+  <svg viewBox="0 0 700 440" width="700" height="440" font-family="-apple-system,Segoe UI,sans-serif">
+    <defs><marker id="b3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7d8b9c"/></marker>
+      <marker id="b3g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#3f8f5f"/></marker></defs>
+
+    <rect x="256" y="14" width="188" height="46" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="350" y="34" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">08:00 AM trigger</text>
+    <text x="350" y="49" text-anchor="middle" font-size="10" fill="var(--muted)">read Sheet1</text>
+
+    <path d="M350 62 L350 76" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b3)"/>
+
+    <path d="M350 80 L500 118 L350 156 L200 118 Z" fill="var(--blue-soft)" stroke="var(--blue)" stroke-width="1.5"/>
+    <text x="350" y="113" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--blue)">any row still Fail —</text>
+    <text x="350" y="128" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--blue)">in either bot's column?</text>
+
+    <rect x="18" y="94" width="172" height="70" rx="9" fill="var(--amber-soft)" stroke="var(--amber)"/>
+    <text x="34" y="114" font-size="11.5" font-weight="700" fill="var(--amber)">YES — start that bot</text>
+    <text x="34" y="131" font-size="10" fill="var(--muted)">Start Job on Orchestrator:</text>
+    <text x="34" y="144" font-size="10" font-family="ui-monospace,Consolas,monospace" fill="var(--ink-2)">Bot_1_CsvScraper</text>
+    <text x="34" y="157" font-size="10" font-family="ui-monospace,Consolas,monospace" fill="var(--ink-2)">Bot_2_BrandSearch</text>
+
+    <path d="M200 118 L194 118" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b3)"/>
+
+    <rect x="18" y="176" width="172" height="46" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="34" y="194" font-size="11" font-weight="700" fill="var(--ink)">queue itself for later</text>
+    <text x="34" y="210" font-size="10" fill="var(--muted)">and upload nothing this time</text>
+    <path d="M104 166 L104 172" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b3)"/>
+
+    <path d="M500 118 L540 118 L540 150" stroke="#3f8f5f" stroke-width="1.6" fill="none" marker-end="url(#b3g)"/>
+    <text x="512" y="112" font-size="10.5" font-weight="700" fill="var(--green)">NO</text>
+
+    <rect x="240" y="156" width="440" height="252" rx="12" fill="var(--soft)" stroke="var(--line-2)"/>
+    <text x="256" y="176" font-size="11.5" font-weight="800" letter-spacing=".05em" fill="var(--muted)">EVERYTHING IS DONE — FILE THE DAY</text>
+
+    <rect x="256" y="186" width="408" height="42" rx="8" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="272" y="204" font-size="11" font-weight="700" fill="var(--ink)">create C:\CSV_Data\&lt;today +9h&gt;</text>
+    <text x="272" y="219" font-size="10" fill="var(--muted)">and move every CSV out of the working folder into it</text>
+
+    <rect x="256" y="238" width="408" height="42" rx="8" fill="var(--green-soft)" stroke="var(--green)"/>
+    <text x="272" y="256" font-size="11" font-weight="700" fill="var(--green)">upload that folder to Google Drive</text>
+    <text x="272" y="271" font-size="10" fill="var(--muted)">a new subfolder named for the date, inside the CSV parent folder</text>
+
+    <rect x="256" y="290" width="408" height="42" rx="8" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="272" y="308" font-size="11" font-weight="700" fill="var(--ink)">upload both robots' daily logs</text>
+    <text x="272" y="323" font-size="10" fill="var(--muted)">to a second Drive folder, so a bad day can be read after the fact</text>
+
+    <rect x="256" y="342" width="408" height="42" rx="8" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="272" y="360" font-size="11" font-weight="700" fill="var(--ink)">Clear-RecycleBin</text>
+    <text x="272" y="375" font-size="10" fill="var(--muted)">the VM has a small disk and a day is ~2.5 GB</text>
+
+    <path d="M460 230 L460 234" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b3)"/>
+    <path d="M460 282 L460 286" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b3)"/>
+    <path d="M460 334 L460 338" stroke="#7d8b9c" stroke-width="1.5" marker-end="url(#b3)"/>
+
+    <text x="18" y="250" font-size="10.5" fill="var(--muted)">Bot 3 is the only</text>
+    <text x="18" y="264" font-size="10.5" fill="var(--muted)">one that decides</text>
+    <text x="18" y="278" font-size="10.5" fill="var(--muted)">a day is finished.</text>
+    <text x="18" y="298" font-size="10.5" fill="var(--muted)">If it uploads, the</text>
+    <text x="18" y="312" font-size="10.5" fill="var(--muted)">day is complete.</text>
+    <text x="18" y="326" font-size="10.5" fill="var(--muted)">If it does not,</text>
+    <text x="18" y="340" font-size="10.5" fill="var(--muted)">nothing is on</text>
+    <text x="18" y="354" font-size="10.5" fill="var(--muted)">Drive to mislead</text>
+    <text x="18" y="368" font-size="10.5" fill="var(--muted)">Phase 2.</text>
+  </svg>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">Where things live on the VM</h3>
+      <table class="kv">
+        <tr><td>Working CSVs</td><td class="mono">…\UiPath\Shopify_Scraper\Scrapped_Csv_Files</td></tr>
+        <tr><td>Filed by date</td><td class="mono">C:\CSV_Data\YYYY-MM-DD</td></tr>
+        <tr><td>Bot 1 log</td><td class="mono">…\Shopify_Scraper\Log_File\DD-MM-YYYY.txt</td></tr>
+        <tr><td>Bot 2 log</td><td class="mono">…\Shopify_BrandSearch_Scraper\Logs\</td></tr>
+        <tr><td>Startup script</td><td class="mono">C:\Users\Administrator\Desktop\jane.bat</td></tr>
+        <tr><td>Chrome profile</td><td>A dedicated one under LocalAppData<span class="note">So ordinary browsing on the VM cannot disturb the robot's signed-in BrandSearch session</span></td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Published to UiPath Cloud</h3>
+      <table class="kv">
+        <tr><td>Account</td><td><b>techbugs86</b></td></tr>
+        <tr><td>Orchestrator folder</td><td><code>ShiftGRit_Automation</code></td></tr>
+        <tr><td>Processes</td><td><code>Bot_1_CsvScraper</code> · <code>Bot_2_BrandSearch</code> · <code>Bot_3_CsvUploader</code></td></tr>
+        <tr><td>Triggers</td><td>12:00 AM · 06:00 AM · 08:00 AM, all daily, priority Inherited</td></tr>
+        <tr><td>Studio</td><td>26.0.191 / 26.0.198, VB expressions, Windows target</td></tr>
+        <tr><td>Key packages</td><td>UiPath.GSuite, UIAutomation, WebAPI, System, Python, FTP</td></tr>
+      </table>
+      <div class="warn" style="margin-bottom:0"><b>+9 hours, everywhere.</b> Every date the robots write —
+      folder names, log names, the sheet's Updated_Date — is <code>Now.AddHours(9)</code>. The VM's clock is
+      not on the working day, so this shifts it. It is also why the Drive folder's <b>name</b> is the only
+      date Phase 2 trusts: the files inside it are stamped the evening before.</div>
+    </div>
+  </div>
+</section>
+
+
 <!-- ═══════════ FLOW ═══════════ -->
-<section id="flow">
-  <div class="sec-h"><span class="sec-n">→</span><h2>How it works, start to finish</h2></div>
-  <p class="sec-d">One night and one page view, step by step. Nothing else happens in this system.</p>
+<section id="phase2">
+  <div class="sec-h"><span class="sec-n ph">P2</span><h2>Phase 2 — Turning it into a tracker</h2></div>
+  <p class="sec-d">From the Drive folder onwards: one night and one page view, step by step. Everything from
+  here down is Phase 2.</p>
 
   <div class="arch">
   <svg viewBox="0 0 700 600" width="700" height="600" font-family="-apple-system,Segoe UI,sans-serif">
@@ -1220,7 +1665,8 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
 <!-- ═══════════ CREDENTIALS ═══════════ -->
 <section id="creds">
   <div class="sec-h"><span class="sec-n">4</span><h2>Credentials &amp; configuration</h2></div>
-  <p class="sec-d">Where every secret lives. No values are written here on purpose — this file goes in the repo.</p>
+  <p class="sec-d">Both phases. Where every secret lives — no values are written here on purpose, because
+  this file goes in the repo.</p>
 
   <div class="warn"><b>Nothing on this page is a secret.</b> Every value below lives in a file or a dashboard
   that is not in git. If you need an actual value, read it from the place named — never copy it into code,
@@ -1260,6 +1706,28 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
     </table>
   </div>
 
+  <h3>Phase 1 — the UiPath side</h3>
+  <div class="card">
+    <table class="kv">
+      <tr><td>The VM</td><td><code class="mono">149.104.69.201</code> over RDP, user <code>Administrator</code>
+        <span class="note">Password is <b>not written here</b> — see the note below. Everything the robots
+        write lives under this account's profile</span></td></tr>
+      <tr><td>UiPath Cloud</td><td>Account <b>techbugs86</b>, Orchestrator folder <code>ShiftGRit_Automation</code>
+        <span class="note">Holds the three published processes and their triggers. Bot 3 also starts jobs
+        through this, so a robot removed from the folder silently stops the recovery path</span></td></tr>
+      <tr><td>Google account</td><td><code>techbugs86@gmail.com</code><span class="note">The same account owns the sheet, the Drive folders and the robots' Gmail connection</span></td></tr>
+      <tr><td>The sheet</td><td><b>Shopify_Scraper</b><span class="note mono">1kLdowNERzLeI9jyfKW8-4URfsS1w0vupICOWkBANucQ</span><span class="note">Bot 2's stage 2 reads it over Google's public CSV export, so it must stay shared "anyone with the link — Viewer"</span></td></tr>
+      <tr><td>Drive · CSVs</td><td class="mono">18pys1Pn4EHeycwWWvtj5StiqqFQTYTEs<span class="note">Bot 3 creates the dated subfolder in here. This is the folder Phase 2 reads</span></td></tr>
+      <tr><td>Drive · logs</td><td class="mono">1-1BvKm4MQ_aUv56fCVbqJBUMmYLPuIo4</td></tr>
+      <tr><td>BrandSearch</td><td>A signed-in session on <code>app.brandsearch.co</code>, held in a Chrome profile of its own on the VM<span class="note">If that session expires Bot 2 reports "not signed in" for every store — sign in once on the VM using that profile</span></td></tr>
+      <tr><td>Alert email</td><td><code>techbugs86@gmail.com</code>, <code>ayankhan343536@gmail.com</code></td></tr>
+    </table>
+    <div class="warn" style="margin-bottom:0"><b>The VM password is deliberately not in this file.</b> This
+    page lives in the git repo, and a password written here would be copied into every clone and every
+    future export of it. It belongs in the team's password store; ask whoever hands the project over. The
+    same rule applies to every value in this section — names and locations here, secrets there.</div>
+  </div>
+
   <div class="warn"><b>If the dashboard is empty but the pages load</b>, this is nearly always the token: the
   server's <code>API_TOKEN</code> and Vercel's <code>TRACKER_API_TOKEN</code> no longer match. Everything else
   works; the doorman is simply being turned away.</div>
@@ -1269,6 +1737,21 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
 <section id="run">
   <div class="sec-h"><span class="sec-n">5</span><h2>Running it day to day</h2></div>
   <p class="sec-d">It runs itself. These are for when it comes back short.</p>
+
+  <div class="card">
+    <h3 style="margin-top:0">When a day's Drive folder never appeared — that is Phase 1</h3>
+    <p style="font-size:13.8px">Phase 2 can only read what Bot 3 uploaded. If the folder is missing or short,
+    nothing on the server will fix it; go to the sheet first.</p>
+    <table class="kv">
+      <tr><td>1 · open Sheet1</td><td>Any row with <code>Fail</code> or a blank in <b>Robot_Status</b> is a store Bot 1 never got. Column H says why</td></tr>
+      <tr><td>2 · check column G</td><td>Same for <b>Brand_Search_Bot_Status</b> and Bot 2</td></tr>
+      <tr><td>3 · rerun</td><td>Start <code>Bot_1_CsvScraper</code> from Orchestrator. It picks up exactly those rows — finished stores are not redone</td></tr>
+      <tr><td>4 · then Bot 3</td><td>It refuses to upload while anything is still <code>Fail</code>, so run it only once the sheet is clean</td></tr>
+      <tr><td>if it looks stuck</td><td>RDP into the VM and read <code>…\Shopify_Scraper\Log_File\DD-MM-YYYY.txt</code></td></tr>
+    </table>
+    <div class="warn" style="margin-bottom:0"><b>Nothing needs to be reset between runs.</b> The queue is
+    "Fail or empty", so an interrupted night simply resumes where it stopped.</div>
+  </div>
 
   <div class="card">
     <h3 style="margin-top:0">It already happens</h3>
@@ -1359,11 +1842,19 @@ node scripts/build-vercel-site.mjs   <i>then commit vercel-site/ and push</i></p
 </section>
 
 <footer>
-  <p><b>Repo</b> · <code>techbugs86/Shopify_Stores_Scraper</code> — the deeper documents live in
-  <code>tracker/</code>: <b>README.md</b> (what it is), <b>INGEST.md</b> (the two commands in full),
-  <b>DEPLOY.md</b> (server and Vercel), <b>DRIVE.md</b> (Google credentials), <b>N8N.md</b>.</p>
-  <p style="margin-top:8px">Every number on this page — row counts, table sizes, column names, route list —
-  was read from the running system on 9 September 2026, not copied from memory.</p>
+  <p><b>Phase 1 sources</b> · <code>UiPath_Side_Scraping/Shopify_Scraper_UiPath_Bots.zip</code> — three UiPath
+  Studio projects: <code>Shopify_Scraper</code>, <code>Shopify_BrandSearch_Scraper</code>,
+  <code>Shopify_Scraper_Drive_Uploader</code>. Open them in Studio 26 or later. The workflows carry their own
+  notes on the canvas; most of Phase 1 above was read out of those.</p>
+  <p style="margin-top:8px"><b>Phase 2 sources</b> · <code>techbugs86/Shopify_Stores_Scraper</code> — the
+  deeper documents live in <code>tracker/</code>: <b>README.md</b> (what it is), <b>INGEST.md</b> (the two
+  commands in full), <b>DEPLOY.md</b> (server and Vercel), <b>DRIVE.md</b> (Google credentials),
+  <b>N8N.md</b>.</p>
+  <p style="margin-top:8px"><b>The actual secret values</b> are in <code>CREDENTIALS.local.md</code> beside
+  this file. It is gitignored on purpose and does not travel with the repo — ask for it directly.</p>
+  <p style="margin-top:8px">Every number on this page — row counts, table sizes, column names, route list,
+  bot settings — was read from the running system or the workflow files on 9 September 2026, not copied from
+  memory.</p>
 </footer>
 
 </div>
