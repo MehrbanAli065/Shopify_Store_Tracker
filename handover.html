@@ -136,7 +136,7 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
     <div class="meta">
       <span class="pill">Phase 1 · 3 UiPath robots</span>
       <span class="pill">Phase 2 · API + database + site</span>
-      <span class="pill">242 stores</span>
+      <span class="pill">242 stores today — the list grows</span>
       <span class="pill">10.9M history rows</span>
       <span class="pill">8.2 GB database</span>
       <span class="pill">Runs itself, every night</span>
@@ -154,8 +154,10 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
   <li><a href="#backend">2 · Backend</a></li>
   <li><a href="#db">3 · Database</a></li>
   <li><a href="#creds">4 · Credentials</a></li>
-  <li><a href="#run">5 · Daily use</a></li>
-  <li><a href="#gotchas">6 · Gotchas</a></li>
+  <li><a href="#deploy">5 · Deployment</a></li>
+  <li><a href="#run">6 · Daily use</a></li>
+  <li><a href="#gotchas">7 · Gotchas</a></li>
+  <li><a href="#whole">The whole thing</a></li>
 </ul></nav>
 
 <div class="wrap">
@@ -164,7 +166,8 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
 <section id="what">
   <div class="sec-h"><span class="sec-n">?</span><h2>What it does</h2></div>
   <div class="card">
-    <p>242 Shopify stores are watched every night, and the system records <b>what changed</b>: a price moved,
+    <p>Every Shopify store on the list is watched each night — <b>242 of them today</b> — and the system
+    records <b>what changed</b>: a price moved,
     a variant sold out, a product left the store, a product came back. The result is a dashboard where you can
     pick any store, any product, any variant, and read its whole price and stock history day by day.</p>
     <p style="margin-top:10px">It is built in <b>two halves that meet in exactly one place</b> — a folder of
@@ -176,7 +179,7 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
       <h3 style="margin-top:0;color:var(--blue)">Phase 1 — collecting it</h3>
       <p style="font-size:13.8px">Three UiPath robots on a Windows VM, coordinating through one Google Sheet.
       They ask every store for its own product feed, find each store's 20 best sellers, and file the day's
-      ~240 CSVs into a dated Drive folder.</p>
+      day’s CSVs into a dated Drive folder.</p>
       <p style="font-size:13.4px;color:var(--muted);margin-top:9px">UiPath Studio · Google Sheets · Chrome ·
       Google Drive. It knows nothing about the database.</p>
     </div>
@@ -198,7 +201,7 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
   database or the website.</p>
 
   <div class="card">
-    <p>Phase 1 answers one question: <b>where do 242 CSV files come from every night?</b> Three robots run in
+    <p>Phase 1 answers one question: <b>where does a folder of CSVs come from every night?</b> Three robots run in
     turn on a rented Windows machine, coordinating through a single Google Sheet, and finish by putting the
     day's folder on Google Drive. Phase 2 picks it up from there and never looks back.</p>
     <p style="margin-top:10px">Each robot is published to the <b>techbugs86</b> UiPath Cloud account, in the
@@ -245,7 +248,7 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
     <text x="577" y="84" text-anchor="middle" font-size="13" font-weight="700" fill="var(--amber)">Google Sheet</text>
     <text x="577" y="100" text-anchor="middle" font-size="10.5" fill="var(--muted)">"Shopify_Scraper"</text>
     <line x1="486" y1="110" x2="668" y2="110" stroke="var(--amber)" stroke-opacity=".4"/>
-    <text x="486" y="126" font-size="10.5" fill="var(--ink-2)">the store list — 242 rows</text>
+    <text x="486" y="126" font-size="10.5" fill="var(--ink-2)">the store list — one row per store</text>
     <text x="486" y="142" font-size="10.5" fill="var(--ink-2)">the queue — who still needs doing</text>
     <text x="486" y="158" font-size="10.5" fill="var(--ink-2)">the result — pass / fail per store</text>
     <text x="486" y="174" font-size="10.5" fill="var(--ink-2)">the top-20 handles per store</text>
@@ -269,7 +272,7 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
     <!-- handoff -->
     <rect x="16" y="374" width="668" height="80" rx="11" fill="var(--soft)" stroke="var(--line-2)" stroke-dasharray="5 4"/>
     <text x="32" y="398" font-size="12.5" font-weight="800" letter-spacing=".06em" fill="var(--muted)">THE HANDOVER TO PHASE 2</text>
-    <text x="32" y="418" font-size="11.5" fill="var(--ink)">A dated Drive folder holding ~240 CSVs. That is the entire contract between the two phases.</text>
+    <text x="32" y="418" font-size="11.5" fill="var(--ink)">A dated Drive folder holding one CSV per store. That is the entire contract between the two phases.</text>
     <text x="32" y="437" font-size="11" fill="var(--muted)">Phase 2 never touches UiPath, the sheet or the VM — it only reads that folder. Either half can be rebuilt without the other.</text>
 
     <path d="M577 306 L577 340 L350 340 L350 370" stroke="#7d8b9c" stroke-width="1.6" fill="none" marker-end="url(#p1)"/>
@@ -286,7 +289,7 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
     </table>
     <h3>Sheet1 — the store list and the queue</h3>
     <table class="kv">
-      <tr><td>A · Store_ID</td><td>1–242. The same id Phase 2's <code>stores</code> table uses</td></tr>
+      <tr><td>A · Store_ID</td><td>The store's number — the same id Phase 2's <code>stores</code> table uses<span class="note">Numbered from 1; 242 rows today. A new store is a new row here, and nothing else has to change</span></td></tr>
       <tr><td>B · Store_Url</td><td>The domain, in whatever shape it was typed — the bots normalise it</td></tr>
       <tr><td>C · Status</td><td>What happened to this store on the last run</td></tr>
       <tr><td>D · Updated_Date</td><td>When, shifted +9 hours to the VM's working day</td></tr>
@@ -301,6 +304,11 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
       <tr><td>Error Logging</td><td>Store_ID · Store_Url · Status · Updated_Date · Failed_Reason</td></tr>
       <tr><td><code>CsvData_YYYY-MM-DD</code><br><code>BrandSearch_YYYY-MM-DD</code></td><td>Yesterday's two tabs, copied aside before the working tabs are cleared for the new day</td></tr>
     </table>
+    <div class="good"><b>Adding a store is one row.</b> Put its URL in a new Sheet1 row with the next
+    Store_ID and leave the status columns blank — blank means "still to do", so Bot 1 picks it up on its next
+    run and Bot 2 follows. Nothing on the VM, in Orchestrator or on the server needs changing. Phase 2 learns
+    about it from the CSV that then appears. <b>242 is simply today's count, not a limit.</b></div>
+
     <div class="warn" style="margin-bottom:0"><b>Why "Fail or empty" is the queue.</b> A blank cell is a store
     that has never been done today; <code>Fail</code> is one that was tried and did not work. Both need doing,
     so both filter the same way, and a run that is interrupted simply resumes — nothing has to remember where
@@ -399,16 +407,16 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
         <tr><td>Page size</td><td>250 → 100 → 50, one whole pass each<span class="note">Never mid-catalogue: page 5 means different products at each size, so changing part way would skip and repeat</span></td></tr>
         <tr><td>Max pages</td><td>100 (Shopify refuses page × limit past 25,000 anyway)</td></tr>
         <tr><td>Between pages</td><td>3,000 ms</td></tr>
-        <tr><td>Between stores</td><td><b>8,000 ms</b><span class="note">The single most important number here — Shopify throttles per IP across the whole platform, not per store</span></td></tr>
+        <tr><td>Between stores</td><td><b>8,000 ms</b><span class="note">The single most important number here, and it matters more as the list grows — Shopify throttles per IP across the whole platform, not per store</span></td></tr>
         <tr><td>Tries per page</td><td>6, backing off 5s → 300s</td></tr>
         <tr><td>Stock columns</td><td>On → 49 columns instead of 47</td></tr>
       </table>
     </div>
     <div class="card">
       <h3 style="margin-top:0">What was measured, not guessed</h3>
-      <p style="font-size:13.8px">All 251 stores were probed once, gently, before this was written — one
-      request each at <code>limit=1</code>, 900 ms apart. <b>234 answered with JSON. Not one returned 429 or
-      500.</b></p>
+      <p style="font-size:13.8px">Every store on the list was probed once, gently, before this was written — one
+      request each at <code>limit=1</code>, 900 ms apart. Of the 251 on it that day, <b>234 answered with JSON,
+      and not one returned 429 or 500.</b></p>
       <p style="font-size:13.8px;margin-top:9px">So the 429s and 500s in a live run are caused by the
       <i>pace</i> of the run, not by the stores — which is what the delays above are for.</p>
       <p style="font-size:13.8px;margin-top:9px">The other 17 will never answer at any pace, and are told
@@ -637,7 +645,7 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
     <rect x="22" y="44" width="200" height="66" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
     <circle cx="40" cy="62" r="10" fill="var(--blue)"/><text x="40" y="66" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">1</text>
     <text x="58" y="66" font-size="12.5" font-weight="700" fill="var(--ink)">The scraper runs</text>
-    <text x="34" y="85" font-size="10.5" fill="var(--muted)">242 shops → one CSV each,</text>
+    <text x="34" y="85" font-size="10.5" fill="var(--muted)">every shop on the list → one CSV,</text>
     <text x="34" y="99" font-size="10.5" fill="var(--muted)">about 2.5 GB in total</text>
 
     <rect x="250" y="44" width="200" height="66" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
@@ -860,7 +868,7 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
       <tr><td><code>history.html</code></td><td>Scrape-run history for one store — which days ran, which failed</td></tr>
       <tr><td><code>print.html</code></td><td>Print/PDF version of a report</td></tr>
       <tr><td><code>app.css</code></td><td>One stylesheet, 42 KB, light and dark themes</td></tr>
-      <tr><td><code>logos/</code> + <code>logos.json</code></td><td>225 store logos, fetched once and held locally so pages never call 242 shops</td></tr>
+      <tr><td><code>logos/</code> + <code>logos.json</code></td><td>One logo per store, fetched once and held locally so a page never calls every shop</td></tr>
     </table>
   </div>
 
@@ -978,7 +986,7 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
 
     <rect x="270" y="14" width="160" height="44" rx="8" fill="var(--blue-soft)" stroke="var(--blue)" stroke-width="1.6"/>
     <text x="350" y="34" text-anchor="middle" font-size="13" font-weight="700" fill="var(--blue)">stores</text>
-    <text x="350" y="49" text-anchor="middle" font-size="10" fill="var(--muted)">242 — the registry</text>
+    <text x="350" y="49" text-anchor="middle" font-size="10" fill="var(--muted)">242 today — the registry</text>
 
     <rect x="270" y="96" width="160" height="44" rx="8" fill="var(--paper)" stroke="var(--line-2)" stroke-width="1.4"/>
     <text x="350" y="116" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">products</text>
@@ -1734,8 +1742,172 @@ footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:v
 </section>
 
 <!-- ═══════════ DAILY USE ═══════════ -->
+<!-- ═══════════ DEPLOYMENT ═══════════ -->
+<section id="deploy">
+  <div class="sec-h"><span class="sec-n">5</span><h2>Deployment — what lives where</h2></div>
+  <p class="sec-d">Four places, four different ways of getting there. Every path on this page is the real one.</p>
+
+  <div class="card">
+    <p>Nothing here deploys as one unit. The robots are published from Studio, the API is copied over ssh, the
+    pages go out on a git push, and the database never moves at all. This section says which is which, so a
+    change lands where it was meant to.</p>
+  </div>
+
+  <h3>The map</h3>
+  <div class="arch">
+  <svg viewBox="0 0 700 380" width="700" height="380" font-family="-apple-system,Segoe UI,sans-serif">
+    <defs><marker id="dp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7d8b9c"/></marker></defs>
+
+    <!-- dev machine -->
+    <rect x="16" y="90" width="184" height="196" rx="11" fill="var(--paper)" stroke="var(--line-2)" stroke-width="1.6"/>
+    <text x="32" y="112" font-size="12" font-weight="800" letter-spacing=".05em" fill="var(--muted)">YOUR MACHINE</text>
+    <text x="32" y="130" font-size="10" font-family="ui-monospace,Consolas,monospace" fill="var(--ink-2)">E:\Company_Projects\</text>
+    <text x="32" y="143" font-size="10" font-family="ui-monospace,Consolas,monospace" fill="var(--ink-2)">Shopify_Stores\</text>
+    <line x1="32" y1="154" x2="184" y2="154" stroke="var(--line)"/>
+    <text x="32" y="171" font-size="10.5" fill="var(--ink-2)">tracker/ — all the code</text>
+    <text x="32" y="187" font-size="10.5" fill="var(--ink-2)">UiPath_Side_Scraping/</text>
+    <text x="32" y="200" font-size="10.5" fill="var(--ink-2)">— the bot projects</text>
+    <text x="32" y="220" font-size="10.5" fill="var(--muted)">git remote:</text>
+    <text x="32" y="233" font-size="10" fill="var(--muted)">techbugs86/</text>
+    <text x="32" y="245" font-size="10" fill="var(--muted)">Shopify_Stores_Scraper</text>
+    <text x="32" y="266" font-size="10.5" fill="var(--faint)">nothing runs here</text>
+    <text x="32" y="278" font-size="10.5" fill="var(--faint)">in production</text>
+
+    <!-- targets -->
+    <rect x="272" y="20" width="410" height="76" rx="10" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="288" y="40" font-size="12" font-weight="700" fill="var(--ink)">① UiPath Cloud + the Windows VM</text>
+    <text x="288" y="57" font-size="10.5" fill="var(--muted)">techbugs86 → folder ShiftGRit_Automation → 149.104.69.201</text>
+    <text x="288" y="72" font-size="10.5" fill="var(--muted)">the three robots and their triggers</text>
+    <text x="288" y="88" font-size="10" font-weight="700" fill="var(--blue)">deployed by: Publish from UiPath Studio</text>
+
+    <rect x="272" y="108" width="410" height="76" rx="10" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="288" y="128" font-size="12" font-weight="700" fill="var(--ink)">② The server — API and ingest</text>
+    <text x="288" y="145" font-size="10.5" font-family="ui-monospace,Consolas,monospace" fill="var(--muted)">66.45.238.72:/home/mehrban/shopify-store-tracker/tracker</text>
+    <text x="288" y="160" font-size="10.5" fill="var(--muted)">pm2 app "tracker" on port 3200 · cron at 06:00 UTC</text>
+    <text x="288" y="176" font-size="10" font-weight="700" fill="var(--blue)">deployed by: tar over ssh, then pm2 restart</text>
+
+    <rect x="272" y="196" width="410" height="76" rx="10" fill="var(--green-soft)" stroke="var(--green)"/>
+    <text x="288" y="216" font-size="12" font-weight="700" fill="var(--green)">③ PostgreSQL</text>
+    <text x="288" y="233" font-size="10.5" font-family="ui-monospace,Consolas,monospace" fill="var(--muted)">the same box · /var/lib/postgresql · 127.0.0.1:5432</text>
+    <text x="288" y="248" font-size="10.5" fill="var(--muted)">8.2 GB · backed up nightly to ~/backups</text>
+    <text x="288" y="264" font-size="10" font-weight="700" fill="var(--green)">deployed by: nothing. It is never redeployed, only migrated</text>
+
+    <rect x="272" y="284" width="410" height="76" rx="10" fill="var(--paper)" stroke="var(--blue)" stroke-width="1.5"/>
+    <text x="288" y="304" font-size="12" font-weight="700" fill="var(--blue)">④ Vercel — the pages and the proxy</text>
+    <text x="288" y="321" font-size="10.5" fill="var(--muted)">project shopify-tracker-web · root dir tracker/vercel-site</text>
+    <text x="288" y="336" font-size="10.5" fill="var(--muted)">shopify-tracker-web.vercel.app</text>
+    <text x="288" y="352" font-size="10" font-weight="700" fill="var(--blue)">deployed by: git push to main</text>
+
+    <path d="M204 150 L268 58" stroke="#7d8b9c" stroke-width="1.4" fill="none" marker-end="url(#dp)"/>
+    <path d="M204 172 L268 146" stroke="#7d8b9c" stroke-width="1.4" fill="none" marker-end="url(#dp)"/>
+    <path d="M204 200 L268 322" stroke="#7d8b9c" stroke-width="1.4" fill="none" marker-end="url(#dp)"/>
+    <path d="M462 184 L462 192" stroke="#7d8b9c" stroke-width="1.4" marker-end="url(#dp)"/>
+  </svg>
+  </div>
+  <p style="font-size:13px;color:var(--muted);margin-top:8px">The database has no arrow from your machine on
+  purpose — code is deployed to it, data never is.</p>
+
+  <h3>Every path, in one table</h3>
+  <div class="card">
+    <table class="kv">
+      <tr><td>Source of truth</td><td class="mono">E:\Company_Projects\Shopify_Stores\<span class="note">GitHub <code>techbugs86/Shopify_Stores_Scraper</code>, branch <code>main</code></span></td></tr>
+      <tr><td>Bot projects</td><td class="mono">…\UiPath_Side_Scraping\Shopify_Scraper_UiPath_Bots.zip</td></tr>
+      <tr><td>Robots run at</td><td class="mono">149.104.69.201 → C:\Users\Administrator\Documents\UiPath\</td></tr>
+      <tr><td>Robot output</td><td class="mono">…\Shopify_Scraper\Scrapped_Csv_Files → C:\CSV_Data\YYYY-MM-DD</td></tr>
+      <tr><td>API + ingest</td><td class="mono">66.45.238.72 → /home/mehrban/shopify-store-tracker/tracker</td></tr>
+      <tr><td>Server config</td><td class="mono">…/tracker/.env<span class="note">Mode 600, never in git, never overwritten by a deploy</span></td></tr>
+      <tr><td>Server log</td><td class="mono">/home/mehrban/ingest.log</td></tr>
+      <tr><td>Database files</td><td class="mono">/var/lib/postgresql (Postgres's own — not in the project folder)</td></tr>
+      <tr><td>Backups</td><td class="mono">/home/mehrban/backups<span class="note">Nightly 02:30, seven kept, older pruned by the script</span></td></tr>
+      <tr><td>Pages source</td><td class="mono">tracker/public/</td></tr>
+      <tr><td>Pages deployed</td><td class="mono">tracker/vercel-site/<span class="note">Built from public/ and committed — Vercel deploys what is in the repo</span></td></tr>
+      <tr><td>Vercel root dir</td><td class="mono">tracker/vercel-site<span class="note">Settings → General → Root Directory. Wrong here and every page 404s</span></td></tr>
+      <tr><td>Local CSVs</td><td class="mono">E:\Project CSV\YYYY-MM-DD\<span class="note">Only for <code>ingest:server</code>; override with CSV_BASE</span></td></tr>
+    </table>
+  </div>
+
+  <!-- ① -->
+  <h3 class="bot">① Deploying a robot <span class="tg">UiPath Studio</span></h3>
+  <div class="card">
+    <table class="kv">
+      <tr><td>1 · open</td><td>The project folder in <b>UiPath Studio 26</b> or later (they were built on 26.0.191 / 26.0.198)</td></tr>
+      <tr><td>2 · publish</td><td>Publish → to <b>Orchestrator</b>, tenant <code>techbugs86</code>, folder <code>ShiftGRit_Automation</code></td></tr>
+      <tr><td>3 · point the process</td><td>Orchestrator → Automations → the process → set it to the new package version<span class="note">Publishing alone changes nothing — a process stays on the version it was pinned to</span></td></tr>
+      <tr><td>4 · check the trigger</td><td>Triggers must remain 12:00 AM / 06:00 AM / 08:00 AM, daily</td></tr>
+      <tr><td>verify</td><td>Run the process once by hand and watch Sheet1's status columns fill in</td></tr>
+    </table>
+    <div class="warn" style="margin-bottom:0"><b>Names are load-bearing.</b> Bot 3 starts the other two by
+    name — <code>Bot_1_CsvScraper</code> and <code>Bot_2_BrandSearch</code>, in folder
+    <code>ShiftGRit_Automation</code>. Rename a process or move it to another folder and the nightly recovery
+    path stops working silently: Bot 3 will simply never restart anything.</div>
+  </div>
+
+  <!-- ② -->
+  <h3 class="bot">② Deploying the API and the ingest scripts <span class="tg">tar over ssh</span></h3>
+  <div class="card">
+    <p style="font-size:13.8px">Run from <code>tracker/</code> on your machine. One command: it copies, installs
+    and restarts.</p>
+    <pre>tar czf - --exclude=node_modules --exclude=.env --exclude=vercel-site \
+    app.mjs server.mjs package.json package-lock.json lib db scripts public api \
+  | ssh -i ~/.ssh/tracker_deploy mehrban@66.45.238.72 \
+      'tar xzf - -C ~/shopify-store-tracker/tracker && cd ~/shopify-store-tracker/tracker \
+       && npm install --omit=dev && pm2 restart tracker --update-env'</pre>
+    <table class="kv">
+      <tr><td>What is excluded</td><td><code>node_modules</code> (installed on the server), <code>.env</code> (the server's own), <code>vercel-site</code> (that goes to Vercel)</td></tr>
+      <tr><td>Restart</td><td><code>pm2 restart tracker --update-env</code><span class="note">Without <code>--update-env</code> a changed .env is not picked up</span></td></tr>
+      <tr><td>Survives reboot</td><td>Only because of <code>pm2 save</code> — the saved list is what comes back<span class="note">If you ever recreate the pm2 app, run <code>pm2 save</code> again or a reboot loses it</span></td></tr>
+      <tr><td>verify</td><td><code>pm2 status</code>, then <code>curl -H "x-tracker-token: …" localhost:3200/api/stores</code> on the server</td></tr>
+    </table>
+    <h3>Schema changes</h3>
+    <table class="kv">
+      <tr><td>Migrations</td><td><code>npm run migrate</code> — <code>npm run migrate:check</code> first to see what it would do</td></tr>
+      <tr><td>Views</td><td><code>npm run views</code> rebuilds <code>v_change_report</code></td></tr>
+      <tr><td>Search indexes</td><td><code>npm run search:init</code> (pg_trgm)</td></tr>
+    </table>
+    <div class="warn" style="margin-bottom:0"><b>The database is never "deployed".</b> It is 8.2 GB of live
+    history in Postgres's own directory. Code moves to it; it does not move. Before any migration, check the
+    last backup in <code>~/backups</code> is from last night.</div>
+  </div>
+
+  <!-- ③ -->
+  <h3 class="bot">③ Deploying the pages <span class="tg">git push</span></h3>
+  <div class="card">
+    <pre>node scripts/build-vercel-site.mjs      <i># public/ → vercel-site/, stamps the CSS hash</i>
+git add tracker/vercel-site
+git commit -m "…"
+git push origin main                   <i># Vercel builds within a minute</i></pre>
+    <table class="kv">
+      <tr><td>Project</td><td><code>shopify-tracker-web</code><span class="note mono">prj_itnh6lHFvLQcVvz72uDSaSOOdf77</span></td></tr>
+      <tr><td>Live at</td><td><a href="https://shopify-tracker-web.vercel.app/">shopify-tracker-web.vercel.app</a></td></tr>
+      <tr><td>Root directory</td><td><code>tracker/vercel-site</code></td></tr>
+      <tr><td>Rewrites</td><td><code>/api/*</code> and <code>/reports/*</code> → <code>api/index.mjs</code>, max duration 60s<span class="note">In <code>vercel-site/vercel.json</code> — this is what makes the proxy work</span></td></tr>
+      <tr><td>Env vars</td><td><code>TRACKER_API_ORIGIN</code>, <code>TRACKER_API_TOKEN</code></td></tr>
+      <tr><td>verify</td><td>Open the site, pick a store, confirm rows appear. Empty rows with the page loading = the token</td></tr>
+    </table>
+    <div class="warn" style="margin-bottom:0"><b>Forgetting the build step is the usual mistake.</b>
+    <code>public/</code> is the source but <code>vercel-site/</code> is what deploys, so an edit that is not
+    rebuilt and committed simply never reaches the site — and nothing errors. The build also stamps the
+    stylesheet's content hash into the link, without which browsers hold yesterday's CSS against today's
+    markup.</div>
+  </div>
+
+  <!-- order -->
+  <h3 class="bot">Order, when a change touches more than one</h3>
+  <div class="card">
+    <table class="kv">
+      <tr><td>1 · server first</td><td>The API deploys in about a minute, by hand</td></tr>
+      <tr><td>2 · then push</td><td>Vercel picks it up automatically</td></tr>
+    </table>
+    <div class="warn" style="margin-bottom:0"><b>Never the other way round.</b> The pages go live within a
+    minute of the push; the API only when you run the tar command. Push first and a live page calls a route its
+    server does not have yet — a real 404 in front of whoever is looking at it.</div>
+  </div>
+</section>
+
+
 <section id="run">
-  <div class="sec-h"><span class="sec-n">5</span><h2>Running it day to day</h2></div>
+  <div class="sec-h"><span class="sec-n">6</span><h2>Running it day to day</h2></div>
   <p class="sec-d">It runs itself. These are for when it comes back short.</p>
 
   <div class="card">
@@ -1781,24 +1953,14 @@ node scripts/ingest.mjs --store 3 --date 2026-09-09 --rewind</pre>
 
   <div class="card">
     <h3 style="margin-top:0">Deploying a change</h3>
-    <pre><i># backend / scripts → the server</i>
-tar czf - --exclude=node_modules --exclude=.env --exclude=vercel-site \
-    app.mjs server.mjs package.json package-lock.json lib db scripts public api \
-  | ssh -i ~/.ssh/tracker_deploy mehrban@66.45.238.72 \
-      'tar xzf - -C ~/shopify-store-tracker/tracker && cd ~/shopify-store-tracker/tracker \
-       && npm install --omit=dev && pm2 restart tracker --update-env'
-
-<i># frontend → Vercel</i>
-node scripts/build-vercel-site.mjs   <i>then commit vercel-site/ and push</i></pre>
-    <div class="warn" style="margin-bottom:0"><b>Order matters</b> when a change touches both. The pages deploy
-    in about a minute on push; the API waits for the command above. Push last, or a live page will call a route
-    its server does not have yet.</div>
+    <p style="font-size:13.8px;margin-bottom:0">Its own section — see
+    <a href="#deploy"><b>5 · Deployment</b></a> above for every path and command.</p>
   </div>
 </section>
 
 <!-- ═══════════ GOTCHAS ═══════════ -->
 <section id="gotchas">
-  <div class="sec-h"><span class="sec-n">6</span><h2>Things that will bite you</h2></div>
+  <div class="sec-h"><span class="sec-n">7</span><h2>Things that will bite you</h2></div>
   <p class="sec-d">Every one of these cost real time to find. They are written down so they cost you none.</p>
 
   <div class="card">
@@ -1840,6 +2002,152 @@ node scripts/build-vercel-site.mjs   <i>then commit vercel-site/ and push</i></p
     folder reporting "already done" on a day you know is missing means the date was resolved wrongly.</p>
   </div>
 </section>
+
+<!-- ═══════════ THE WHOLE THING ═══════════ -->
+<section id="whole">
+  <div class="sec-h"><span class="sec-n">∞</span><h2>The whole project, on one page</h2></div>
+  <p class="sec-d">Both phases, end to end — from a shop's own product feed to a chart in someone's browser.
+  If you read only one diagram, read this one.</p>
+
+  <div class="arch">
+  <svg viewBox="0 0 700 712" width="700" height="712" font-family="-apple-system,Segoe UI,sans-serif">
+    <defs>
+      <marker id="w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+        <path d="M0 0 L10 5 L0 10 z" fill="#7d8b9c"/></marker>
+      <marker id="wa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0 0 L10 5 L0 10 z" fill="#c08a3e"/></marker>
+      <marker id="wg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+        <path d="M0 0 L10 5 L0 10 z" fill="#3f8f5f"/></marker>
+    </defs>
+
+    <!-- ═══ sources ═══ -->
+    <rect x="90" y="16" width="340" height="42" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="106" y="35" font-size="11.5" font-weight="700" fill="var(--ink)">The stores themselves</text>
+    <text x="106" y="50" font-size="10" fill="var(--muted)">each shop's own public /products.json — no login, no browser</text>
+
+    <rect x="450" y="16" width="240" height="42" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="466" y="35" font-size="11.5" font-weight="700" fill="var(--ink)">app.brandsearch.co</text>
+    <text x="466" y="50" font-size="10" fill="var(--muted)">who is selling best, per store</text>
+
+    <!-- ═══ PHASE 1 ═══ -->
+    <rect x="8" y="74" width="684" height="268" rx="13" fill="var(--soft)" stroke="var(--blue)" stroke-width="1.5"/>
+    <text x="22" y="95" font-size="12" font-weight="800" letter-spacing=".07em" fill="var(--blue)">PHASE 1 · UIPATH ON THE WINDOWS VM · 149.104.69.201</text>
+
+    <text x="80" y="130" text-anchor="end" font-size="10.5" font-weight="700" fill="var(--muted)">12:00 AM</text>
+    <rect x="90" y="106" width="340" height="48" rx="9" fill="var(--blue-soft)" stroke="var(--blue)"/>
+    <text x="106" y="126" font-size="12" font-weight="700" fill="var(--blue)">Bot 1 · Csv Scraper</text>
+    <text x="106" y="142" font-size="10" fill="var(--muted)">pages through every store's feed, writes one 49-column CSV each</text>
+
+    <text x="80" y="188" text-anchor="end" font-size="10.5" font-weight="700" fill="var(--muted)">06:00 AM</text>
+    <rect x="90" y="164" width="340" height="48" rx="9" fill="var(--blue-soft)" stroke="var(--blue)"/>
+    <text x="106" y="184" font-size="12" font-weight="700" fill="var(--blue)">Bot 2 · BrandSearch</text>
+    <text x="106" y="200" font-size="10" fill="var(--muted)">reads the top 20, marks them inside that CSV — matched by handle</text>
+
+    <text x="80" y="246" text-anchor="end" font-size="10.5" font-weight="700" fill="var(--muted)">08:00 AM</text>
+    <rect x="90" y="222" width="340" height="48" rx="9" fill="var(--blue-soft)" stroke="var(--blue)"/>
+    <text x="106" y="242" font-size="12" font-weight="700" fill="var(--blue)">Bot 3 · Csv Uploader</text>
+    <text x="106" y="258" font-size="10" fill="var(--muted)">only if the other two finished: files the day and uploads it</text>
+
+    <!-- the sheet -->
+    <rect x="450" y="106" width="240" height="106" rx="10" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.4"/>
+    <text x="466" y="126" font-size="11.5" font-weight="700" fill="var(--amber)">Google Sheet · Shopify_Scraper</text>
+    <text x="466" y="144" font-size="10" fill="var(--ink-2)">the store list — one row per store</text>
+    <text x="466" y="159" font-size="10" fill="var(--ink-2)">the queue — Fail or empty = still to do</text>
+    <text x="466" y="174" font-size="10" fill="var(--ink-2)">the result — pass / fail and the reason</text>
+    <text x="466" y="189" font-size="10" fill="var(--ink-2)">the top-20 handles per store</text>
+    <text x="466" y="205" font-size="9.5" fill="var(--muted)">the bots never call each other — they meet here</text>
+
+    <rect x="450" y="222" width="240" height="48" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="466" y="240" font-size="10.5" font-weight="700" fill="var(--ink)">add a store = add a row</text>
+    <text x="466" y="256" font-size="9.5" fill="var(--muted)">242 today; the list is meant to grow</text>
+
+    <rect x="90" y="286" width="600" height="40" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="106" y="304" font-size="10.5" font-weight="700" fill="var(--ink)">C:\Users\Administrator\Documents\UiPath\Shopify_Scraper\Scrapped_Csv_Files → C:\CSV_Data\&lt;date&gt;</text>
+    <text x="106" y="319" font-size="9.5" fill="var(--muted)">the working folder all three bots share, then the day filed under its own date</text>
+
+    <path d="M260 58 L260 102" stroke="#7d8b9c" stroke-width="1.6" marker-end="url(#w)"/>
+    <path d="M570 58 L570 68 L440 68 L440 186 L446 186" stroke="#7d8b9c" stroke-width="1.4" fill="none" marker-end="url(#w)"/>
+    <path d="M260 156 L260 160" stroke="#7d8b9c" stroke-width="1.6" marker-end="url(#w)"/>
+    <path d="M260 214 L260 218" stroke="#7d8b9c" stroke-width="1.6" marker-end="url(#w)"/>
+    <path d="M260 272 L260 282" stroke="#7d8b9c" stroke-width="1.6" marker-end="url(#w)"/>
+    <path d="M434 130 L446 130" stroke="#c08a3e" stroke-width="1.3" marker-end="url(#wa)"/>
+    <path d="M434 244 L446 244" stroke="#c08a3e" stroke-width="1.3" marker-end="url(#wa)"/>
+
+    <!-- ═══ THE SEAM ═══ -->
+    <rect x="8" y="354" width="684" height="54" rx="11" fill="var(--green-soft)" stroke="var(--green)" stroke-width="2" stroke-dasharray="7 4"/>
+    <text x="24" y="376" font-size="12" font-weight="800" letter-spacing=".06em" fill="var(--green)">GOOGLE DRIVE · ONE FOLDER PER DAY, NAMED 2026-09-09</text>
+    <text x="24" y="395" font-size="10.5" fill="var(--ink-2)">The only thing the two phases share. The folder's NAME is the date — the files inside are stamped the evening before.</text>
+
+    <path d="M260 330 L260 350" stroke="#3f8f5f" stroke-width="2" marker-end="url(#wg)"/>
+
+    <!-- ═══ PHASE 2 ═══ -->
+    <rect x="8" y="424" width="684" height="272" rx="13" fill="var(--soft)" stroke="var(--green)" stroke-width="1.5"/>
+    <text x="22" y="445" font-size="12" font-weight="800" letter-spacing=".07em" fill="var(--green)">PHASE 2 · NODE + POSTGRES ON THE SERVER · 66.45.238.72</text>
+
+    <text x="80" y="480" text-anchor="end" font-size="10.5" font-weight="700" fill="var(--muted)">11:00 AM</text>
+    <rect x="90" y="456" width="340" height="50" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="106" y="475" font-size="12" font-weight="700" fill="var(--ink)">cron → ingest.mjs</text>
+    <text x="106" y="491" font-size="10" fill="var(--muted)">reads the folder, streams each CSV, compares every variant</text>
+
+    <rect x="450" y="456" width="240" height="50" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="466" y="474" font-size="10.5" font-weight="700" fill="var(--ink)">same as yesterday? skip it</text>
+    <text x="466" y="489" font-size="9.5" fill="var(--muted)">~97% are. 2.5 GB of CSV becomes</text>
+    <text x="466" y="501" font-size="9.5" fill="var(--muted)">~150,000 rows, not 4 million</text>
+
+    <rect x="90" y="518" width="340" height="48" rx="9" fill="var(--green-soft)" stroke="var(--green)"/>
+    <text x="106" y="537" font-size="12" font-weight="700" fill="var(--green)">PostgreSQL 16 · localhost only</text>
+    <text x="106" y="553" font-size="10" fill="var(--muted)">variant_history — one row per real event, never a snapshot</text>
+
+    <rect x="450" y="518" width="240" height="48" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="466" y="536" font-size="10.5" font-weight="700" fill="var(--ink)">10.9M rows · 8.2 GB</text>
+    <text x="466" y="551" font-size="9.5" fill="var(--muted)">10 tables, backed up nightly at 02:30</text>
+
+    <rect x="90" y="578" width="340" height="48" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="106" y="597" font-size="12" font-weight="700" fill="var(--ink)">Express API · port 3200</text>
+    <text x="106" y="613" font-size="10" fill="var(--muted)">19 routes, every one behind a shared token</text>
+
+    <rect x="450" y="578" width="240" height="48" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="466" y="596" font-size="10.5" font-weight="700" fill="var(--ink)">pm2 app "tracker"</text>
+    <text x="466" y="611" font-size="9.5" fill="var(--muted)">~/shopify-store-tracker/tracker</text>
+
+    <text x="80" y="662" text-anchor="end" font-size="10.5" font-weight="700" fill="var(--muted)">any time</text>
+    <rect x="90" y="638" width="340" height="48" rx="9" fill="var(--paper)" stroke="var(--blue)" stroke-width="1.5"/>
+    <text x="106" y="657" font-size="12" font-weight="700" fill="var(--blue)">Vercel · shopify-tracker-web</text>
+    <text x="106" y="673" font-size="10" fill="var(--muted)">static pages + the proxy that holds the token</text>
+
+    <rect x="450" y="638" width="240" height="48" rx="9" fill="var(--paper)" stroke="var(--line-2)"/>
+    <text x="466" y="656" font-size="10.5" font-weight="700" fill="var(--ink)">whoever opens the link</text>
+    <text x="466" y="671" font-size="9.5" fill="var(--muted)">store → product → variant → its history</text>
+
+    <path d="M260 508 L260 514" stroke="#7d8b9c" stroke-width="1.6" marker-end="url(#w)"/>
+    <path d="M260 568 L260 574" stroke="#7d8b9c" stroke-width="1.6" marker-end="url(#w)"/>
+    <path d="M260 628 L260 634" stroke="#7d8b9c" stroke-width="1.6" marker-end="url(#w)"/>
+    <path d="M434 662 L446 662" stroke="#7d8b9c" stroke-width="1.4" marker-end="url(#w)"/>
+    <path d="M434 481 L446 481" stroke="#7d8b9c" stroke-width="1.3" marker-end="url(#w)"/>
+  </svg>
+  </div>
+
+  <div class="grid2" style="margin-top:14px">
+    <div class="card">
+      <h3 style="margin-top:0">Read it as one sentence</h3>
+      <p style="font-size:13.8px">Overnight, three robots ask every store on the sheet for its own catalogue,
+      mark each store's best sellers inside the file, and drop the day on Drive under its date. At 11:00 a
+      Node job reads that folder and writes down <b>only what is different from yesterday</b>. A dashboard on
+      Vercel reads it back.</p>
+      <p style="font-size:13.8px;margin-top:10px">That is the entire project. Everything else on this page is
+      detail about one of those steps.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Why the seam matters</h3>
+      <p style="font-size:13.8px">The two halves share <b>one folder</b> and nothing else. No shared database,
+      no API between them, no code in common.</p>
+      <p style="font-size:13.8px;margin-top:10px">So Phase 2 does not care whether the CSVs came from UiPath,
+      a Python script, or a person copying files by hand — and Phase 1 does not know a database exists. Either
+      side can be rewritten without touching the other, and either can be tested by pointing at a folder.</p>
+    </div>
+  </div>
+</section>
+
 
 <footer>
   <p><b>Phase 1 sources</b> · <code>UiPath_Side_Scraping/Shopify_Scraper_UiPath_Bots.zip</code> — three UiPath
