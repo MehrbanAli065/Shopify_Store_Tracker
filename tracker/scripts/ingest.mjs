@@ -152,18 +152,33 @@ console.log(`  parsed: ${rowCount} rows → ${csvProducts.size} products, ${csvV
 const prior = await one(
   `SELECT id FROM scrape_runs WHERE store_id = $1 AND run_date = $2`, [STORE_ID, RUN_DATE])
 
+/**
+ * What makes a replay unsafe is newer data, not a previous attempt at this one.
+ *
+ * The check used to sit inside `if (prior)`, so it only fired for a day that
+ * had already been ingested. The dangerous case is the opposite: a day that was
+ * MISSED — the store crashed, or its file never arrived — and then later days
+ * went in. Filling that gap now diffs an old file against a newer state and
+ * writes changes that never happened, and nothing stopped it.
+ *
+ * Found on 9 Sep 2026: store 3 crashed on the 7th and 8th, and the guard would
+ * have let both be "filled in" on top of the 9th.
+ */
+const newer = await q(
+  `SELECT run_date FROM scrape_runs WHERE store_id = $1 AND run_date > $2 ORDER BY run_date`,
+  [STORE_ID, RUN_DATE])
+
+if (newer.length) {
+  console.error(
+    `\n  ✗ ${RUN_DATE} is older than data this store already has ` +
+    `(${newer.map(r => r.run_date).join(', ')}).\n` +
+    `    ${prior ? 'Replaying' : 'Filling in'} an older day on top of newer data would ` +
+    `record changes that never happened.\n` +
+    `    Re-ingest the newest date instead, or rebuild the store from scratch.\n`)
+  await close(); process.exit(2)
+}
+
 if (prior) {
-  const newer = await q(
-    `SELECT run_date FROM scrape_runs WHERE store_id = $1 AND run_date > $2 ORDER BY run_date`,
-    [STORE_ID, RUN_DATE])
-  if (newer.length) {
-    console.error(
-      `\n  ✗ ${RUN_DATE} has already been ingested, and newer runs exist ` +
-      `(${newer.map(r => r.run_date).join(', ')}).\n` +
-      `    Replaying an older day on top of newer data would corrupt the history.\n` +
-      `    Re-ingest the newest date instead, or rebuild the store from scratch.\n`)
-    await close(); process.exit(2)
-  }
 
   console.log(`  rewinding the existing ${RUN_DATE} run …`)
   // drop this run's history, then rebuild the current-state layer from what is left

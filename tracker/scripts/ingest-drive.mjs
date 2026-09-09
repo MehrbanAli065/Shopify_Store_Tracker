@@ -97,10 +97,25 @@ function storeFor (name, stores) {
     .sort((a, b) => b.csv_prefix.length - a.csv_prefix.length)[0] || null
 }
 
+/**
+ * A store the size of The Dress Outlet — 382 MB of CSV, 556,000 variants — sits
+ * right at Node's default heap ceiling. It went in fine on 4, 5 and 6 September
+ * and then died on the 7th and the 8th with nothing in the log but Node's own
+ * version banner, which is the last line a heap crash prints. Run on its own
+ * afterwards, on the same day's file, it succeeded in one go.
+ *
+ * So the big ones get room: a heap sized to the file rather than to the
+ * default. Small stores are left alone — they do not need it, and handing every
+ * one of 240 processes a 3 GB ceiling on a 7.9 GB machine invites the kernel to
+ * start killing things instead.
+ */
+const BIG_MB = 200
+
 function runIngest (job) {
   return new Promise(resolve => {
+    const heap = Number(job.mb) > BIG_MB ? ['--max-old-space-size=3072'] : []
     const child = spawn(process.execPath,
-      [path.join(HERE, 'ingest.mjs'), '--store', String(job.store.id),
+      [...heap, path.join(HERE, 'ingest.mjs'), '--store', String(job.store.id),
        '--date', job.date, '--file', job.local],
       { stdio: ['ignore', 'pipe', 'pipe'] })
     let out = ''
@@ -274,7 +289,15 @@ if (!ready.length) { console.log('\n  nothing downloaded\n'); await close(); pro
 // ── ingest ────────────────────────────────────────────────────────
 console.log('')
 const started = Date.now()
-const results = await pool(ready, CONC, runIngest)
+// The heaviest files run first and alone. Three 3 GB ceilings side by side do
+// not fit in 7.9 GB, and the machine is at its emptiest before the rest start.
+const heavy = ready.filter(j => Number(j.mb) > BIG_MB)
+const rest  = ready.filter(j => Number(j.mb) <= BIG_MB)
+if (heavy.length) console.log(`  ${heavy.length} large file(s) first, one at a time\n`)
+const results = [
+  ...await pool(heavy, 1, runIngest),
+  ...await pool(rest, CONC, runIngest),
+]
 
 const ok   = results.filter(r => r.code === 0)
 const fail = results.filter(r => r.code !== 0)
