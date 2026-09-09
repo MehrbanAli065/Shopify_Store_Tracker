@@ -52,9 +52,9 @@ ssh mehrban@66.45.238.72
 
 | | |
 |---|---|
-| App | `~/tracker`, run by `pm2` as `tracker` |
+| App | `~/shopify-store-tracker/tracker`, run by `pm2` as `tracker` |
 | Port | 3200, `HOST=0.0.0.0` (Vercel reaches it directly) |
-| Config | `~/tracker/.env`, mode 600 |
+| Config | `~/shopify-store-tracker/tracker/.env`, mode 600 |
 | Database | `shopify_tracker_db`, user `tracker`, on localhost:5432 |
 | Backups | `~/backup-db.sh` nightly at 02:30, seven kept in `~/backups` |
 
@@ -77,7 +77,7 @@ From `tracker/` on your machine:
 ```bash
 tar czf - --exclude=node_modules --exclude=.env --exclude=vercel-site \
     app.mjs server.mjs package.json package-lock.json lib db scripts public api \
-  | ssh mehrban@66.45.238.72 'tar xzf - -C ~/tracker && cd ~/tracker \
+  | ssh mehrban@66.45.238.72 'tar xzf - -C ~/shopify-store-tracker/tracker && cd ~/shopify-store-tracker/tracker \
       && npm install --omit=dev && pm2 restart tracker --update-env'
 ```
 
@@ -94,7 +94,7 @@ The product finder searches by substring, which no ordinary index serves. After
 the first deploy that carries `db/search-indexes.sql`, run once on the server:
 
 ```bash
-ssh -i ~/.ssh/tracker_deploy mehrban@66.45.238.72 'cd ~/tracker && npm run search:init'
+ssh -i ~/.ssh/tracker_deploy mehrban@66.45.238.72 'cd ~/shopify-store-tracker/tracker && npm run search:init'
 ```
 
 It creates `pg_trgm` and two GIN indexes on `products` — about a minute over

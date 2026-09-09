@@ -113,7 +113,7 @@ try {
 
   console.log('· server par ingest chal rahi hai …\n')
   const remote = [
-    'cd ~/tracker',
+    'cd ~/shopify-store-tracker/tracker',
     `node scripts/ingest-folder.mjs --dir ${REMOTE_DIR} ${passthrough.join(' ')}`.trim(),
   ].join(' && ')
   await run('ssh', [...ssh, SERVER, remote])

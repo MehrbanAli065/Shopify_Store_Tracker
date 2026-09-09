@@ -67,7 +67,7 @@ if (STATUS) {
   process.exit(code)
 }
 
-const cmd = `cd ~/tracker && node scripts/ingest-drive.mjs ${passthrough.join(' ')}`.trim()
+const cmd = `cd ~/shopify-store-tracker/tracker && node scripts/ingest-drive.mjs ${passthrough.join(' ')}`.trim()
 
 if (DETACH) {
   console.log(`\n  ${SERVER} — starting in the background\n`)

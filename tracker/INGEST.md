@@ -182,7 +182,7 @@ nothing can stop it half way.
 It already happens by itself:
 
 ```
-0 6 * * *  /home/mehrban/tracker/scripts/ingest-daily.sh
+0 6 * * *  /home/mehrban/shopify-store-tracker/tracker/scripts/ingest-daily.sh
 ```
 
 **06:00 UTC = 11:00 Asia/Karachi.** The server runs on UTC, so the crontab hour
@@ -223,7 +223,7 @@ no file that day.
 
 ```bash
 ssh -i ~/.ssh/tracker_deploy mehrban@66.45.238.72 \
-  "cd ~/tracker && node -e \"
+  "cd ~/shopify-store-tracker/tracker && node -e \"
     import('dotenv/config').then(async () => {
       const { q } = await import('./lib/db.mjs')
       console.table(await q(\\\`SELECT run_date, count(*)::int stores,
