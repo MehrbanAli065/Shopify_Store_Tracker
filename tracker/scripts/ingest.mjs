@@ -307,11 +307,44 @@ console.log(`  previous state: ${dbProducts.size} products, ${dbVariants.size} v
             (isFirstRun ? '  (first run)' : ''))
 
 // ── 4 · SAFETY: a collapsed feed is a scrape failure, not a store event ──
+//
+// Two corrections, both found on 9 Sep 2026 with Presentopia stuck.
+//
+// The comparison is against products still LISTED, not every product the store
+// has ever had. A product already recorded as gone cannot go again, so counting
+// it makes the feed look like it collapsed when it did not.
+//
+// And a collapse that repeats is not a collapse. One short file is a scrape
+// that went wrong; the same small number three days running is the store,
+// smaller than it was. Without that, this guard deadlocks: removals are
+// skipped, so the stored count never comes down, so tomorrow it trips again.
+// Presentopia sat in it for eleven days — its feed said 68 products every day
+// while the database kept 1,093 of them live and the dashboard showed 1,093.
+// Its own storefront says 68.
+const liveInDb = [...dbProducts.values()].filter(p => p.is_active !== false).length
+
+const collapsed = !isFirstRun && csvProducts.size < liveInDb * 0.5
+
+// The last three runs that saw anything, today excluded — a re-run of today
+// must not read its own earlier attempt as corroboration.
+const recent = collapsed ? await q(
+  `SELECT products_found FROM scrape_runs
+    WHERE store_id = $1 AND run_date < $2 AND products_found > 0
+    ORDER BY run_date DESC LIMIT 3`, [STORE_ID, RUN_DATE]) : []
+
+const tolerance = Math.max(2, Math.round(csvProducts.size * 0.1))
+const steady = recent.length >= 3 &&
+  recent.every(r => Math.abs(r.products_found - csvProducts.size) <= tolerance)
+
 let allowRemovals = true
-if (!isFirstRun && csvProducts.size < dbProducts.size * 0.5) {
+if (collapsed && !steady) {
   allowRemovals = false
-  console.log(`  ⚠ product count collapsed (${dbProducts.size} → ${csvProducts.size}) — ` +
+  console.log(`  ⚠ product count collapsed (${liveInDb} listed → ${csvProducts.size}) — ` +
               `skipping removal detection, run marked partial`)
+} else if (collapsed) {
+  console.log(`  small feed (${liveInDb} listed → ${csvProducts.size}), but the last ` +
+              `${recent.length} runs agree (${recent.map(r => r.products_found).join(', ')}) — ` +
+              `treating it as the store, not a bad file`)
 }
 
 // ── 5 · products: insert new, refresh existing ────────────────────
