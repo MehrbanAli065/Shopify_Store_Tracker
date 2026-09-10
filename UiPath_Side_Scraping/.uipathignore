@@ -1,0 +1,58 @@
+# .uipathignore
+# Ye file project folder mein rakhein — wahan jahan project.json hai.
+# Publish ke waqt neeche wali cheezein package mein NAHI jayengi.
+# Runtime par koi asar nahi — bot inhi paths par likhta rahega.
+#
+# Teenon bots ke liye ek jaisi: Shopify_Scraper, Shopify_BrandSearch_Scraper,
+# Shopify_Scraper_Drive_Uploader
+
+# ── ASAL MASLA: scraped data project ke andar ──
+# (workflows mein ye paths mile: ...\Shopify_Scraper\Scrapped_Csv_Files
+#  aur ...\Shopify_Scraper\Log_File aur ...\Shopify_BrandSearch_Scraper\Logs)
+Scrapped_Csv_Files/
+Scraped_Csv_Files/
+Log_File/
+Logs/
+Output/
+Data/
+Backup/
+Temp/
+
+# ── data files, kahin bhi hon ──
+*.csv
+*.log
+*.tmp
+*.bak
+
+# ── UiPath ke apne cache folders (Studio khud dobara bana leta hai) ──
+.local/
+.screenshots/
+.tmh/
+
+# ── version control aur editor ──
+.git/
+.vs/
+.vscode/
+.idea/
+*.user
+
+# ── Python ka kachra (aap UiPath.Python.Activities use karte hain) ──
+__pycache__/
+*.pyc
+
+# ── Windows ──
+Thumbs.db
+desktop.ini
+
+
+# ═══════════════════════════════════════════════════════════════
+# JAAN BOOJH KAR YAHAN NAHI RAKHE GAYE — inhein kabhi add na karein:
+#
+#   .objects/     Object Repository — runtime par chahiye hota hai
+#   .entities/    Data Service entities — runtime par chahiye
+#   .settings/    project settings — size zero, exclude karne ka faida nahi
+#   *.xlsx        agar kabhi input template rakha to bot toot jayega
+#   *.png *.jpg   agar image-based automation use ki to zaroori ho sakti hain
+#   venv/ *.py    Python scripts aur environment — runtime par chahiye
+#   *.json        project.json aur entry-points.json isi mein aate hain (!)
+# ═══════════════════════════════════════════════════════════════
