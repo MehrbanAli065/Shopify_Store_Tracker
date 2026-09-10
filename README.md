@@ -23,7 +23,7 @@ Web app  ─ store cards → report → history → CSV / PDF
 | Path | What it is |
 |---|---|
 | [`tracker/`](tracker/) | The application — database, ingest, API and frontend |
-| [`For Python/`](For%20Python/) | Drive upload helper used by the scraper VM |
+| [`UiPath_Side_Scraping/`](UiPath_Side_Scraping/) | The UiPath robots that produce the daily CSVs |
 
 Start with [`tracker/README.md`](tracker/README.md) to run it, and
 [`tracker/DEPLOY.md`](tracker/DEPLOY.md) for how the live deployment is put together.

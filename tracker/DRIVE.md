@@ -126,9 +126,9 @@ Then drop `--dry-run` to do it for real.
 
 ## Option C · OAuth refresh token
 
-Use this if you would rather reuse the same Google app the Python uploader
-already uses (`For Python/settings.yaml`). It is equally headless once the
-refresh token exists, but there are more moving parts.
+Use this if you would rather reuse an existing Google OAuth app — the one the
+scraper VM's uploader was registered under, for instance. It is equally
+headless once the refresh token exists, but there are more moving parts.
 
 You need three values in `.env`:
 
