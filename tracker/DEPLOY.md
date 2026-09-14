@@ -69,6 +69,56 @@ survive the machine. The server runs **UTC**; Karachi is five hours ahead.
 | 06:00 | 11:00 | `ingest-daily.sh` | The daily check. It no longer ingests — `RUN_DRIVE=0` — it asks the database what landed and mails two lines. If the VM goes quiet, this mail is how you find out |
 | 06:30 | 11:30 | `backup-db.sh` | `pg_dump` of the whole database. Deliberately **after** the VM, so the newest dump holds the newest day |
 | 07:00 | 12:00 | `cleanup-csv.sh` | Drops a day out of `~/csv` once the database can account for it — at least as many stores recorded as there are CSV files. A day that did not ingest is kept, and the log says why |
+| 07:15 | 12:15 | `security-scan.sh` | Checks the server still looks the way it was verified to. Quiet when nothing changed; mails when something did |
+
+### Checking nothing has been tampered with
+
+Two scanners, both written after a payload was force-pushed into this repo on
+11 Sep 2026 disguised as a font file.
+
+**`security-scan.sh`** runs daily on the server. It is not an antivirus — it is
+a list of facts that were verified by hand, so a change to any of them is
+noticed by a machine rather than by luck: the same two ssh keys, the same four
+cron jobs, no `~/.ssh/rc`, no stored git credentials, the same ten tables and
+five functions, no event triggers, no untrusted procedural language, no font
+file that is secretly text.
+
+Every `EXPECT_` value at the top of it is one of those facts. **When you
+legitimately add an ssh key, a cron job or a database function, update the
+matching line in the same change** — otherwise it mails every morning and gets
+ignored, which is worse than not having it.
+
+```bash
+/home/mehrban/security-scan.sh      # exits 0 when nothing changed
+tail -5 ~/security-scan.log
+```
+
+**`repo-scan.py`** checks a git ref before you trust it. Run it after any pull
+you did not make yourself, and on any branch from someone else:
+
+```bash
+python tracker/scripts/repo-scan.py                    # the working tree
+python tracker/scripts/repo-scan.py --remote origin    # fetch, then scan
+python tracker/scripts/repo-scan.py --history          # every blob ever committed
+```
+
+It exits 1 if anything is flagged. A finding is not proof — it is a file worth
+opening before trusting the ref.
+
+The check that actually caught the real payload was the dullest one: *this file
+claims to be a font and contains text*. The filename is the attacker's choice;
+the content is not.
+
+### One setting worth more than both scanners
+
+That payload ran from `.vscode/tasks.json` with `"runOn": "folderOpen"` — simply
+opening the folder in VS Code executed it. In VS Code, set:
+
+```json
+"task.allowAutomaticTasks": "off"
+```
+
+A repository cannot then run anything just because you looked at it.
 
 Install the crontab from the copy in the repo:
 

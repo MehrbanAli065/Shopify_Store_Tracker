@@ -40,5 +40,6 @@ mehrban.html
 # local copy of the database dump — 295 MB, and the server keeps its own nightly
 _deploy/
 
-# handover credentials — real values, deliberately local only
-CREDENTIALS.local.md
+# anything named *.local.md stays on this machine: handover credentials, and
+# incident notes that should not be published with the code they describe
+*.local.md

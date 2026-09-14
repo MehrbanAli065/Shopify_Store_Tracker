@@ -17,3 +17,9 @@
 # 07:00 UTC is after the VM (~03:20) and after the 06:30 backup, so a day is
 # only dropped once it is in the database AND in a dump.
 0 7 * * * /home/mehrban/cleanup-csv.sh
+
+# The daily check that the server still looks the way it did on 14 Sep 2026:
+# the same two ssh keys, the same four cron jobs, the same ten tables and five
+# functions, no event triggers, no untrusted language, no font file that is
+# secretly text. Quiet when nothing changed; mails when something did.
+15 7 * * * /home/mehrban/security-scan.sh
