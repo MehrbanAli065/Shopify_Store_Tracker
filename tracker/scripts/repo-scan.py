@@ -58,7 +58,19 @@ def looks_textual(data):
     return bool(head) and all(9 <= b < 127 or b in (10, 13) for b in head)
 
 
-def check(path, data, findings):
+# This file has to contain the very strings it searches for, and the deploy
+# notes have to quote them to explain the attack. Both would be flagged every
+# run, and a scanner that always cries wolf is one nobody reads - which is the
+# failure this whole thing exists to avoid.
+#
+# The exclusion is narrow and it is announced. Markdown is skipped only for the
+# content patterns: nothing here executes a .md, and the two structural tests -
+# a new top-level entry, a binary file holding text - still apply to every file
+# whatever it is called.
+SELF = 'tracker/scripts/repo-scan.py'
+
+
+def check(path, data, findings, skipped):
     low = path.lower()
 
     if low.endswith(BINARY_EXT) and len(data) > 200 and looks_textual(data):
@@ -67,6 +79,10 @@ def check(path, data, findings):
 
     if b'\x00' in data[:4096]:
         return  # genuinely binary, the text patterns below cannot apply
+
+    if path == SELF or low.endswith('.md'):
+        skipped.add(path)
+        return
 
     for pat, why in PATTERNS:
         if re.search(pat, data, re.I):
@@ -141,11 +157,15 @@ def main():
         findings.append((name + '/', 'a top-level entry this project has never had'))
 
     n = 0
+    skipped = set()
     for path, data in blobs_of(ref, args.history):
         n += 1
-        check(path, data, findings)
+        check(path, data, findings, skipped)
 
     print('scanned %d blobs in %s%s' % (n, ref, ' (whole history)' if args.history else ''))
+    if skipped:
+        print('%d file(s) exempt from the content patterns (this scanner, and prose that '
+              'quotes them) - the structural tests still applied to them' % len(skipped))
 
     if not findings:
         print('nothing flagged')
