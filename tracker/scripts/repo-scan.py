@@ -30,6 +30,24 @@ EXPECTED_TOP = {
 BINARY_EXT = ('.woff2', '.woff', '.ttf', '.eot', '.otf', '.png', '.jpg',
               '.jpeg', '.gif', '.ico', '.pdf', '.zip', '.gz', '.mp4', '.webp')
 
+# Source people write is wrapped. Obfuscated payloads are one enormous line,
+# whatever else they do - and that is true of every sample seen so far, while
+# the strings in PATTERNS were only true of one of them. This check was added
+# after the list below failed to catch a payload appended to an eslint config:
+# it used a different encoding, so not one of those strings appeared in it.
+SOURCE_EXT = ('.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.py', '.sh',
+              '.ps1', '.bat', '.rb', '.php')
+# Measured on both sides rather than guessed. The longest legitimate line found
+# across these projects is 1,134 characters - an inline SVG <path d="...">,
+# which is naturally one long line. The shortest payload found is 5,295. The
+# threshold sits between them with room either way; move it if a real file ever
+# trips it, and write down what that file was.
+MAX_SOURCE_LINE = 2500
+
+# Minified code is legitimately one long line. It belongs in these places and
+# nowhere else - a config file at the top of a project is not one of them.
+MINIFIED_OK = ('node_modules/', '/dist/', '/build/', '/vendor/', '.min.')
+
 # The single check that caught it: a file claiming to be a font, holding text.
 # Everything else here is a second opinion.
 PATTERNS = [
@@ -79,6 +97,12 @@ def check(path, data, findings, skipped):
 
     if b'\x00' in data[:4096]:
         return  # genuinely binary, the text patterns below cannot apply
+
+    if low.endswith(SOURCE_EXT) and not any(m in low for m in MINIFIED_OK):
+        longest = max((len(ln) for ln in data.split(b'\n')), default=0)
+        if longest > MAX_SOURCE_LINE:
+            findings.append((path, 'a source file with a %d-character line - '
+                                   'people do not write those' % longest))
 
     if path == SELF or low.endswith('.md'):
         skipped.add(path)
@@ -138,6 +162,10 @@ def main():
     ap.add_argument('--remote', help='fetch this remote first, then scan what came back')
     ap.add_argument('--history', action='store_true',
                     help='scan every blob ever committed, not just the current tree')
+    # The layout check knows what THIS project looks like. Pointed at any other
+    # repository it would flag every directory, which is noise, not a finding.
+    ap.add_argument('--no-layout', action='store_true',
+                    help='skip the top-level layout check, for scanning a different project')
     args = ap.parse_args()
 
     ref = args.ref
@@ -148,9 +176,10 @@ def main():
 
     findings = []
 
-    top = {ln.split('\t')[-1].rstrip('/') for ln in git('ls-tree', '--name-only', ref).splitlines()}
-    for name in sorted(top - EXPECTED_TOP):
-        findings.append((name + '/', 'a top-level entry this project has never had'))
+    if not args.no_layout:
+        top = {ln.split('\t')[-1].rstrip('/') for ln in git('ls-tree', '--name-only', ref).splitlines()}
+        for name in sorted(top - EXPECTED_TOP):
+            findings.append((name + '/', 'a top-level entry this project has never had'))
 
     n = 0
     skipped = set()
