@@ -1,0 +1,19 @@
+# Backup at 06:30 UTC (11:30 PKT), not 02:30. The day arrives from the VM at
+# about 03:20, so the old time meant every backup was a day behind - the
+# newest dump never held the newest day. 06:30 is after the VM and after the
+# verification job below.
+30 6 * * * /home/mehrban/backup-db.sh
+
+# Shopify tracker: the daily check. It no longer ingests anything - the VM
+# delivers to ~/csv and ingests there at about 03:20. This asks the database
+# what actually landed and mails two lines. If the VM ever goes quiet, this
+# mail is how you find out.
+# 06:00 UTC = 11:00 Asia/Karachi (the server runs UTC).
+0 6 * * * /home/mehrban/shopify-store-tracker/tracker/scripts/ingest-daily.sh
+# Clear ~/csv once the database can account for a day, rather than once the
+# folder is three days old. The old test asked the wrong question twice: a
+# day that ingested cleanly sat around for three days at 2.6 GB, and a day
+# that never ingested was deleted anyway, taking the only raw copy with it.
+# 07:00 UTC is after the VM (~03:20) and after the 06:30 backup, so a day is
+# only dropped once it is in the database AND in a dump.
+0 7 * * * /home/mehrban/cleanup-csv.sh

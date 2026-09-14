@@ -56,7 +56,27 @@ ssh mehrban@66.45.238.72
 | Port | 3200, `HOST=0.0.0.0` (Vercel reaches it directly) |
 | Config | `~/shopify-store-tracker/tracker/.env`, mode 600 |
 | Database | `shopify_tracker_db`, user `tracker`, on localhost:5432 |
-| Backups | `~/backup-db.sh` nightly at 02:30, seven kept in `~/backups` |
+| Backups | `~/backup-db.sh`, seven kept in `~/backups` — see the cron table below |
+
+### The three cron jobs
+
+All three live in `mehrban`'s crontab and are kept in `tracker/scripts/` so they
+survive the machine. The server runs **UTC**; Karachi is five hours ahead.
+
+| UTC | PKT | Job | What it does |
+|---|---|---|---|
+| ~03:20 | 08:20 | *(not cron)* | The VM delivers the day into `~/csv/<date>` and ingests it there. An Orchestrator trigger, not a cron job |
+| 06:00 | 11:00 | `ingest-daily.sh` | The daily check. It no longer ingests — `RUN_DRIVE=0` — it asks the database what landed and mails two lines. If the VM goes quiet, this mail is how you find out |
+| 06:30 | 11:30 | `backup-db.sh` | `pg_dump` of the whole database. Deliberately **after** the VM, so the newest dump holds the newest day |
+| 07:00 | 12:00 | `cleanup-csv.sh` | Drops a day out of `~/csv` once the database can account for it — at least as many stores recorded as there are CSV files. A day that did not ingest is kept, and the log says why |
+
+Install the crontab from the copy in the repo:
+
+```bash
+crontab tracker/scripts/crontab.txt
+crontab -l                       # check it took
+```
+
 
 Apache holds ports 80/443 with 40 other sites on this machine and is **not** part of
 this deployment. Do not change it without running `apache2ctl configtest` first.

@@ -4,7 +4,8 @@
 #   crontab:  0 6 * * *  /home/mehrban/shopify-store-tracker/tracker/scripts/ingest-daily.sh
 #             06:00 UTC, which is 11:00 in Asia/Karachi — the server runs UTC.
 #
-# Runs ingest-drive.mjs, then asks the database what actually landed and mails
+# The Drive ingest is OFF (see RUN_DRIVE below). What is left is the part that
+# still matters: it asks the database what actually landed and mails
 # that. The numbers come from the database rather than from the script's own
 # output on purpose: if the run dies halfway, parsing its log would report
 # whatever it had printed before dying, while the database still knows the
@@ -17,6 +18,17 @@
 # but the first one may land in spam: this IP has no SPF or DKIM of its own.
 
 set -u
+
+# Drive no longer receives anything. The VM sends the day's CSVs straight into
+# ~/csv and ingests them there, finishing around 03:20 UTC, so running the
+# Drive ingest afterwards only ever printed "nothing to do".
+#
+# The mail below is NOT off, and that is the whole reason this job stays: it
+# is the independent check that the VM really did its work. Nothing else
+# would tell you if the VM had gone quiet.
+#
+# Set this to 1 if Drive is ever the source again.
+RUN_DRIVE=0
 
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$DIR" || exit 1
@@ -34,16 +46,25 @@ STARTED=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
 
 echo "" >> "$LOG"
 echo "===== $STARTED =====" >> "$LOG"
-"$NODE" scripts/ingest-drive.mjs >> "$LOG" 2>&1
-RC=$?
+if [ "$RUN_DRIVE" = "1" ]; then
+  "$NODE" scripts/ingest-drive.mjs >> "$LOG" 2>&1
+  RC=$?
+else
+  echo "  drive ingest is off - the VM delivers straight to ~/csv" >> "$LOG"
+  RC=0
+fi
 
 # ── what the database says, which is the only account that matters ──
 # The run date is the folder the script chose, so it is read back from the log
 # rather than guessed from today's clock — a run just after midnight, or one
 # that fell back to the newest folder, would otherwise be reported as a day
 # with nothing in it.
-DAY=$(sed -n 's/^  day *\([0-9-]\{10\}\).*/\1/p' "$LOG" | tail -1)
-[ -n "$DAY" ] || DAY=$(TZ=${DRIVE_TZ:-Asia/Karachi} date '+%Y-%m-%d')
+if [ "$RUN_DRIVE" = "1" ]; then
+  DAY=$(sed -n 's/^  day *\([0-9-]\{10\}\).*/\1/p' "$LOG" | tail -1)
+fi
+# Not an "else": with the drive step off that line is never written again,
+# and reading the old log would pin DAY to the last day Drive ever ran.
+[ -n "${DAY:-}" ] || DAY=$(TZ=${DRIVE_TZ:-Asia/Karachi} date '+%Y-%m-%d')
 
 read_db() {
   psql "$DATABASE_URL" -X -q -A -t -c "$1" 2>/dev/null | tr -d '[:space:]'

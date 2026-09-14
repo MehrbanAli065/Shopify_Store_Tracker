@@ -1,0 +1,6 @@
+# Shell scripts run on a Linux server. CRLF would break the shebang line and
+# every heredoc in them, and Git on Windows will happily introduce it.
+*.sh text eol=lf
+
+# Same reason: this is installed with `crontab`, which does not tolerate CRLF.
+crontab.txt text eol=lf
