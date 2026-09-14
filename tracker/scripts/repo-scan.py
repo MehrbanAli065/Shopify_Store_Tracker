@@ -104,35 +104,31 @@ def blobs_of(ref, whole_history):
         seen.add(sha)
         want.append((sha, path))
 
-    # One batch process. Per-blob git calls take minutes on a repo this size.
+    # Everything is handed to one `git cat-file --batch` up front and the reply
+    # is read as one stream. The obvious version - write a sha, flush, read the
+    # answer, repeat - spends its whole life in syscalls: with bufsize=0 on
+    # Windows the header alone is read a byte at a time, and a thousand objects
+    # took longer than anyone would wait. A scanner nobody runs is no scanner.
     p = subprocess.Popen(['git', 'cat-file', '--batch'],
-                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0)
-    try:
-        for sha, path in want:
-            p.stdin.write((sha + '\n').encode())
-            p.stdin.flush()
-            header = b''
-            while not header.endswith(b'\n'):
-                c = p.stdout.read(1)
-                if not c:
-                    return
-                header += c
-            bits = header.decode('utf-8', 'replace').split()
-            if len(bits) < 3 or bits[1] != 'blob':
-                continue
-            size = int(bits[2])
-            data = b''
-            while len(data) < size:
-                chunk = p.stdout.read(size - len(data))
-                if not chunk:
-                    break
-                data += chunk
-            p.stdout.read(1)
-            if size <= 3_000_000:
-                yield path, data
-    finally:
-        p.stdin.close()
-        p.wait()
+                         stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    NL = b'\n'
+    out, _ = p.communicate(NL.join(sha.encode() for sha, _ in want) + NL)
+
+    by_sha = dict(want)
+    i = 0
+    while i < len(out):
+        nl = out.find(NL, i)
+        if nl < 0:
+            break
+        bits = out[i:nl].decode('utf-8', 'replace').split()
+        i = nl + 1
+        if len(bits) < 3 or bits[1] != 'blob':
+            continue                      # "<sha> missing", or a tree/commit
+        sha, size = bits[0], int(bits[2])
+        data = out[i:i + size]
+        i += size + 1                     # the object, then its trailing newline
+        if size <= 3_000_000:
+            yield by_sha.get(sha, sha), data
 
 
 def main():
